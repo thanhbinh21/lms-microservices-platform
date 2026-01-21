@@ -1,0 +1,173 @@
+_format_version: "3.0"
+_transform: true
+
+# Services - Microservices Backend
+services:
+  - name: auth-service
+    url: http://host.docker.internal:3001
+    routes:
+      - name: auth-route
+        paths:
+          - /auth
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+      - name: correlation-id
+        config:
+          header_name: x-trace-id
+          generator: uuid
+          echo_downstream: true
+
+  - name: course-service
+    url: http://host.docker.internal:3002
+    routes:
+      - name: course-route
+        paths:
+          - /course
+        strip_path: true
+    plugins:
+      - name: jwt
+        config:
+          secret_is_base64: false
+          key_claim_name: kid
+          claims_to_verify:
+            - exp
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - x-user-id:$(headers.x-user-id)
+              - x-user-role:$(headers.x-user-role)
+      - name: correlation-id
+        config:
+          header_name: x-trace-id
+          generator: uuid
+          echo_downstream: true
+
+  - name: payment-service
+    url: http://host.docker.internal:3003
+    routes:
+      - name: payment-route
+        paths:
+          - /payment
+        strip_path: true
+    plugins:
+      - name: jwt
+        config:
+          secret_is_base64: false
+          key_claim_name: kid
+          claims_to_verify:
+            - exp
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - x-user-id:$(headers.x-user-id)
+              - x-user-role:$(headers.x-user-role)
+      - name: correlation-id
+        config:
+          header_name: x-trace-id
+          generator: uuid
+          echo_downstream: true
+
+  - name: media-service
+    url: http://host.docker.internal:3004
+    routes:
+      - name: media-route
+        paths:
+          - /media
+        strip_path: true
+    plugins:
+      - name: jwt
+        config:
+          secret_is_base64: false
+          key_claim_name: kid
+          claims_to_verify:
+            - exp
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - x-user-id:$(headers.x-user-id)
+              - x-user-role:$(headers.x-user-role)
+      - name: correlation-id
+        config:
+          header_name: x-trace-id
+          generator: uuid
+          echo_downstream: true
+
+  - name: notification-service
+    url: http://host.docker.internal:3005
+    routes:
+      - name: notification-route
+        paths:
+          - /notification
+        strip_path: true
+    plugins:
+      - name: jwt
+        config:
+          secret_is_base64: false
+          key_claim_name: kid
+          claims_to_verify:
+            - exp
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - x-user-id:$(headers.x-user-id)
+              - x-user-role:$(headers.x-user-role)
+      - name: correlation-id
+        config:
+          header_name: x-trace-id
+          generator: uuid
+          echo_downstream: true
+
+# Global Plugins
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        - OPTIONS
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - x-trace-id
+      exposed_headers:
+        - x-trace-id
+      credentials: true
+      max_age: 3600
+
+# JWT Consumers (will be managed by auth-service)
+# This is placeholder - actual JWT validation will use auth-service's public key
