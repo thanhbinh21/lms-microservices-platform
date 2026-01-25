@@ -20,7 +20,7 @@ out
 .env.production.local
 
 # Sensitive files - DO NOT COMMIT
-README.md
+READMECODE.md
 project_structure.md
 .github/
 
