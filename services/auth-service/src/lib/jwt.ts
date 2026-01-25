@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { logger } from '@lms/logger';
 
 interface JwtPayload {
@@ -23,10 +23,12 @@ export function generateAccessToken(
   secret: string,
   expiresIn: string = '15m'
 ): string {
-  const token = jwt.sign(payload, secret, {
+  const options: SignOptions = {
+    // @ts-ignore - jsonwebtoken accepts string for expiresIn despite type definition
     expiresIn,
     algorithm: 'HS256',
-  });
+  };
+  const token = jwt.sign(payload, secret, options);
 
   logger.debug({ userId: payload.userId }, 'Access token generated');
   return token;
@@ -43,10 +45,12 @@ export function generateRefreshToken(
   secret: string,
   expiresIn: string = '7d'
 ): string {
-  const token = jwt.sign(payload, secret, {
+  const options: SignOptions = {
+    // @ts-ignore - jsonwebtoken accepts string for expiresIn despite type definition
     expiresIn,
     algorithm: 'HS256',
-  });
+  };
+  const token = jwt.sign(payload, secret, options);
 
   logger.debug({ userId: payload.userId }, 'Refresh token generated');
   return token;
