@@ -61,7 +61,7 @@ services:
 
   # Kong API Gateway (DB-less mode)
   kong:
-    image: kong:3.5-alpine
+    image: kong/kong-gateway:3.5
     container_name: lms-kong-gateway
     environment:
       KONG_DATABASE: 'off'

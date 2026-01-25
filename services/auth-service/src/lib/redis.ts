@@ -1,13 +1,13 @@
-import { createClient } from 'redis';
+import { createClient, RedisClientType } from 'redis';
 import { logger } from '@lms/logger';
 
-let redisClient: ReturnType<typeof createClient> | null = null;
+let redisClient: RedisClientType | null = null;
 
 /**
  * Initialize Redis client for session storage
  * Session TTL: 7 days (matches refresh token expiry)
  */
-export async function initRedis(redisUrl: string) {
+export async function initRedis(redisUrl: string): Promise<RedisClientType> {
   if (redisClient) {
     return redisClient;
   }
