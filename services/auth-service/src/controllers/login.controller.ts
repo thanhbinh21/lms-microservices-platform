@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -6,19 +7,19 @@ import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma.js';
 import { generateTokenPair } from '../lib/jwt.js';
 import { setSession } from '../lib/redis.js';
+import { getEnv } from '../lib/env.js';
 
-// Validation schema
+// Schema dang nhap
 const loginSchema = z.object({
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().email('Email khong hop le'),
+  password: z.string().min(1, 'Vui long nhap mat khau'),
 });
 
-/**
- * POST /login
- * Authenticate existing user
- */
+const REFRESH_TOKEN_DAYS = 7;
+
+/** POST /login - Xac thuc nguoi dung */
 export async function login(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string;
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
 
   try {
     // Validate request body
@@ -54,20 +55,16 @@ export async function login(req: Request, res: Response) {
       return res.status(401).json(response);
     }
 
-    // Generate JWT tokens
-    const jwtSecret = process.env.JWT_SECRET!;
+    // Tao cap token JWT
+    const env = getEnv();
     const tokens = generateTokenPair(
-      {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-      },
-      jwtSecret
+      { userId: user.id, email: user.email, role: user.role },
+      env.JWT_SECRET,
     );
 
-    // Store refresh token in database
+    // Luu refresh token vao DB
     const refreshTokenExpiry = new Date();
-    refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 7); // 7 days
+    refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + REFRESH_TOKEN_DAYS);
 
     await prisma.refreshToken.create({
       data: {

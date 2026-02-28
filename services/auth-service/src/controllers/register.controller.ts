@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -6,21 +7,23 @@ import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma.js';
 import { generateTokenPair } from '../lib/jwt.js';
 import { setSession } from '../lib/redis.js';
+import { getEnv } from '../lib/env.js';
 
-// Validation schemas
+// Schema dang ky - ADMIN chi duoc tao boi admin hien tai, khong cho phep tu dang ky
 const registerSchema = z.object({
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  role: z.enum(['STUDENT', 'INSTRUCTOR', 'ADMIN']).default('STUDENT'),
+  email: z.string().email('Email khong hop le'),
+  password: z.string().min(8, 'Mat khau toi thieu 8 ky tu'),
+  name: z.string().min(2, 'Ten toi thieu 2 ky tu'),
+  role: z.enum(['STUDENT', 'INSTRUCTOR']).default('STUDENT'),
 });
 
-/**
- * POST /register
- * Register new user account
- */
+// Hang so cau hinh
+const BCRYPT_SALT_ROUNDS = 10;
+const REFRESH_TOKEN_DAYS = 7;
+
+/** POST /register - Dang ky tai khoan moi */
 export async function register(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string;
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
 
   try {
     // Validate request body
@@ -42,8 +45,8 @@ export async function register(req: Request, res: Response) {
       return res.status(409).json(response);
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(validatedData.password, 10);
+    // Ma hoa mat khau
+    const hashedPassword = await bcrypt.hash(validatedData.password, BCRYPT_SALT_ROUNDS);
 
     // Create user
     const user = await prisma.user.create({
@@ -62,20 +65,16 @@ export async function register(req: Request, res: Response) {
       },
     });
 
-    // Generate JWT tokens
-    const jwtSecret = process.env.JWT_SECRET!;
+    // Tao cap token JWT
+    const env = getEnv();
     const tokens = generateTokenPair(
-      {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-      },
-      jwtSecret
+      { userId: user.id, email: user.email, role: user.role },
+      env.JWT_SECRET,
     );
 
-    // Store refresh token in database
+    // Luu refresh token vao DB
     const refreshTokenExpiry = new Date();
-    refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 7); // 7 days
+    refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + REFRESH_TOKEN_DAYS);
 
     await prisma.refreshToken.create({
       data: {
@@ -85,7 +84,7 @@ export async function register(req: Request, res: Response) {
       },
     });
 
-    // Store session in Redis
+    // Luu session vao Redis
     await setSession(user.id, {
       email: user.email,
       role: user.role,

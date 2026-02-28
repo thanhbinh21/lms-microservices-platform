@@ -23,8 +23,9 @@ import {
   updateLesson,
   deleteLesson,
 } from './controllers/lesson.controller';
+import { requireAuth, requireRole } from './middleware/require-auth';
 
-// Validate environment on startup — crashes with clear error if missing
+// Validate bien moi truong khi khoi dong
 validateCourseServiceEnv();
 
 const app = express();
@@ -32,10 +33,10 @@ const PORT = process.env.PORT || 3002;
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
-app.use(express.json());
+app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000', credentials: true }));
+app.use(express.json({ limit: '1mb' }));
 
-// Request logging
+// Ghi log request
 app.use((req: Request, _res: Response, next: NextFunction) => {
   logger.info({ method: req.method, url: req.url, traceId: req.headers['x-trace-id'] }, 'Incoming request');
   next();
@@ -58,21 +59,22 @@ app.get('/api/courses', listCourses);
 app.get('/api/courses/:slug', getCourseBySlug);
 
 // ─── Instructor Routes (Kong injects x-user-id, x-user-role) ─────────────────
-app.get('/api/instructor/courses', getInstructorCourses);
-app.post('/api/courses', createCourse);
-app.put('/api/courses/:id', updateCourse);
-app.delete('/api/courses/:id', deleteCourse);
+// requireRole middleware: validates header exists + role check, sets res.locals.userId
+app.get('/api/instructor/courses', requireAuth, getInstructorCourses);
+app.post('/api/courses', ...requireRole('instructor', 'admin'), createCourse);
+app.put('/api/courses/:id', ...requireRole('instructor', 'admin'), updateCourse);
+app.delete('/api/courses/:id', ...requireRole('instructor', 'admin'), deleteCourse);
 
 // Chapter routes
-app.post('/api/courses/:courseId/chapters', createChapter);
-app.put('/api/courses/:courseId/chapters/:chapterId', updateChapter);
-app.delete('/api/courses/:courseId/chapters/:chapterId', deleteChapter);
-app.put('/api/courses/:courseId/chapters/reorder', reorderChapters);
+app.post('/api/courses/:courseId/chapters', ...requireRole('instructor', 'admin'), createChapter);
+app.put('/api/courses/:courseId/chapters/:chapterId', ...requireRole('instructor', 'admin'), updateChapter);
+app.delete('/api/courses/:courseId/chapters/:chapterId', ...requireRole('instructor', 'admin'), deleteChapter);
+app.put('/api/courses/:courseId/chapters/reorder', ...requireRole('instructor', 'admin'), reorderChapters);
 
-// Lesson routes
-app.post('/api/courses/:courseId/chapters/:chapterId/lessons', createLesson);
-app.put('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', updateLesson);
-app.delete('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', deleteLesson);
+// Route bai hoc
+app.post('/api/courses/:courseId/chapters/:chapterId/lessons', ...requireRole('instructor', 'admin'), createLesson);
+app.put('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), updateLesson);
+app.delete('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), deleteLesson);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {
@@ -101,13 +103,13 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
 const server = app.listen(PORT, () => {
-  logger.info(`🚀 [COURSE-SERVICE] Running on port ${PORT}`);
-  logger.info(`📍 Environment: ${process.env.NODE_ENV}`);
+  logger.info(`[COURSE-SERVICE] Da khoi dong tren port ${PORT}`);
+  logger.info(`Moi truong: ${process.env.NODE_ENV}`);
 });
 
-// Graceful shutdown
+// Tat server an toan
 const shutdown = (signal: string) => {
-  logger.info(`${signal} received — shutting down`);
+  logger.info(`${signal} - dang tat server`);
   server.close(() => {
     logger.info('Server closed');
     process.exit(0);

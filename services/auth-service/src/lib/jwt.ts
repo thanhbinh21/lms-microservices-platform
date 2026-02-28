@@ -5,6 +5,7 @@ interface JwtPayload {
   userId: string;
   email: string;
   role: string;
+  type?: 'access' | 'refresh';
 }
 
 interface TokenPair {
@@ -12,53 +13,41 @@ interface TokenPair {
   refreshToken: string;
 }
 
-/**
- * Generate JWT access token
- * @param payload - User data to embed in token
- * @param secret - JWT secret key
- * @param expiresIn - Token expiry (default: 15m)
- */
+// Thoi gian het han mac dinh
+const DEFAULT_ACCESS_EXPIRY = '15m';
+const DEFAULT_REFRESH_EXPIRY = '7d';
+
+/** Tao access token - het han ngan, dung cho API request */
 export function generateAccessToken(
   payload: JwtPayload,
   secret: string,
-  expiresIn: string = '15m'
+  expiresIn?: string,
 ): string {
   const options: SignOptions = {
-    // @ts-ignore - jsonwebtoken accepts string for expiresIn despite type definition
-    expiresIn,
+    expiresIn: (expiresIn || process.env.JWT_ACCESS_EXPIRY || DEFAULT_ACCESS_EXPIRY) as SignOptions['expiresIn'],
     algorithm: 'HS256',
   };
-  const token = jwt.sign(payload, secret, options);
-
-  logger.debug({ userId: payload.userId }, 'Access token generated');
+  const token = jwt.sign({ ...payload, type: 'access' }, secret, options);
+  logger.debug({ userId: payload.userId }, 'Access token da tao');
   return token;
 }
 
-/**
- * Generate JWT refresh token
- * @param payload - User data to embed in token
- * @param secret - JWT secret key
- * @param expiresIn - Token expiry (default: 7d)
- */
+/** Tao refresh token - het han dai, dung de lam moi access token */
 export function generateRefreshToken(
   payload: JwtPayload,
   secret: string,
-  expiresIn: string = '7d'
+  expiresIn?: string,
 ): string {
   const options: SignOptions = {
-    // @ts-ignore - jsonwebtoken accepts string for expiresIn despite type definition
-    expiresIn,
+    expiresIn: (expiresIn || process.env.JWT_REFRESH_EXPIRY || DEFAULT_REFRESH_EXPIRY) as SignOptions['expiresIn'],
     algorithm: 'HS256',
   };
-  const token = jwt.sign(payload, secret, options);
-
-  logger.debug({ userId: payload.userId }, 'Refresh token generated');
+  const token = jwt.sign({ ...payload, type: 'refresh' }, secret, options);
+  logger.debug({ userId: payload.userId }, 'Refresh token da tao');
   return token;
 }
 
-/**
- * Generate both access and refresh tokens
- */
+/** Tao cap access + refresh token */
 export function generateTokenPair(payload: JwtPayload, secret: string): TokenPair {
   return {
     accessToken: generateAccessToken(payload, secret),
@@ -66,34 +55,15 @@ export function generateTokenPair(payload: JwtPayload, secret: string): TokenPai
   };
 }
 
-/**
- * Verify JWT token
- * @param token - JWT token string
- * @param secret - JWT secret key
- * @returns Decoded payload or null if invalid
- */
+/** Xac thuc token - tra ve payload hoac null neu khong hop le */
 export function verifyToken(token: string, secret: string): JwtPayload | null {
   try {
     const decoded = jwt.verify(token, secret, {
       algorithms: ['HS256'],
     });
-
     return decoded as JwtPayload;
   } catch (err) {
-    logger.warn({ err }, 'Token verification failed');
-    return null;
-  }
-}
-
-/**
- * Decode token without verification (for debugging)
- */
-export function decodeToken(token: string): JwtPayload | null {
-  try {
-    const decoded = jwt.decode(token);
-    return decoded as JwtPayload;
-  } catch (err) {
-    logger.warn({ err }, 'Token decode failed');
+    logger.warn({ err }, 'Xac thuc token that bai');
     return null;
   }
 }

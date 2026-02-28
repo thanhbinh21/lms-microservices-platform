@@ -1,18 +1,19 @@
+import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { logger } from '@lms/logger';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
+import { handlePrismaError } from '../lib/prisma-errors';
 
-// ─── Validation Schemas ───────────────────────────────────────────────────────
-
+// Schema tao khoa hoc
 const createCourseSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters'),
+  title: z.string().min(3, 'Tieu de toi thieu 3 ky tu'),
   description: z.string().optional(),
-  price: z.number().min(0, 'Price must be non-negative').default(0),
+  price: z.number().min(0, 'Gia phai >= 0').default(0),
   level: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']).default('BEGINNER'),
 });
 
+// Schema cap nhat khoa hoc
 const updateCourseSchema = z.object({
   title: z.string().min(3).optional(),
   description: z.string().optional(),
@@ -22,15 +23,7 @@ const updateCourseSchema = z.object({
   thumbnail: z.string().url().optional(),
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getInstructorId(req: Request): string {
-  // Kong Gateway injects x-user-id — trust this header, never re-verify JWT
-  const userId = req.headers['x-user-id'] as string;
-  if (!userId) throw new Error('Missing x-user-id header from Gateway');
-  return userId;
-}
-
+// Tao slug tu tieu de
 function generateSlug(title: string): string {
   return title
     .toLowerCase()
@@ -40,14 +33,33 @@ function generateSlug(title: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-// ─── Controllers ──────────────────────────────────────────────────────────────
+/** Tao slug duy nhat - them -1, -2, -3 neu bi trung */
+async function generateUniqueSlug(title: string, excludeId?: string): Promise<string> {
+  const base = generateSlug(title);
+  let slug = base;
+  let counter = 1;
+  for (;;) {
+    const existing = await prisma.course.findFirst({
+      where: { slug, ...(excludeId ? { NOT: { id: excludeId } } : {}) },
+      select: { id: true },
+    });
+    if (!existing) return slug;
+    slug = `${base}-${counter++}`;
+  }
+}
 
 /**
- * GET /api/courses
- * Public — list all published courses with pagination
+ * Chuyen Decimal (truong price) thanh number de JSON serialize.
  */
+function serializeCourse<T extends { price: unknown }>(course: T): Omit<T, 'price'> & { price: number } {
+  return { ...course, price: Number(course.price) };
+}
+
+// ─── Controllers ──────────────────────────────────────────────────────────────
+
+/** GET /api/courses - Danh sach khoa hoc da xuat ban (co phan trang) */
 export async function listCourses(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string || '';
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
@@ -57,17 +69,9 @@ export async function listCourses(req: Request, res: Response) {
       prisma.course.findMany({
         where: { status: 'PUBLISHED' },
         select: {
-          id: true,
-          title: true,
-          slug: true,
-          description: true,
-          thumbnail: true,
-          price: true,
-          level: true,
-          instructorId: true,
-          totalLessons: true,
-          totalDuration: true,
-          createdAt: true,
+          id: true, title: true, slug: true, description: true,
+          thumbnail: true, price: true, level: true, instructorId: true,
+          totalLessons: true, totalDuration: true, createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -76,27 +80,20 @@ export async function listCourses(req: Request, res: Response) {
       prisma.course.count({ where: { status: 'PUBLISHED' } }),
     ]);
 
-    const response: ApiResponse<{ courses: typeof courses; total: number; page: number; limit: number }> = {
-      success: true,
-      code: 200,
-      message: 'Courses fetched successfully',
-      data: { courses, total, page, limit },
+    const response: ApiResponse<unknown> = {
+      success: true, code: 200, message: 'Courses fetched successfully',
+      data: { courses: courses.map(serializeCourse), total, page, limit },
       trace_id: traceId,
     };
     return res.status(200).json(response);
   } catch (err) {
-    logger.error({ err }, 'listCourses error');
-    const response: ApiResponse<null> = { success: false, code: 500, message: 'Failed to fetch courses', data: null, trace_id: traceId };
-    return res.status(500).json(response);
+    return handlePrismaError(err, res, traceId, 'listCourses');
   }
 }
 
-/**
- * GET /api/courses/:slug
- * Public — get course detail with full curriculum
- */
+/** GET /api/courses/:slug - Chi tiet khoa hoc voi chuong trinh giang day */
 export async function getCourseBySlug(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string || '';
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
   try {
     const course = await prisma.course.findUnique({
       where: { slug: req.params.slug, status: 'PUBLISHED' },
@@ -114,7 +111,6 @@ export async function getCourseBySlug(req: Request, res: Response) {
                 order: true,
                 duration: true,
                 isFree: true,
-                // videoUrl excluded — only accessible for enrolled users
               },
             },
           },
@@ -123,64 +119,50 @@ export async function getCourseBySlug(req: Request, res: Response) {
     });
 
     if (!course) {
-      const response: ApiResponse<null> = { success: false, code: 404, message: 'Course not found', data: null, trace_id: traceId };
-      return res.status(404).json(response);
+      const notFound: ApiResponse<null> = {
+        success: false, code: 404, message: 'Course not found', data: null, trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
     }
 
-    const response: ApiResponse<typeof course> = {
-      success: true,
-      code: 200,
-      message: 'Course fetched successfully',
-      data: course,
-      trace_id: traceId,
+    const response: ApiResponse<unknown> = {
+      success: true, code: 200, message: 'Course fetched successfully',
+      data: serializeCourse(course), trace_id: traceId,
     };
     return res.status(200).json(response);
   } catch (err) {
-    logger.error({ err }, 'getCourseBySlug error');
-    const response: ApiResponse<null> = { success: false, code: 500, message: 'Failed to fetch course', data: null, trace_id: traceId };
-    return res.status(500).json(response);
+    return handlePrismaError(err, res, traceId, 'getCourseBySlug');
   }
 }
 
-/**
- * GET /api/instructor/courses
- * Instructor — get own courses (including DRAFT)
- */
+/** GET /api/instructor/courses - Lay danh sach khoa hoc cua giang vien */
 export async function getInstructorCourses(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string || '';
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
   try {
-    const instructorId = getInstructorId(req);
     const courses = await prisma.course.findMany({
       where: { instructorId },
       include: { _count: { select: { chapters: true, enrollments: true } } },
       orderBy: { updatedAt: 'desc' },
     });
 
-    const response: ApiResponse<typeof courses> = {
-      success: true, code: 200, message: 'Instructor courses fetched', data: courses, trace_id: traceId,
+    const response: ApiResponse<unknown> = {
+      success: true, code: 200, message: 'Instructor courses fetched',
+      data: courses.map(serializeCourse), trace_id: traceId,
     };
     return res.status(200).json(response);
   } catch (err) {
-    logger.error({ err }, 'getInstructorCourses error');
-    const response: ApiResponse<null> = { success: false, code: 500, message: 'Failed to fetch courses', data: null, trace_id: traceId };
-    return res.status(500).json(response);
+    return handlePrismaError(err, res, traceId, 'getInstructorCourses');
   }
 }
 
-/**
- * POST /api/courses
- * Instructor — create a new course
- */
+/** POST /api/courses - Tao khoa hoc moi */
 export async function createCourse(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string || '';
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
   try {
-    const instructorId = getInstructorId(req);
     const validated = createCourseSchema.parse(req.body);
-
-    // Generate unique slug
-    let slug = generateSlug(validated.title);
-    const existing = await prisma.course.findUnique({ where: { slug } });
-    if (existing) slug = `${slug}-${Date.now()}`;
+    const slug = await generateUniqueSlug(validated.title);
 
     const course = await prisma.course.create({
       data: {
@@ -193,48 +175,48 @@ export async function createCourse(req: Request, res: Response) {
       },
     });
 
-    const response: ApiResponse<typeof course> = {
-      success: true, code: 201, message: 'Course created successfully', data: course, trace_id: traceId,
+    const response: ApiResponse<unknown> = {
+      success: true, code: 201, message: 'Course created successfully',
+      data: serializeCourse(course), trace_id: traceId,
     };
     return res.status(201).json(response);
   } catch (err) {
     if (err instanceof z.ZodError) {
-      const response: ApiResponse<null> = { success: false, code: 400, message: err.errors[0].message, data: null, trace_id: traceId };
-      return res.status(400).json(response);
+      const bad: ApiResponse<null> = {
+        success: false, code: 400, message: err.errors[0].message, data: null, trace_id: traceId,
+      };
+      return res.status(400).json(bad);
     }
-    logger.error({ err }, 'createCourse error');
-    const response: ApiResponse<null> = { success: false, code: 500, message: 'Failed to create course', data: null, trace_id: traceId };
-    return res.status(500).json(response);
+    return handlePrismaError(err, res, traceId, 'createCourse');
   }
 }
 
-/**
- * PUT /api/courses/:id
- * Instructor — update own course
- */
+/** PUT /api/courses/:id - Cap nhat khoa hoc (admin duoc phep cap nhat moi khoa hoc) */
 export async function updateCourse(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string || '';
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = res.locals.userRole as string;
   try {
-    const instructorId = getInstructorId(req);
     const validated = updateCourseSchema.parse(req.body);
 
-    // Ownership check
     const course = await prisma.course.findUnique({ where: { id: req.params.id } });
     if (!course) {
-      const response: ApiResponse<null> = { success: false, code: 404, message: 'Course not found', data: null, trace_id: traceId };
-      return res.status(404).json(response);
+      const notFound: ApiResponse<null> = {
+        success: false, code: 404, message: 'Khong tim thay khoa hoc', data: null, trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
     }
-    if (course.instructorId !== instructorId) {
-      const response: ApiResponse<null> = { success: false, code: 403, message: 'Forbidden — not your course', data: null, trace_id: traceId };
-      return res.status(403).json(response);
+    // Admin duoc phep cap nhat bat ky khoa hoc nao
+    if (course.instructorId !== instructorId && userRole !== 'admin') {
+      const forbidden: ApiResponse<null> = {
+        success: false, code: 403, message: 'Khong co quyen - khong phai khoa hoc cua ban', data: null, trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
     }
 
-    // Re-generate slug if title changes
     let slug = course.slug;
     if (validated.title && validated.title !== course.title) {
-      slug = generateSlug(validated.title);
-      const existing = await prisma.course.findFirst({ where: { slug, NOT: { id: course.id } } });
-      if (existing) slug = `${slug}-${Date.now()}`;
+      slug = await generateUniqueSlug(validated.title, course.id);
     }
 
     const updated = await prisma.course.update({
@@ -242,42 +224,48 @@ export async function updateCourse(req: Request, res: Response) {
       data: { ...validated, slug },
     });
 
-    const response: ApiResponse<typeof updated> = {
-      success: true, code: 200, message: 'Course updated successfully', data: updated, trace_id: traceId,
+    const response: ApiResponse<unknown> = {
+      success: true, code: 200, message: 'Course updated successfully',
+      data: serializeCourse(updated), trace_id: traceId,
     };
     return res.status(200).json(response);
   } catch (err) {
     if (err instanceof z.ZodError) {
-      const response: ApiResponse<null> = { success: false, code: 400, message: err.errors[0].message, data: null, trace_id: traceId };
-      return res.status(400).json(response);
+      const bad: ApiResponse<null> = {
+        success: false, code: 400, message: err.errors[0].message, data: null, trace_id: traceId,
+      };
+      return res.status(400).json(bad);
     }
-    logger.error({ err }, 'updateCourse error');
-    const response: ApiResponse<null> = { success: false, code: 500, message: 'Failed to update course', data: null, trace_id: traceId };
-    return res.status(500).json(response);
+    return handlePrismaError(err, res, traceId, 'updateCourse');
   }
 }
 
-/**
- * DELETE /api/courses/:id
- * Instructor — delete own course (only DRAFT allowed)
- */
+/** DELETE /api/courses/:id - Xoa khoa hoc (chi DRAFT, admin duoc phep) */
 export async function deleteCourse(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string || '';
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = res.locals.userRole as string;
   try {
-    const instructorId = getInstructorId(req);
     const course = await prisma.course.findUnique({ where: { id: req.params.id } });
-
     if (!course) {
-      const response: ApiResponse<null> = { success: false, code: 404, message: 'Course not found', data: null, trace_id: traceId };
-      return res.status(404).json(response);
+      const notFound: ApiResponse<null> = {
+        success: false, code: 404, message: 'Khong tim thay khoa hoc', data: null, trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
     }
-    if (course.instructorId !== instructorId) {
-      const response: ApiResponse<null> = { success: false, code: 403, message: 'Forbidden — not your course', data: null, trace_id: traceId };
-      return res.status(403).json(response);
+    if (course.instructorId !== instructorId && userRole !== 'admin') {
+      const forbidden: ApiResponse<null> = {
+        success: false, code: 403, message: 'Khong co quyen - khong phai khoa hoc cua ban', data: null, trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
     }
     if (course.status === 'PUBLISHED') {
-      const response: ApiResponse<null> = { success: false, code: 400, message: 'Cannot delete a published course. Archive it first.', data: null, trace_id: traceId };
-      return res.status(400).json(response);
+      const bad: ApiResponse<null> = {
+        success: false, code: 400,
+        message: 'Khong the xoa khoa hoc da xuat ban. Hay luu tru truoc.',
+        data: null, trace_id: traceId,
+      };
+      return res.status(400).json(bad);
     }
 
     await prisma.course.delete({ where: { id: req.params.id } });
@@ -287,8 +275,6 @@ export async function deleteCourse(req: Request, res: Response) {
     };
     return res.status(200).json(response);
   } catch (err) {
-    logger.error({ err }, 'deleteCourse error');
-    const response: ApiResponse<null> = { success: false, code: 500, message: 'Failed to delete course', data: null, trace_id: traceId };
-    return res.status(500).json(response);
+    return handlePrismaError(err, res, traceId, 'deleteCourse');
   }
 }

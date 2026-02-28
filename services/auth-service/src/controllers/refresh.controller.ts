@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { logger } from '@lms/logger';
@@ -5,26 +6,26 @@ import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma.js';
 import { verifyToken, generateTokenPair } from '../lib/jwt.js';
 import { setSession } from '../lib/redis.js';
+import { getEnv } from '../lib/env.js';
 
-// Validation schema
+// Schema xac thuc
 const refreshSchema = z.object({
-  refreshToken: z.string().min(1, 'Refresh token is required'),
+  refreshToken: z.string().min(1, 'Refresh token la bat buoc'),
 });
 
-/**
- * POST /refresh
- * Refresh access token using refresh token
- */
+const REFRESH_TOKEN_DAYS = 7;
+
+/** POST /refresh - Lam moi access token bang refresh token */
 export async function refresh(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string;
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
 
   try {
     // Validate request body
     const validatedData = refreshSchema.parse(req.body);
 
-    // Verify refresh token
-    const jwtSecret = process.env.JWT_SECRET!;
-    const payload = verifyToken(validatedData.refreshToken, jwtSecret);
+    // Xac thuc refresh token
+    const env = getEnv();
+    const payload = verifyToken(validatedData.refreshToken, env.JWT_SECRET);
 
     if (!payload) {
       const response: ApiResponse<null> = {
@@ -71,32 +72,30 @@ export async function refresh(req: Request, res: Response) {
       return res.status(401).json(response);
     }
 
-    // Generate new token pair
+    // Tao cap token moi
     const newTokens = generateTokenPair(
       {
         userId: storedToken.user.id,
         email: storedToken.user.email,
         role: storedToken.user.role,
       },
-      jwtSecret
+      env.JWT_SECRET,
     );
 
-    // Delete old refresh token
-    await prisma.refreshToken.delete({
-      where: { id: storedToken.id },
-    });
-
-    // Store new refresh token
+    // Xoa token cu va tao token moi trong transaction de tranh mat du lieu
     const refreshTokenExpiry = new Date();
-    refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 7); // 7 days
+    refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + REFRESH_TOKEN_DAYS);
 
-    await prisma.refreshToken.create({
-      data: {
-        token: newTokens.refreshToken,
-        userId: storedToken.user.id,
-        expiresAt: refreshTokenExpiry,
-      },
-    });
+    await prisma.$transaction([
+      prisma.refreshToken.delete({ where: { id: storedToken.id } }),
+      prisma.refreshToken.create({
+        data: {
+          token: newTokens.refreshToken,
+          userId: storedToken.user.id,
+          expiresAt: refreshTokenExpiry,
+        },
+      }),
+    ]);
 
     // Update session in Redis
     await setSession(storedToken.user.id, {

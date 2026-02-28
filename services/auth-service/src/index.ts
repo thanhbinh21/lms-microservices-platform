@@ -2,29 +2,29 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { logger } from '@lms/logger';
-import { validateAuthServiceEnv } from '@lms/env-validator';
 import type { ApiResponse } from '@lms/types';
 import { initRedis, closeRedis } from './lib/redis.js';
+import { initEnv } from './lib/env.js';
 import { register } from './controllers/register.controller.js';
 import { login } from './controllers/login.controller.js';
 import { refresh } from './controllers/refresh.controller.js';
 import { logout } from './controllers/logout.controller.js';
 
-// Validate environment variables
-const env = validateAuthServiceEnv();
+// Validate bien moi truong khi khoi dong
+const env = initEnv();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
+// Middleware bao mat
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
-// Request logging
+// Ghi log request
 app.use((req: Request, res: Response, next: NextFunction) => {
   logger.info({
     method: req.method,
@@ -34,7 +34,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Health check
+// Kiem tra suc khoe
 app.get('/health', (req: Request, res: Response) => {
   const response: ApiResponse<any> = {
     success: true,
@@ -50,13 +50,13 @@ app.get('/health', (req: Request, res: Response) => {
   res.json(response);
 });
 
-// Auth routes
+// Routes xac thuc
 app.post('/register', register);
 app.post('/login', login);
 app.post('/refresh', refresh);
 app.post('/logout', logout);
 
-// 404 handler
+// Xu ly 404
 app.use((req: Request, res: Response) => {
   const response: ApiResponse<null> = {
     success: false,
@@ -68,9 +68,9 @@ app.use((req: Request, res: Response) => {
   res.status(404).json(response);
 });
 
-// Global error handler
+// Xu ly loi toan cuc
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  logger.error({ err, traceId: req.headers['x-trace-id'] }, 'Unhandled error');
+  logger.error({ err, traceId: req.headers['x-trace-id'] }, 'Loi khong xu ly');
 
   const response: ApiResponse<null> = {
     success: false,
@@ -82,33 +82,30 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   res.status(500).json(response);
 });
 
-// Start server
+// Khoi dong server
 async function startServer() {
   try {
-    // Initialize Redis
+    // Ket noi Redis
     await initRedis(env.REDIS_URL);
 
     app.listen(PORT, () => {
-      logger.info({ port: PORT }, 'Auth Service started successfully');
-      logger.info('Environment: ' + env.NODE_ENV);
-      logger.info('Database: Connected to Neon PostgreSQL');
-      logger.info('Redis: Connected for session storage');
+      logger.info({ port: PORT }, 'Auth Service da khoi dong');
     });
   } catch (error) {
-    logger.error({ error }, 'Failed to start Auth Service');
+    logger.error({ error }, 'Khoi dong Auth Service that bai');
     process.exit(1);
   }
 }
 
-// Graceful shutdown
+// Tat server an toan
 process.on('SIGINT', async () => {
-  logger.info('Shutting down Auth Service...');
+  logger.info('Dang tat Auth Service...');
   await closeRedis();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  logger.info('Shutting down Auth Service...');
+  logger.info('Dang tat Auth Service...');
   await closeRedis();
   process.exit(0);
 });

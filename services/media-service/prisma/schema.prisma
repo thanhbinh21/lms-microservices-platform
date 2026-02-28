@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum MediaType {
+  VIDEO
+  IMAGE
+  DOCUMENT
+}
+
+enum UploadStatus {
+  PENDING    // Presigned URL generated, awaiting upload
+  UPLOADED   // Upload confirmed by client
+  PROCESSED  // Post-processing done (thumbnail, transcode, etc.)
+  FAILED     // Upload or processing failed
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model MediaAsset {
+  id            String       @id @default(uuid())
+  filename      String                           // Original filename from client
+  storageKey    String       @unique @map("storage_key") // Key in S3 or local path
+  mimeType      String       @map("mime_type")
+  size          Int          @default(0)          // Bytes
+  type          MediaType    @default(VIDEO)
+  status        UploadStatus @default(PENDING)
+
+  // Ownership — cross-service reference (no FK to course_db)
+  uploaderId    String       @map("uploader_id")  // x-user-id from Gateway
+  courseId      String?      @map("course_id")     // Referenced, not FK
+  lessonId      String?      @map("lesson_id")     // Referenced, not FK
+
+  // Storage URLs
+  url           String?                            // Public/CDN URL after upload completes
+  presignedUrl  String?      @map("presigned_url") // Temporary presigned URL for upload
+  presignedExp  DateTime?    @map("presigned_exp") // Presigned URL expiry
+
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@index([uploaderId])
+  @@index([courseId])
+  @@index([lessonId])
+  @@index([status])
+  @@map("media_assets")
+}
