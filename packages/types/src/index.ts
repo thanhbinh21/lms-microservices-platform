@@ -1,4 +1,4 @@
-// API Response Standard
+// Chuan response API thong nhat toan he thong
 export interface ApiResponse<T = any> {
   success: boolean;
   code: number;
@@ -7,21 +7,21 @@ export interface ApiResponse<T = any> {
   trace_id: string;
 }
 
-// User Context (from JWT)
+// Thong tin user tu JWT (Gateway inject vao header)
 export interface UserContext {
   userId: string;
   email: string;
   role: 'student' | 'instructor' | 'admin';
 }
 
-// Gateway Headers
+// Headers tu Kong Gateway
 export interface GatewayHeaders {
   'x-user-id': string;
   'x-user-role': string;
   'x-trace-id': string;
 }
 
-// Kafka Event Base
+// Base event cho Kafka
 export interface KafkaEvent<T = any> {
   event_id: string;
   event_type: string;
@@ -30,7 +30,7 @@ export interface KafkaEvent<T = any> {
   trace_id: string;
 }
 
-// Payment Events
+// Event thanh toan hoan tat
 export interface PaymentCompletedEvent {
   order_id: string;
   user_id: string;
@@ -40,7 +40,7 @@ export interface PaymentCompletedEvent {
   vnpay_transaction_id: string;
 }
 
-// Course Enrollment
+// Du lieu ghi danh khoa hoc
 export interface EnrollmentData {
   user_id: string;
   course_id: string;
@@ -48,7 +48,7 @@ export interface EnrollmentData {
   order_id: string;
 }
 
-// VNPay Response
+// Response tu VNPay callback
 export interface VNPayResponse {
   vnp_TxnRef: string;
   vnp_Amount: string;

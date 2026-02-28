@@ -49,7 +49,6 @@ model Course {
 
   @@index([instructorId])
   @@index([status])
-  @@index([slug])
   @@map("courses")
 }
 

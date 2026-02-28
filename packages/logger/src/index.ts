@@ -1,15 +1,20 @@
 import pino from 'pino';
 
+// Chi dung pino-pretty trong moi truong dev, production dung JSON mac dinh
+const isDev = process.env.NODE_ENV !== 'production';
+
 export const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      translateTime: 'SYS:standard',
-      ignore: 'pid,hostname',
+  ...(isDev && {
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'SYS:standard',
+        ignore: 'pid,hostname',
+      },
     },
-  },
+  }),
 });
 
 export default logger;

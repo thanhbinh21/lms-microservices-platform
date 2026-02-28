@@ -1,17 +1,18 @@
 import { PrismaClient } from '../generated/prisma';
 
-// Prisma Singleton - tranh loi "too many connections" khi HMR
+// Singleton Prisma Client — tranh tao nhieu instance khi hot-reload
 declare global {
   // eslint-disable-next-line no-var
   var prismaGlobal: PrismaClient | undefined;
 }
 
-export const prisma: PrismaClient =
+const prisma: PrismaClient =
   global.prismaGlobal ??
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
 
+// Trong dev, luu vao global de tranh tao moi moi lan reload
 if (process.env.NODE_ENV !== 'production') {
   global.prismaGlobal = prisma;
 }

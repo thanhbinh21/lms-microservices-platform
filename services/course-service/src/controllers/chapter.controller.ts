@@ -1,8 +1,9 @@
+import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { logger } from '@lms/logger';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
+import { handlePrismaError } from '../lib/prisma-errors';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -21,25 +22,24 @@ const reorderSchema = z.object({
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
-async function verifyCourseOwnership(courseId: string, instructorId: string) {
+// Kiem tra quyen so huu khoa hoc, admin co the bypass
+async function verifyCourseOwnership(courseId: string, instructorId: string, userRole?: string) {
   const course = await prisma.course.findUnique({ where: { id: courseId } });
   if (!course) return { error: 'Course not found', status: 404 };
-  if (course.instructorId !== instructorId) return { error: 'Forbidden — not your course', status: 403 };
+  if (course.instructorId !== instructorId && userRole !== 'admin') return { error: 'Forbidden — not your course', status: 403 };
   return { course };
 }
 
 // ─── Controllers ──────────────────────────────────────────────────────────────
 
-/**
- * POST /api/courses/:courseId/chapters
- * Instructor — add a chapter to a course
- */
+/** POST /api/courses/:courseId/chapters - Them chuong vao khoa hoc */
 export async function createChapter(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string || '';
-  const instructorId = req.headers['x-user-id'] as string;
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = res.locals.userRole as string;
 
   try {
-    const { error, status } = await verifyCourseOwnership(req.params.courseId, instructorId);
+    const { error, status } = await verifyCourseOwnership(req.params.courseId, instructorId, userRole);
     if (error) {
       const response: ApiResponse<null> = { success: false, code: status!, message: error, data: null, trace_id: traceId };
       return res.status(status!).json(response);
@@ -47,7 +47,7 @@ export async function createChapter(req: Request, res: Response) {
 
     const validated = createChapterSchema.parse(req.body);
 
-    // Auto-assign order (append to end)
+    // Tu dong gan thu tu (them vao cuoi)
     const lastChapter = await prisma.chapter.findFirst({
       where: { courseId: req.params.courseId },
       orderBy: { order: 'desc' },
@@ -71,22 +71,18 @@ export async function createChapter(req: Request, res: Response) {
       const response: ApiResponse<null> = { success: false, code: 400, message: err.errors[0].message, data: null, trace_id: traceId };
       return res.status(400).json(response);
     }
-    logger.error({ err }, 'createChapter error');
-    const response: ApiResponse<null> = { success: false, code: 500, message: 'Failed to create chapter', data: null, trace_id: traceId };
-    return res.status(500).json(response);
+    return handlePrismaError(err, res, traceId, 'createChapter');
   }
 }
 
-/**
- * PUT /api/courses/:courseId/chapters/:chapterId
- * Instructor — update chapter title or publish status
- */
+/** PUT /api/courses/:courseId/chapters/:chapterId - Cap nhat chuong */
 export async function updateChapter(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string || '';
-  const instructorId = req.headers['x-user-id'] as string;
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = res.locals.userRole as string;
 
   try {
-    const { error, status } = await verifyCourseOwnership(req.params.courseId, instructorId);
+    const { error, status } = await verifyCourseOwnership(req.params.courseId, instructorId, userRole);
     if (error) {
       const response: ApiResponse<null> = { success: false, code: status!, message: error, data: null, trace_id: traceId };
       return res.status(status!).json(response);
@@ -108,22 +104,18 @@ export async function updateChapter(req: Request, res: Response) {
       const response: ApiResponse<null> = { success: false, code: 400, message: err.errors[0].message, data: null, trace_id: traceId };
       return res.status(400).json(response);
     }
-    logger.error({ err }, 'updateChapter error');
-    const response: ApiResponse<null> = { success: false, code: 500, message: 'Failed to update chapter', data: null, trace_id: traceId };
-    return res.status(500).json(response);
+    return handlePrismaError(err, res, traceId, 'updateChapter');
   }
 }
 
-/**
- * DELETE /api/courses/:courseId/chapters/:chapterId
- * Instructor — delete a chapter (cascades to lessons)
- */
+/** DELETE /api/courses/:courseId/chapters/:chapterId - Xoa chuong */
 export async function deleteChapter(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string || '';
-  const instructorId = req.headers['x-user-id'] as string;
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = res.locals.userRole as string;
 
   try {
-    const { error, status } = await verifyCourseOwnership(req.params.courseId, instructorId);
+    const { error, status } = await verifyCourseOwnership(req.params.courseId, instructorId, userRole);
     if (error) {
       const response: ApiResponse<null> = { success: false, code: status!, message: error, data: null, trace_id: traceId };
       return res.status(status!).json(response);
@@ -138,22 +130,18 @@ export async function deleteChapter(req: Request, res: Response) {
     };
     return res.status(200).json(response);
   } catch (err) {
-    logger.error({ err }, 'deleteChapter error');
-    const response: ApiResponse<null> = { success: false, code: 500, message: 'Failed to delete chapter', data: null, trace_id: traceId };
-    return res.status(500).json(response);
+    return handlePrismaError(err, res, traceId, 'deleteChapter');
   }
 }
 
-/**
- * PUT /api/courses/:courseId/chapters/reorder
- * Instructor — bulk reorder chapters (drag & drop from Phase 7)
- */
+/** PUT /api/courses/:courseId/chapters/reorder - Sap xep lai chuong */
 export async function reorderChapters(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string || '';
-  const instructorId = req.headers['x-user-id'] as string;
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = res.locals.userRole as string;
 
   try {
-    const { error, status } = await verifyCourseOwnership(req.params.courseId, instructorId);
+    const { error, status } = await verifyCourseOwnership(req.params.courseId, instructorId, userRole);
     if (error) {
       const response: ApiResponse<null> = { success: false, code: status!, message: error, data: null, trace_id: traceId };
       return res.status(status!).json(response);
@@ -161,7 +149,7 @@ export async function reorderChapters(req: Request, res: Response) {
 
     const { chapters } = reorderSchema.parse(req.body);
 
-    // Atomic update all chapter orders
+    // Cap nhat thu tu dong loat trong transaction
     await prisma.$transaction(
       chapters.map(({ id, order }) =>
         prisma.chapter.update({ where: { id, courseId: req.params.courseId }, data: { order } })
@@ -177,8 +165,6 @@ export async function reorderChapters(req: Request, res: Response) {
       const response: ApiResponse<null> = { success: false, code: 400, message: err.errors[0].message, data: null, trace_id: traceId };
       return res.status(400).json(response);
     }
-    logger.error({ err }, 'reorderChapters error');
-    const response: ApiResponse<null> = { success: false, code: 500, message: 'Failed to reorder chapters', data: null, trace_id: traceId };
-    return res.status(500).json(response);
+    return handlePrismaError(err, res, traceId, 'reorderChapters');
   }
 }

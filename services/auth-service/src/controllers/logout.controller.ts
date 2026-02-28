@@ -1,17 +1,20 @@
+import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { logger } from '@lms/logger';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma.js';
 import { verifyToken } from '../lib/jwt.js';
 import { deleteSession } from '../lib/redis.js';
+import { getEnv } from '../lib/env.js';
 
 /**
  * POST /logout
- * Invalidate session and tokens
- * Requires Authorization header with Bearer token
+ * Huy phien dang nhap va thu hoi token.
+ * Luu y: Auth-service la truong hop dac biet - phai xac thuc token truc tiep
+ * vi khong the dung x-user-id header cho logout (can verify token de biet user).
  */
 export async function logout(req: Request, res: Response) {
-  const traceId = req.headers['x-trace-id'] as string;
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
 
   try {
     // Extract token from Authorization header
@@ -30,9 +33,9 @@ export async function logout(req: Request, res: Response) {
 
     const token = authHeader.split(' ')[1];
 
-    // Verify token
-    const jwtSecret = process.env.JWT_SECRET!;
-    const payload = verifyToken(token, jwtSecret);
+    // Xac thuc token de lay userId
+    const env = getEnv();
+    const payload = verifyToken(token, env.JWT_SECRET);
 
     if (!payload) {
       const response: ApiResponse<null> = {
