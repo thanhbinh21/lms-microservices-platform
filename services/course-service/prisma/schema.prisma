@@ -1,0 +1,107 @@
+// Prisma Schema for Course Service
+// Database: course_db (Neon Serverless PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model Course {
+  id           String       @id @default(uuid())
+  title        String
+  slug         String       @unique
+  description  String?
+  thumbnail    String?      // Cloudinary/S3 URL (Phase 6)
+  price        Decimal      @default(0) @db.Decimal(10, 2)
+  level        CourseLevel  @default(BEGINNER)
+  status       CourseStatus @default(DRAFT)
+  instructorId String       @map("instructor_id")  // from x-user-id (Gateway)
+  totalLessons Int          @default(0) @map("total_lessons")
+  totalDuration Int         @default(0) @map("total_duration") // seconds
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  chapters Chapter[]
+  enrollments Enrollment[]
+
+  @@index([instructorId])
+  @@index([status])
+  @@index([slug])
+  @@map("courses")
+}
+
+model Chapter {
+  id          String   @id @default(uuid())
+  title       String
+  order       Int      @default(0)
+  isPublished Boolean  @default(false) @map("is_published")
+  courseId    String   @map("course_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@index([courseId])
+  @@map("chapters")
+}
+
+model Lesson {
+  id          String   @id @default(uuid())
+  title       String
+  order       Int      @default(0)
+  videoUrl    String?  @map("video_url")   // VideoCipher/S3 (Phase 6)
+  duration    Int      @default(0)          // seconds
+  isPublished Boolean  @default(false) @map("is_published")
+  isFree      Boolean  @default(false) @map("is_free") // preview lesson
+  chapterId   String   @map("chapter_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@index([chapterId])
+  @@map("lessons")
+}
+
+// Enrollment — owned by Course Service (source of truth for access control)
+// Populated by Kafka consumer in Phase 12
+model Enrollment {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")      // from Kafka event
+  courseId   String   @map("course_id")
+  orderId    String   @unique @map("order_id") // idempotency key
+  enrolledAt DateTime @default(now()) @map("enrolled_at")
+
+  // Relations
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId]) // prevent duplicate enrollments
+  @@index([userId])
+  @@map("enrollments")
+}

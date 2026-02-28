@@ -55,6 +55,9 @@ coverage
 *.sqlite3
 prisma/migrations/
 
+# Prisma generated client (auto-generated, do not commit)
+**/src/generated/
+
 # Secrets & Keys
 *.pem
 *.key
