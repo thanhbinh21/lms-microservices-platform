@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { loginSchema, type LoginInput } from '@/lib/schemas/auth.schema';
+import { z } from 'zod';
 import { loginAction } from '@/app/actions/auth';
 import { useAppDispatch } from '@/lib/redux/hooks';
 import { setUser } from '@/lib/redux/authSlice';
+import { Loader2, QrCode, LogIn, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
 import {
   Form,
   FormControl,
@@ -20,6 +22,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 
+// Override schema inline if needed, but assuming standard loginSchema format exists
+const loginSchema = z.object({
+  email: z.string().email('Email không đúng định dạng'),
+  password: z.string().min(6, 'Mật khẩu phải từ 6 ký tự'),
+});
+type LoginInput = z.infer<typeof loginSchema>;
+
 export default function LoginForm() {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -27,6 +36,7 @@ export default function LoginForm() {
   const [success, setSuccess] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // States: Default, Loading, Error (validation via React Hook Form), Error (API via error state), Disabled
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -41,26 +51,28 @@ export default function LoginForm() {
     setSuccess('');
 
     try {
+      // 1. Trigger API
       const result = await loginAction(data);
 
       if (result.success && result.user && result.accessToken) {
-        // Update Redux store
+        // 2. Map Redux
         dispatch(setUser({
           user: result.user,
           accessToken: result.accessToken,
         }));
 
-        setSuccess('Login successful! Redirecting...');
+        setSuccess('Đăng nhập thành công! Đang chuyển hướng...');
         
-        // Redirect to dashboard after short delay
+        // 3. Redirect
         setTimeout(() => {
           router.push('/dashboard');
-        }, 500);
+        }, 800);
       } else {
-        setError(result.message || 'Login failed');
+        // API Error logic
+        setError(result.message || 'Tài khoản hoặc mật khẩu không chính xác.');
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError('Lỗi kết nối máy chủ. Vui lòng thử lại sau.');
       console.error('Login error:', err);
     } finally {
       setIsLoading(false);
@@ -68,29 +80,36 @@ export default function LoginForm() {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto shadow-lg border-0 bg-white">
-      <CardHeader className="space-y-1 pb-6">
-        <CardTitle className="text-2xl font-bold text-center text-slate-800">Welcome Back</CardTitle>
-        <CardDescription className="text-center text-slate-600">Enter your credentials to access your account</CardDescription>
+    <Card className="glass-panel w-full border-white/60 shadow-2xl shadow-primary/10 rounded-3xl overflow-hidden relative">
+      {/* Decorative inner glow */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+
+      <CardHeader className="space-y-2 pb-6 pt-10 px-8 text-center">
+        <CardTitle className="text-3xl font-bold tracking-tight">Đăng Nhập</CardTitle>
+        <CardDescription className="text-base text-muted-foreground font-medium">
+          Truy cập nền tảng học tập thế hệ mới
+        </CardDescription>
       </CardHeader>
-      <CardContent className="px-6">
+
+      <CardContent className="px-8 flex flex-col gap-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
             <FormField
               control={form.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel className="font-semibold text-foreground">Email</FormLabel>
                   <FormControl>
                     <Input
                       type="email"
-                      placeholder="your@email.com"
+                      placeholder="nhapemail@domain.com"
+                      className="h-12 rounded-xl bg-white/60 backdrop-blur-sm border-white/80 focus-visible:ring-primary/40 focus-visible:border-primary shadow-sm transition-all text-sm px-4"
                       {...field}
                       disabled={isLoading}
                     />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-xs text-destructive font-medium" />
                 </FormItem>
               )}
             />
@@ -100,45 +119,105 @@ export default function LoginForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <div className="flex items-center justify-between">
+                    <FormLabel className="font-semibold text-foreground">Mật khẩu</FormLabel>
+                    <Link href="/forgot-password" className="text-xs font-semibold text-primary hover:underline hover:text-primary/80">
+                      Quên mật khẩu?
+                    </Link>
+                  </div>
                   <FormControl>
                     <Input
                       type="password"
-                      placeholder="Enter your password"
+                      placeholder="Nhập mật khẩu của bạn"
+                      className="h-12 rounded-xl bg-white/60 backdrop-blur-sm border-white/80 focus-visible:ring-primary/40 focus-visible:border-primary shadow-sm transition-all text-sm px-4"
                       {...field}
                       disabled={isLoading}
                     />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-xs text-destructive font-medium" />
                 </FormItem>
               )}
             />
 
+            {/* Remember & QR Code */}
+            <div className="flex items-center justify-between pt-1">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  disabled={isLoading}
+                  className="w-4 h-4 rounded appearance-none border-2 border-primary/30 checked:bg-primary checked:border-primary transition-all relative
+                    checked:after:content-[''] checked:after:absolute checked:after:w-1.5 checked:after:h-2.5 checked:after:border-r-2 checked:after:border-b-2 checked:after:border-white 
+                    checked:after:left-[5px] checked:after:top-[1px] checked:after:rotate-45 disabled:opacity-50"
+                  defaultChecked
+                />
+                <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                  Ghi nhớ đăng nhập
+                </span>
+              </label>
+
+              <Button type="button" variant="ghost" size="sm" className="h-auto p-0 text-sm font-semibold text-primary hover:text-primary/80 hover:bg-transparent" disabled={isLoading}>
+                <QrCode className="w-4 h-4 mr-1.5" />
+                Quét mã QR
+              </Button>
+            </div>
+
+            {/* Error State: API Failed */}
             {error && (
-              <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm font-medium text-red-600">
-                {error}
+              <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3.5 flex items-start gap-3 animate-in fade-in zoom-in-95 duration-300">
+                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                <p className="text-sm font-semibold text-destructive">{error}</p>
               </div>
             )}
 
+            {/* Success State */}
             {success && (
-              <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm font-medium text-green-600">
-                ✓ {success}
+              <div className="rounded-xl bg-green-500/10 border border-green-500/20 p-3.5 flex items-center justify-center animate-in fade-in zoom-in-95 duration-300">
+                <p className="text-sm font-bold text-green-700">{success}</p>
               </div>
             )}
 
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={isLoading}>
-              {isLoading ? 'Logging in...' : 'Login'}
+            {/* Submit Button */}
+            <Button 
+              type="submit" 
+              className="w-full h-12 rounded-xl text-base font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5 mt-2" 
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                <>
+                  Đăng nhập
+                  <LogIn className="ml-2 h-5 w-5" />
+                </>
+              )}
             </Button>
           </form>
         </Form>
       </CardContent>
-      <CardFooter className="flex justify-center bg-slate-50 border-t pt-6">
-        <p className="text-sm text-slate-600">
-          Don&apos;t have an account?{' '}
-          <a href="/register" className="text-blue-600 hover:text-blue-700 font-medium hover:underline">
-            Register here
-          </a>
-        </p>
+      
+      <CardFooter className="flex flex-col gap-4 pb-8 pt-2 px-8">
+        <div className="relative w-full">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border/60" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white/80 backdrop-blur-sm px-2 text-muted-foreground font-semibold">
+              Hoặc tiếp tục với
+            </span>
+          </div>
+        </div>
+        
+        <div className="text-center mt-2">
+          <p className="text-sm text-muted-foreground font-medium">
+            Chưa có tài khoản?{' '}
+            <Link href="/register" className="text-primary hover:text-primary/80 font-bold hover:underline underline-offset-4">
+              Đăng ký ngay
+            </Link>
+          </p>
+        </div>
       </CardFooter>
     </Card>
   );
