@@ -2,22 +2,45 @@
 
 import { useAppSelector } from '@/lib/redux/hooks';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { logoutAction } from '@/app/actions/auth';
+import { getDashboardData } from '@/app/actions/dashboard';
 import { useAppDispatch } from '@/lib/redux/hooks';
 import { logout } from '@/lib/redux/authSlice';
+import { ScrollReveal } from '@/components/ui/scroll-reveal';
+import Image from 'next/image';
+import Link from 'next/link';
+import { BookOpen, Clock, Trophy, MessageSquare, PlayCircle, LogOut, ArrowRight, Loader2, Info } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [seedNotice, setSeedNotice] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login');
+      return;
     }
+
+    const fetchData = async () => {
+      const res = await getDashboardData();
+      if (res.success && res.data) {
+        setData(res.data);
+        if (res.seeded) {
+          setSeedNotice(true);
+        }
+      }
+      setLoading(false);
+    };
+
+    fetchData();
   }, [isAuthenticated, router]);
 
   const handleLogout = async () => {
@@ -26,52 +49,193 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-indigo-50 p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="bg-white rounded-lg shadow-lg border-0 p-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
-              <p className="text-slate-600 mt-1">Welcome back, {user.name}!</p>
+    <div className="glass-page relative min-h-screen text-foreground overflow-hidden pb-20">
+      {/* Decorative Background Orbs */}
+      <div className="absolute top-[-10%] right-10 w-[40%] h-[40%] rounded-full bg-primary/10 blur-[120px] pointer-events-none" />
+      <div className="absolute top-[40%] left-[-10%] w-[30%] h-[50%] rounded-full bg-indigo-300/15 blur-[100px] pointer-events-none" />
+
+      {/* Top Navbar */}
+      <header className="sticky top-0 z-40 border-b border-white/40 bg-white/50 backdrop-blur-xl shadow-sm">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-8">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <Image src="/logo.png" alt="Logo NexEdu" width={32} height={32} priority />
+            <span className="text-xl font-bold tracking-tight">NexEdu</span>
+          </Link>
+
+          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-muted-foreground">
+            <Link href="/dashboard" className="text-primary border-b-2 border-primary pb-1">Tổng quan</Link>
+            <Link href="#" className="hover:text-primary transition-colors pb-1">Khóa học của tôi</Link>
+            <Link href="#" className="hover:text-primary transition-colors pb-1">Chứng chỉ</Link>
+            <Link href="#" className="hover:text-primary transition-colors pb-1">Cộng đồng</Link>
+          </nav>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="text-sm font-bold leading-none">{user.name}</span>
+              <span className="text-xs text-muted-foreground mt-1 tracking-wide">{user.role}</span>
             </div>
-            <Button onClick={handleLogout} variant="outline" className="border-2 border-slate-300 hover:bg-slate-50">
-              Logout
+            <div className="size-10 rounded-full bg-primary/10 border-2 border-white shadow-sm flex items-center justify-center text-primary font-bold">
+              {user.name?.charAt(0) || 'U'}
+            </div>
+            <Button onClick={handleLogout} variant="ghost" size="icon" className="hover:bg-destructive/10 hover:text-destructive">
+              <LogOut className="size-5" />
             </Button>
           </div>
-          
-          <div className="grid gap-6">
-            <Card className="border-l-4 border-l-blue-600 shadow-sm">
-              <CardContent className="pt-6">
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">Full Name</p>
-                    <p className="text-lg font-semibold text-slate-800">{user.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">Email Address</p>
-                    <p className="text-lg font-semibold text-slate-800">{user.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">Role</p>
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                      {user.role}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">User ID</p>
-                    <p className="text-sm font-mono text-slate-600">{user.id}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
-      </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 space-y-10 relative z-10">
+        
+        {/* Seed Notice Toast */}
+        {seedNotice && (
+          <ScrollReveal>
+             <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-200 p-4 flex items-center gap-4 shadow-sm">
+                <div className="size-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                  <Info className="size-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-blue-900">Khởi tạo dữ liệu mẫu thành công!</h4>
+                  <p className="text-sm text-blue-700">Do database đang rỗng trong lần chạy đầu tiên, hệ thống đã tự động Seed các khóa học và số liệu giả lập để hiển thị giao diện mẫu.</p>
+                </div>
+                <Button variant="ghost" className="ml-auto shrink-0 text-blue-600 hover:bg-blue-200" onClick={() => setSeedNotice(false)}>Đóng</Button>
+             </div>
+          </ScrollReveal>
+        )}
+
+        {/* Welcome Section */}
+        <ScrollReveal>
+          <div className="rounded-[2rem] border border-white/40 bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--primary)/0.85))] p-8 md:p-12 text-white shadow-2xl shadow-primary/20 relative overflow-hidden">
+            <div className="absolute inset-0 bg-[url('/noise.png')] opacity-20 mix-blend-overlay pointer-events-none" />
+            <div className="absolute top-0 right-0 w-80 h-80 bg-white/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+            
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-3">
+                <h1 className="text-3xl md:text-4xl font-bold">Chào buổi sáng, {user.name}! 👋</h1>
+                <p className="text-white/80 max-w-xl text-sm md:text-base leading-relaxed">
+                  Bạn đang làm rất tốt! Tiếp tục chuỗi ngày học tập để hoàn thành khóa "Fullstack Next.js" nhé. 
+                  Hãy nhớ rằng đích đến của bạn là trở thành kỹ sư phần mềm xuất sắc.
+                </p>
+              </div>
+              <Button className="w-fit bg-white text-primary hover:bg-white/90 shadow-xl rounded-xl px-6 h-12 font-bold whitespace-nowrap">
+                Tiếp tục học <PlayCircle className="ml-2 size-5" />
+              </Button>
+            </div>
+          </div>
+        </ScrollReveal>
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 opacity-60">
+            <Loader2 className="size-10 animate-spin text-primary mb-4" />
+            <p className="font-medium text-muted-foreground">Đang tải dữ liệu học tập...</p>
+          </div>
+        ) : (
+          <>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+              {[
+                { label: 'Giờ học tích lũy', value: `${data.stats.totalHours}h`, icon: Clock, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+                { label: 'Khóa đã hoàn thành', value: data.stats.coursesCompleted, icon: BookOpen, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+                { label: 'Chứng chỉ đạt được', value: data.stats.certificates, icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+                { label: 'Thảo luận', value: data.stats.activeDiscussions, icon: MessageSquare, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+              ].map((stat, idx) => (
+                <ScrollReveal key={idx} delay={idx * 100}>
+                  <Card className="glass-panel rounded-2xl border-white/60 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 pointer-events-none">
+                    <CardContent className="p-6 flex items-center gap-4">
+                      <div className={`size-14 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center shrink-0 shadow-inner`}>
+                        <stat.icon className="size-6 stroke-[2]" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold tracking-tight">{stat.value}</p>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mt-1">{stat.label}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </ScrollReveal>
+              ))}
+            </div>
+
+            {/* Main Content Grid (Active Courses & Recommended) */}
+            <div className="grid lg:grid-cols-3 gap-8">
+              
+              {/* Active Courses */}
+              <div className="lg:col-span-2 space-y-6">
+                <ScrollReveal>
+                  <div className="flex items-center justify-between px-1">
+                    <h2 className="text-xl font-bold">Lộ Trình Đang Học</h2>
+                    <Button variant="link" className="text-primary font-semibold hover:no-underline hover:text-primary/80">Xem tất cả</Button>
+                  </div>
+                </ScrollReveal>
+
+                <div className="space-y-4">
+                  {data.activeCourses.map((course: any, idx: number) => (
+                    <ScrollReveal key={idx} delay={idx * 100}>
+                      <Card className="glass-panel rounded-2xl border-white/60 hover:shadow-lg transition-all p-4 md:p-6 flex flex-col md:flex-row gap-6 items-center">
+                        <div className="w-full md:w-48 aspect-video bg-[linear-gradient(135deg,hsl(var(--primary)/0.08),hsl(var(--primary)/0.02))] rounded-xl border border-white/50 flex items-center justify-center shadow-inner shrink-0">
+                          <span className="text-3xl font-bold text-primary/30 uppercase tracking-widest">{course.thumbnail}</span>
+                        </div>
+                        <div className="flex-1 w-full space-y-4">
+                          <div>
+                            <p className="text-xs font-semibold text-primary mb-1">Giảng viên: {course.instructor}</p>
+                            <h3 className="text-lg font-bold leading-tight">{course.title}</h3>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-xs font-semibold text-muted-foreground">
+                              <span>Hoàn thành {course.progress}%</span>
+                              <span>Truy cập: {course.lastAccessed}</span>
+                            </div>
+                            <div className="h-2 w-full bg-secondary/50 rounded-full overflow-hidden shadow-inner">
+                              <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${course.progress}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="w-full md:w-auto shrink-0 flex items-center md:items-end md:h-full">
+                           <Button className="w-full md:w-auto rounded-xl shadow-md">Học tiếp tục</Button>
+                        </div>
+                      </Card>
+                    </ScrollReveal>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recommended Courses Sidebar */}
+              <div className="space-y-6">
+                 <ScrollReveal>
+                  <div className="flex items-center justify-between px-1">
+                    <h2 className="text-xl font-bold">Có Thể Bạn Quan Tâm</h2>
+                  </div>
+                </ScrollReveal>
+
+                <div className="grid gap-4">
+                  {data.recommendedCourses.map((course: any, idx: number) => (
+                    <ScrollReveal key={idx} delay={idx * 150}>
+                       <Card className="glass-panel group rounded-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10 border-white/60 flex flex-col">
+                        <CardContent className="p-4 space-y-3">
+                          <div className="relative aspect-video overflow-hidden rounded-xl bg-[linear-gradient(120deg,hsl(var(--primary)/0.05),hsl(var(--primary)/0.01))] border border-white/50 border-b-0 shadow-inner">
+                            <span className="absolute right-2 top-2 rounded-full bg-white/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-bold text-primary shadow-sm border border-primary/10">
+                              {course.category}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="line-clamp-2 text-sm font-bold leading-tight mb-2 group-hover:text-primary transition-colors">{course.title}</p>
+                            <div className="flex items-center justify-between text-xs font-semibold">
+                              <span className="text-primary">{course.price}</span>
+                              <span className="text-muted-foreground flex items-center gap-1">⭐ {course.rating}</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </ScrollReveal>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          </>
+        )}
+      </main>
     </div>
   );
 }
