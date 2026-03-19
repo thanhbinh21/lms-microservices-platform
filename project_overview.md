@@ -105,9 +105,13 @@ Dự án được chia thành 15 giai đoạn (Phases) theo chuẩn "Vertical Sl
 - [x] **Phase 6:** Build **Media Service** (API Presigned URL S3/VideoCipher) [6]. ✅ Completed: Feb 28, 2026
 - [x] **Phase 6.1:** Code Audit & Production Hardening (Security fixes, Vietnamese comments, optimizations) ✅ Completed: Mar 01, 2026
 - [ ] **Phase 7:** Frontend Instructor UI (Drag & Drop Curriculum) [7].
+  - QA update: Smoke test build on Mar 19, 2026 found role enum mismatch in instructor layout and multiple instructor/dashboard screens still using mock data.
+  - QC fix update: Aligned integration smoke test auth health target from port 3001 to 3101; `pnpm test:integration` now passes 5/5 on Mar 19, 2026.
 - [ ] **Phase 8:** Frontend Public UI (Course Listing, Detail with BFF Aggregation) [7].
   - Progress update: Completed public landing page NexEdu UI (intro page) on Mar 19, 2026.
   - Progress update: Applied white-theme glassmorphism + Be Vietnam Pro typography for landing page on Mar 19, 2026.
+  - QC update: Flow test on Mar 19, 2026 shows Landing/Register/Login/Dashboard pages return 200, but register via Gateway timeout on /auth/register and login API fails with Prisma P2002 (duplicate refresh token) in auth-service.
+  - QC fix update: Resolved /auth/register timeout via Gateway by rehydrating proxy request body and fixed refresh token duplication by adding unique jwtid for refresh tokens; retest via Gateway register/login successful on Mar 19, 2026.
 - [ ] **Phase 9:** Build **Payment Service DB** (Orders & Audit Transactions Table) [8].
 
 ### Phase 10-12: Commerce & Payments (VNPay)
@@ -137,6 +141,9 @@ Dự án được chia thành 15 giai đoạn (Phases) theo chuẩn "Vertical Sl
     - `services/auth-service/.env`: Auth-specific config (DATABASE_URL, JWT_SECRET, PORT)
     - `apps/web-client/.env.local`: Frontend config (NEXT_PUBLIC_GATEWAY_URL)
     - ⚠️ **Critical:** JWT_SECRET must match between Gateway and Auth Service
+*   **Env Sync Update (Mar 19, 2026):** Da dong bo file `.env` cho Gateway/Auth/Course/Media/Web client, sua typo bien root env va dong nhat JWT cho Gateway + Auth de chay local.
+*   **Port Override (Mar 19, 2026):** Auth Service doi PORT tu 3001 sang 3101 de tranh xung dot cong; Gateway da cap nhat AUTH_SERVICE_URL tuong ung.
+*   **Runtime Verification (Mar 19, 2026):** Da run full stack voi Docker infra + service/web local, health check Gateway/Auth/Course/Media va web page deu tra 200.
 
 ### Docker & Deployment
 *   **.dockerignore:** Đã exclude `node_modules`, `.git`, `.env` để tránh build context quá nặng [Phase 3]. ✅

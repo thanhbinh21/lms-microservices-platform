@@ -70,7 +70,7 @@ export default function Home() {
       <header className="sticky top-0 z-40 border-b border-white/40 bg-white/50 backdrop-blur-xl shadow-sm">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 md:px-6">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="Logo NexEdu" width={32} height={32} priority />
+            <Image src="/nexedu-logo.svg" alt="Logo NexEdu" width={44} height={44} priority />
             <span className="text-base font-semibold tracking-tight">NexEdu</span>
           </Link>
 
@@ -305,7 +305,7 @@ export default function Home() {
         <div className="mx-auto grid w-full max-w-6xl gap-10 md:grid-cols-4">
           <div className="space-y-4 md:col-span-2">
             <div className="flex items-center gap-3">
-              <Image src="/logo.png" alt="Logo NexEdu" width={32} height={32} />
+              <Image src="/nexedu-logo.svg" alt="Logo NexEdu" width={44} height={44} />
               <p className="text-xl font-bold">NexEdu Academy</p>
             </div>
             <p className="max-w-md text-sm text-muted-foreground leading-relaxed">

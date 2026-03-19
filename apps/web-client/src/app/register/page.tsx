@@ -14,7 +14,7 @@ export default function RegisterPage() {
       <div className="hidden lg:flex w-[55%] relative z-10 flex-col justify-center px-16 xl:px-24 border-l border-white/50 bg-white/20 backdrop-blur-3xl shadow-[-10px_0_30px_rgba(0,0,0,0.02)]">
         <ScrollReveal className="space-y-8">
           <Link href="/" className="flex items-center gap-3 mb-10 inline-flex w-fit hover:opacity-80 transition-opacity">
-            <Image src="/logo.png" alt="NexEdu Logo" width={56} height={56} priority />
+            <Image src="/nexedu-logo.svg" alt="NexEdu Logo" width={80} height={80} priority />
             <span className="text-3xl font-bold tracking-tight">NexEdu</span>
           </Link>
           
@@ -48,7 +48,7 @@ export default function RegisterPage() {
         {/* Mobile Logo Fallback */}
         <div className="absolute top-6 left-6 lg:hidden">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="NexEdu Logo" width={32} height={32} priority />
+            <Image src="/nexedu-logo.svg" alt="NexEdu Logo" width={44} height={44} priority />
             <span className="text-xl font-bold tracking-tight">NexEdu</span>
           </Link>
         </div>

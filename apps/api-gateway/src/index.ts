@@ -2,7 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
 import dotenv from 'dotenv';
 import { authMiddleware } from './middleware/auth';
 import { traceMiddleware } from './middleware/trace';
@@ -49,6 +49,8 @@ app.use(
       if ('trace_id' in req) {
         proxyReq.setHeader('x-trace-id', (req as any).trace_id);
       }
+      // Dong bo lai body sau khi da qua express.json de tranh request bi abort o service dich
+      fixRequestBody(proxyReq, req);
     },
   })
 );
@@ -70,6 +72,8 @@ app.use(
       if ('trace_id' in req) {
         proxyReq.setHeader('x-trace-id', (req as any).trace_id);
       }
+      // Cac route ghi du lieu can body duoc day lai day du khi proxy
+      fixRequestBody(proxyReq, req);
     },
   })
 );
@@ -90,6 +94,8 @@ app.use(
       if ('trace_id' in req) {
         proxyReq.setHeader('x-trace-id', (req as any).trace_id);
       }
+      // Cac route ghi du lieu can body duoc day lai day du khi proxy
+      fixRequestBody(proxyReq, req);
     },
   })
 );
@@ -110,6 +116,8 @@ app.use(
       if ('trace_id' in req) {
         proxyReq.setHeader('x-trace-id', (req as any).trace_id);
       }
+      // Cac route ghi du lieu can body duoc day lai day du khi proxy
+      fixRequestBody(proxyReq, req);
     },
   })
 );
@@ -130,6 +138,8 @@ app.use(
       if ('trace_id' in req) {
         proxyReq.setHeader('x-trace-id', (req as any).trace_id);
       }
+      // Cac route ghi du lieu can body duoc day lai day du khi proxy
+      fixRequestBody(proxyReq, req);
     },
   })
 );

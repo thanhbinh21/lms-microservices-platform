@@ -11,6 +11,7 @@ import {
   updateCourse,
   deleteCourse,
   getInstructorCourses,
+  getCourseCurriculum,
 } from './controllers/course.controller';
 import {
   createChapter,
@@ -61,6 +62,7 @@ app.get('/api/courses/:slug', getCourseBySlug);
 // ─── Instructor Routes (Kong injects x-user-id, x-user-role) ─────────────────
 // requireRole middleware: validates header exists + role check, sets res.locals.userId
 app.get('/api/instructor/courses', requireAuth, getInstructorCourses);
+app.get('/api/courses/:id/curriculum', ...requireRole('instructor', 'admin'), getCourseCurriculum);
 app.post('/api/courses', ...requireRole('instructor', 'admin'), createCourse);
 app.put('/api/courses/:id', ...requireRole('instructor', 'admin'), updateCourse);
 app.delete('/api/courses/:id', ...requireRole('instructor', 'admin'), deleteCourse);

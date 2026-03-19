@@ -156,6 +156,62 @@ export async function getInstructorCourses(req: Request, res: Response) {
   }
 }
 
+/** GET /api/courses/:id/curriculum - Lay curriculum cho giang vien/admin theo courseId */
+export async function getCourseCurriculum(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = res.locals.userRole as string;
+
+  try {
+    const course = await prisma.course.findUnique({
+      where: { id: req.params.id },
+      include: {
+        chapters: {
+          orderBy: { order: 'asc' },
+          include: {
+            lessons: {
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
+      },
+    });
+
+    if (!course) {
+      const notFound: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Course not found',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    if (course.instructorId !== instructorId && userRole !== 'admin') {
+      const forbidden: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: 'Forbidden — not your course',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
+    }
+
+    const response: ApiResponse<unknown> = {
+      success: true,
+      code: 200,
+      message: 'Course curriculum fetched',
+      data: serializeCourse(course),
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'getCourseCurriculum');
+  }
+}
+
 /** POST /api/courses - Tao khoa hoc moi */
 export async function createCourse(req: Request, res: Response) {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();

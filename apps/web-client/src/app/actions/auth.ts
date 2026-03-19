@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { loginSchema, registerSchema, type LoginInput, type RegisterInput } from '@/lib/schemas/auth.schema';
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || 'http://localhost:8000';
+const AUTH_PREFIX = process.env.NEXT_PUBLIC_AUTH_PREFIX || '/auth';
 
 interface AuthResponse {
   success: boolean;
@@ -22,8 +23,8 @@ export async function loginAction(data: LoginInput): Promise<AuthResponse> {
     // Validate input
     const validated = loginSchema.parse(data);
 
-    // Call Auth Service /login
-    const response = await fetch(`${GATEWAY_URL}/login`, {
+    // Goi qua Gateway de dong nhat data flow toan he thong
+    const response = await fetch(`${GATEWAY_URL}${AUTH_PREFIX}/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -88,8 +89,8 @@ export async function registerAction(data: RegisterInput): Promise<AuthResponse>
     // Remove confirmPassword before sending to API
     const { confirmPassword, ...registerData } = validated;
 
-    // Call Auth Service /register
-    const response = await fetch(`${GATEWAY_URL}/register`, {
+    // Goi qua Gateway de dong nhat data flow toan he thong
+    const response = await fetch(`${GATEWAY_URL}${AUTH_PREFIX}/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -152,8 +153,8 @@ export async function logoutAction(): Promise<{ success: boolean }> {
     const accessToken = cookieStore.get('accessToken')?.value;
 
     if (accessToken) {
-      // Call Auth Service /logout
-      await fetch(`${GATEWAY_URL}/logout`, {
+      // Goi qua Gateway de dong nhat data flow toan he thong
+      await fetch(`${GATEWAY_URL}${AUTH_PREFIX}/logout`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,

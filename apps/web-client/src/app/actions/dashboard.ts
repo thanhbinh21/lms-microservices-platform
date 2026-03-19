@@ -1,7 +1,5 @@
 'use server';
-
-// Lập trình mô phỏng DB bằng 1 biến global để demo tính năng "Seed 1 lần"
-let mockDbSeeded = false;
+import { getInstructorCoursesAction, getPublicCoursesAction } from '@/app/actions/instructor';
 
 interface CourseStat {
   id: string;
@@ -24,74 +22,42 @@ interface DashboardData {
 }
 
 export async function getDashboardData(): Promise<{ success: boolean; data?: DashboardData; seeded: boolean }> {
-  // Simulate network
-  await new Promise(resolve => setTimeout(resolve, 800));
+  const instructorResult = await getInstructorCoursesAction();
+  const publicResult = await getPublicCoursesAction(1, 6);
 
-  const isSeeding = !mockDbSeeded;
-  
-  if (!mockDbSeeded) {
-    // Database rỗng -> Tiến hành "Seed" dữ liệu mẫu
-    console.log('[Seed] Database rỗng. Đang tạo dữ liệu mẫu cho Dashboard...');
-    mockDbSeeded = true;
-  }
+  const instructorCourses = instructorResult.success && instructorResult.data ? instructorResult.data : [];
+  const publicCourses = publicResult.success && publicResult.data ? publicResult.data.courses : [];
 
-  // Khởi tạo Dữ liệu Mẫu (Mock DB)
+  const sourceCourses = instructorCourses.length > 0 ? instructorCourses : publicCourses;
+
   const dashboardData: DashboardData = {
     stats: {
-      totalHours: 124,
-      coursesCompleted: 3,
-      certificates: 2,
-      activeDiscussions: 15,
+      totalHours: sourceCourses.reduce((acc, item) => acc + Math.floor((item.totalDuration || 0) / 3600), 0),
+      coursesCompleted: sourceCourses.filter((item) => item.status === 'PUBLISHED').length,
+      certificates: sourceCourses.filter((item) => item.status === 'PUBLISHED').length,
+      activeDiscussions: sourceCourses.length,
     },
-    activeCourses: [
-      {
-        id: 'c1',
-        title: 'Fullstack Next.js & Microservices',
-        progress: 68,
-        thumbnail: 'NX',
-        instructor: 'Lê Minh Tôn',
-        lastAccessed: '2 giờ trước'
-      },
-      {
-        id: 'c2',
-        title: 'Bảo mật Ứng dụng Web (OWASP/JWT)',
-        progress: 32,
-        thumbnail: 'SEC',
-        instructor: 'Trần Văn Cường',
-        lastAccessed: 'Hôm qua'
-      }
-    ],
-    recommendedCourses: [
-      {
-        id: 'r1',
-        title: 'System Design Interview Cơ Bản',
-        category: 'Software Architecture',
-        price: 'Nâng cấp nền tảng',
-        lessons: 35,
-        rating: '4.9',
-      },
-      {
-        id: 'r2',
-        title: 'Triển khai Docker & Kubernetes',
-        category: 'DevOps',
-        price: '1.490.000đ',
-        lessons: 42,
-        rating: '4.8',
-      },
-      {
-        id: 'r3',
-        title: 'GraphQL API Masterclass',
-        category: 'Web Development',
-        price: '890.000đ',
-        lessons: 28,
-        rating: '4.7',
-      }
-    ]
+    activeCourses: sourceCourses.slice(0, 3).map((item, index) => ({
+      id: item.id,
+      title: item.title,
+      progress: Math.max(10, 70 - index * 18),
+      thumbnail: (item.title.match(/[A-Za-z]/g)?.slice(0, 2).join('') || 'CRS').toUpperCase(),
+      instructor: item.instructorId,
+      lastAccessed: index === 0 ? 'Gần đây' : 'Trong tuần này',
+    })),
+    recommendedCourses: publicCourses.slice(0, 3).map((item) => ({
+      id: item.id,
+      title: item.title,
+      category: item.level,
+      price: `${Number(item.price).toLocaleString('vi-VN')}đ`,
+      lessons: item.totalLessons,
+      rating: '4.8',
+    })),
   };
 
   return {
     success: true,
     data: dashboardData,
-    seeded: isSeeding, // Cờ báo cho UI biết để hiển thị Toast "Đã tạo dữ liệu mẫu"
+    seeded: false,
   };
 }

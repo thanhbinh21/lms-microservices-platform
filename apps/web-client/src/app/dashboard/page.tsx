@@ -12,7 +12,7 @@ import { logout } from '@/lib/redux/authSlice';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
 import Image from 'next/image';
 import Link from 'next/link';
-import { BookOpen, Clock, Trophy, MessageSquare, PlayCircle, LogOut, ArrowRight, Loader2, Info } from 'lucide-react';
+import { BookOpen, Clock, Trophy, MessageSquare, PlayCircle, LogOut, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -21,7 +21,6 @@ export default function DashboardPage() {
   
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [seedNotice, setSeedNotice] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -33,9 +32,6 @@ export default function DashboardPage() {
       const res = await getDashboardData();
       if (res.success && res.data) {
         setData(res.data);
-        if (res.seeded) {
-          setSeedNotice(true);
-        }
       }
       setLoading(false);
     };
@@ -61,7 +57,7 @@ export default function DashboardPage() {
       <header className="sticky top-0 z-40 border-b border-white/40 bg-white/50 backdrop-blur-xl shadow-sm">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-8">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="Logo NexEdu" width={32} height={32} priority />
+            <Image src="/nexedu-logo.svg" alt="Logo NexEdu" width={44} height={44} priority />
             <span className="text-xl font-bold tracking-tight">NexEdu</span>
           </Link>
 
@@ -89,22 +85,6 @@ export default function DashboardPage() {
 
       <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 space-y-10 relative z-10">
         
-        {/* Seed Notice Toast */}
-        {seedNotice && (
-          <ScrollReveal>
-             <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-200 p-4 flex items-center gap-4 shadow-sm">
-                <div className="size-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                  <Info className="size-5" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-blue-900">Khởi tạo dữ liệu mẫu thành công!</h4>
-                  <p className="text-sm text-blue-700">Do database đang rỗng trong lần chạy đầu tiên, hệ thống đã tự động Seed các khóa học và số liệu giả lập để hiển thị giao diện mẫu.</p>
-                </div>
-                <Button variant="ghost" className="ml-auto shrink-0 text-blue-600 hover:bg-blue-200" onClick={() => setSeedNotice(false)}>Đóng</Button>
-             </div>
-          </ScrollReveal>
-        )}
-
         {/* Welcome Section */}
         <ScrollReveal>
           <div className="rounded-[2rem] border border-white/40 bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--primary)/0.85))] p-8 md:p-12 text-white shadow-2xl shadow-primary/20 relative overflow-hidden">

@@ -1,0 +1,38 @@
+{
+  "email": "e2e_20260319163451@nexedu.local",
+  "landing": {
+    "status": 200
+  },
+  "registerPage": {
+    "status": 200
+  },
+  "loginPage": {
+    "status": 200
+  },
+  "dashboardPage": {
+    "status": 200
+  },
+  "registerViaGateway": {
+    "status": "ERR",
+    "error": "TypeError: fetch failed"
+  },
+  "registerDirectAuth": {
+    "status": 201,
+    "body": {
+      "success": true,
+      "code": 201,
+      "message": "User registered successfully",
+      "data": {
+        "user": {
+          "id": "8ebdcb76-5ea0-4025-a172-8bd3f229d085",
+          "email": "e2e_20260319163451_direct@nexedu.local",
+          "name": "E2E User",
+          "role": "STUDENT"
+        },
+        "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI4ZWJkY2I3Ni01ZWEwLTQwMjUtYTE3Mi04YmQzZjIyOWQwODUiLCJlbWFpbCI6ImUyZV8yMDI2MDMxOTE2MzQ1MV9kaXJlY3RAbmV4ZWR1LmxvY2FsIiwicm9sZSI6IlNUVURFTlQiLCJ0eXBlIjoiYWNjZXNzIiwiaWF0IjoxNzczOTM4Mzk2LCJleHAiOjE3NzM5MzkyOTZ9.rVMs-ggvi6hIuQlTi_LM51qzlD4_cG5uUzy9wWxMW7o",
+        "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI4ZWJkY2I3Ni01ZWEwLTQwMjUtYTE3Mi04YmQzZjIyOWQwODUiLCJlbWFpbCI6ImUyZV8yMDI2MDMxOTE2MzQ1MV9kaXJlY3RAbmV4ZWR1LmxvY2FsIiwicm9sZSI6IlNUVURFTlQiLCJ0eXBlIjoicmVmcmVzaCIsImlhdCI6MTc3MzkzODM5NiwiZXhwIjoxNzc0NTQzMTk2fQ.QaYgchU47gD1SXGMzSTK0NkjJ-Ex5qPatUhvLruWegU"
+      },
+      "trace_id": "9d9e5cb7-6abd-4e54-a281-0acdb2c2d02d"
+    }
+  }
+}
