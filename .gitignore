@@ -21,6 +21,7 @@ out
 
 # Sensitive files 
 .github/
+.plan/
 
 # Logs
 logs

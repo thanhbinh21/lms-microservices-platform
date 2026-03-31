@@ -13,11 +13,13 @@ export default function CourseSettingsPage() {
   const router = useRouter();
   const params = useParams();
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [course, setCourse] = useState<CourseDto | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('0');
+  const [thumbnail, setThumbnail] = useState('');
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -28,6 +30,7 @@ export default function CourseSettingsPage() {
         setTitle(result.data.title);
         setDescription(result.data.description || '');
         setPrice(String(result.data.price));
+        setThumbnail(result.data.thumbnail || '');
       }
       setLoading(false);
     };
@@ -42,8 +45,32 @@ export default function CourseSettingsPage() {
       title,
       description,
       price: Number(price),
+      thumbnail: thumbnail.trim() || null,
     });
     setIsSaving(false);
+  };
+
+  const handlePublish = async () => {
+    setIsPublishing(true);
+    const courseId = String(params.courseId);
+
+    const result = await updateCourseAction(courseId, {
+      title,
+      description,
+      price: Number(price),
+      thumbnail: thumbnail.trim() || null,
+      status: 'PUBLISHED',
+    });
+
+    if (!result.success) {
+      window.alert(result.message);
+      setIsPublishing(false);
+      return;
+    }
+
+    setCourse((prev) => (prev ? { ...prev, status: 'PUBLISHED' } : prev));
+    setIsPublishing(false);
+    window.alert('Da xuat ban khoa hoc thanh cong');
   };
 
   if (loading) {
@@ -119,11 +146,24 @@ export default function CourseSettingsPage() {
             <CardHeader>
               <CardTitle>Ảnh bìa (Thumbnail)</CardTitle>
             </CardHeader>
-            <CardContent>
-               <div className="aspect-video rounded-xl bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500 hover:bg-slate-50 hover:border-primary/50 transition-colors cursor-pointer">
-                 <ImageIcon className="w-10 h-10 mb-2 opacity-50" />
-                 <span className="text-sm font-bold">Tải ảnh lên (16:9)</span>
-               </div>
+            <CardContent className="space-y-3">
+              <div className="aspect-video rounded-xl bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500">
+                <ImageIcon className="w-10 h-10 mb-2 opacity-50" />
+                <span className="text-sm font-bold">Dán URL ảnh bìa (16:9)</span>
+              </div>
+              <Input
+                value={thumbnail}
+                onChange={(event) => setThumbnail(event.target.value)}
+                className="h-11 rounded-xl bg-white/70"
+                placeholder="https://..."
+              />
+              {thumbnail.trim() && (
+                <img
+                  src={thumbnail}
+                  alt="thumbnail preview"
+                  className="w-full aspect-video rounded-xl object-cover border border-slate-200"
+                />
+              )}
             </CardContent>
           </Card>
 
@@ -134,10 +174,19 @@ export default function CourseSettingsPage() {
             <CardContent className="space-y-4">
               <div className="p-4 rounded-xl bg-slate-100 border border-slate-200">
                   <p className="font-bold text-sm text-slate-600">{course.status || 'DRAFT'} {(course.status || 'DRAFT') === 'DRAFT' ? '(Bản nháp)' : ''}</p>
-                 <p className="text-xs text-slate-500 mt-1">Khóa học hiện đang ẩn với học viên.</p>
+                 <p className="text-xs text-slate-500 mt-1">
+                   {(course.status || 'DRAFT') === 'PUBLISHED'
+                     ? 'Khóa học đang hiển thị với học viên.'
+                     : 'Khóa học hiện đang ẩn với học viên.'}
+                 </p>
               </div>
-              <Button className="w-full rounded-xl shadow-md font-bold" variant="default">
-                 Xuất bản Khóa học
+              <Button
+                className="w-full rounded-xl shadow-md font-bold"
+                variant="default"
+                onClick={handlePublish}
+                disabled={isPublishing || (course.status || 'DRAFT') === 'PUBLISHED'}
+              >
+                 {isPublishing ? 'Đang xuất bản...' : (course.status || 'DRAFT') === 'PUBLISHED' ? 'Đã xuất bản' : 'Xuất bản Khóa học'}
               </Button>
             </CardContent>
           </Card>

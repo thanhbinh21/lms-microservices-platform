@@ -85,7 +85,8 @@ Production-ready Learning Management System (LMS) designed for online course man
 │                    Port: 3000                       │
 │   - Student UI (Dashboard, Learning, Courses)      │
 │   - Instructor UI (Curriculum Builder)             │
-│   - Server Actions (Data Aggregation)              │
+│   - Server Actions (Data Aggregation) 
+                                    │
 └─────────────────────┬───────────────────────────────┘
                       │
                       │ HTTP Requests
@@ -115,7 +116,7 @@ Production-ready Learning Management System (LMS) designed for online course man
                                 │ Publish Events
                                 ▼
                        ┌─────────────────┐
-                       │  Apache Kafka   │
+                       │  Apache Kafka 
                        │  (Event Bus)    │
                        │  Topics:        │
                        │  - Orders       │

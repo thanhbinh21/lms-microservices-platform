@@ -26,6 +26,12 @@ enum CourseLevel {
   ADVANCED
 }
 
+enum LessonSourceType {
+  UPLOAD
+  YOUTUBE
+}
+
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model Course {
@@ -37,6 +43,7 @@ model Course {
   price        Decimal      @default(0) @db.Decimal(10, 2)
   level        CourseLevel  @default(BEGINNER)
   status       CourseStatus @default(DRAFT)
+  category     String?
   instructorId String       @map("instructor_id")  // from x-user-id (Gateway)
   totalLessons Int          @default(0) @map("total_lessons")
   totalDuration Int         @default(0) @map("total_duration") // seconds
@@ -74,6 +81,7 @@ model Lesson {
   title       String
   order       Int      @default(0)
   videoUrl    String?  @map("video_url")   // VideoCipher/S3 (Phase 6)
+  sourceType  LessonSourceType @default(UPLOAD) @map("source_type")
   duration    Int      @default(0)          // seconds
   isPublished Boolean  @default(false) @map("is_published")
   isFree      Boolean  @default(false) @map("is_free") // preview lesson

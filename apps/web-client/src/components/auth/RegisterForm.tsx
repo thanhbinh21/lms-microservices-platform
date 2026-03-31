@@ -4,36 +4,18 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { registerAction } from '@/app/actions/auth';
 import { useAppDispatch } from '@/lib/redux/hooks';
 import { setUser } from '@/lib/redux/authSlice';
-import { Loader2, UserPlus, AlertCircle } from 'lucide-react';
+import { Loader2, UserPlus } from 'lucide-react';
 import Link from 'next/link';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+import { registerSchema, type RegisterInput } from '@/lib/schemas/auth.schema';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-
-// Override schema inline if needed, but assuming standard registerSchema exists
-const registerSchema = z.object({
-  name: z.string().min(2, 'Tên ít nhất 2 ký tự').max(50, 'Tên quá dài'),
-  email: z.string().email('Email không đúng định dạng'),
-  password: z.string().min(6, 'Mật khẩu phải từ 6 ký tự'),
-  confirmPassword: z.string().min(6, 'Vui lòng xác nhận mật khẩu'),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Mật khẩu không khớp nhau",
-  path: ["confirmPassword"],
-});
-
-type RegisterInput = z.infer<typeof registerSchema>;
+import { mapUiErrorMessage, mapUiSuccessMessage } from '@/lib/ui-notification';
+import { StatusMessage } from '@/components/ui/status-message';
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -49,6 +31,7 @@ export default function RegisterForm() {
       email: '',
       password: '',
       confirmPassword: '',
+      role: 'STUDENT',
     },
   });
 
@@ -66,16 +49,17 @@ export default function RegisterForm() {
           accessToken: result.accessToken,
         }));
 
-        setSuccess('Đăng ký thành công! Đang vào trang chủ...');
+        setSuccess(mapUiSuccessMessage(result.message, 'Đăng ký thành công! Đang chuyển hướng...'));
+        const redirectPath = result.user.role === 'INSTRUCTOR' ? '/instructor/courses' : '/dashboard';
         
         setTimeout(() => {
-          router.push('/dashboard');
+          router.push(redirectPath);
         }, 800);
       } else {
-        setError(result.message || 'Hệ thống đang bận. Đăng ký thất bại.');
+        setError(mapUiErrorMessage(result.message, 'Hệ thống đang bận. Đăng ký thất bại.'));
       }
     } catch (err) {
-      setError('Lỗi kết nối máy chủ. Vui lòng thử lại sau.');
+      setError(mapUiErrorMessage(err, 'Lỗi kết nối máy chủ. Vui lòng thử lại sau.'));
       console.error('Register error:', err);
     } finally {
       setIsLoading(false);
@@ -178,18 +162,45 @@ export default function RegisterForm() {
               />
             </div>
 
-            {error && (
-              <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3.5 flex items-start gap-3 animate-in fade-in zoom-in-95 duration-300 mt-2">
-                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                <p className="text-sm font-semibold text-destructive">{error}</p>
-              </div>
-            )}
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="font-semibold text-foreground">Loại tài khoản</FormLabel>
+                  <FormControl>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className={`cursor-pointer rounded-xl border p-3 text-sm font-semibold transition-colors ${field.value === 'STUDENT' ? 'border-primary bg-primary/10 text-primary' : 'border-white/80 bg-white/60 text-muted-foreground'}`}>
+                        <input
+                          type="radio"
+                          className="sr-only"
+                          value="STUDENT"
+                          checked={field.value === 'STUDENT'}
+                          onChange={() => field.onChange('STUDENT')}
+                          disabled={isLoading}
+                        />
+                        Học viên
+                      </label>
+                      <label className={`cursor-pointer rounded-xl border p-3 text-sm font-semibold transition-colors ${field.value === 'INSTRUCTOR' ? 'border-primary bg-primary/10 text-primary' : 'border-white/80 bg-white/60 text-muted-foreground'}`}>
+                        <input
+                          type="radio"
+                          className="sr-only"
+                          value="INSTRUCTOR"
+                          checked={field.value === 'INSTRUCTOR'}
+                          onChange={() => field.onChange('INSTRUCTOR')}
+                          disabled={isLoading}
+                        />
+                        Giảng viên
+                      </label>
+                    </div>
+                  </FormControl>
+                  <FormMessage className="text-xs text-destructive font-medium" />
+                </FormItem>
+              )}
+            />
 
-            {success && (
-              <div className="rounded-xl bg-green-500/10 border border-green-500/20 p-3.5 flex items-center justify-center animate-in fade-in zoom-in-95 duration-300 mt-2">
-                <p className="text-sm font-bold text-green-700">{success}</p>
-              </div>
-            )}
+            {error && <StatusMessage type="error" message={error} />}
+            {success && <StatusMessage type="success" message={success} />}
 
             <Button 
               type="submit" 

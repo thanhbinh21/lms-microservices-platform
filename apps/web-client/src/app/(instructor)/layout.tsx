@@ -11,20 +11,22 @@ import { LayoutDashboard } from 'lucide-react';
 
 export default function InstructorLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { user, isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    if (isLoading) return;
+
     // Role Guard: Require authentication AND instructor/admin role
     if (!isAuthenticated) {
       router.push('/login');
     } else if (user?.role !== 'INSTRUCTOR' && user?.role !== 'ADMIN') {
       router.push('/dashboard');
     }
-  }, [user, isAuthenticated, router]);
+  }, [user, isAuthenticated, isLoading, router]);
 
-  if (!mounted || !user) return null; // Wait for client hydration
+  if (!mounted || isLoading || !user) return null; // Wait for client hydration
 
   // If authenticated but wrong role, prevent rendering kids to avoid flicker before redirect catches
     if (user.role !== 'INSTRUCTOR' && user.role !== 'ADMIN') {

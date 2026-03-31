@@ -55,6 +55,11 @@ function serializeCourse<T extends { price: unknown }>(course: T): Omit<T, 'pric
   return { ...course, price: Number(course.price) };
 }
 
+function inferSourceType(videoUrl?: string | null): 'UPLOAD' | 'YOUTUBE' {
+  if (!videoUrl) return 'UPLOAD';
+  return videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') ? 'YOUTUBE' : 'UPLOAD';
+}
+
 // ─── Controllers ──────────────────────────────────────────────────────────────
 
 /** GET /api/courses - Danh sach khoa hoc da xuat ban (co phan trang) */
@@ -95,7 +100,7 @@ export async function listCourses(req: Request, res: Response) {
 export async function getCourseBySlug(req: Request, res: Response) {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
   try {
-    const course = await prisma.course.findUnique({
+    const course = await prisma.course.findFirst({
       where: { slug: req.params.slug, status: 'PUBLISHED' },
       include: {
         chapters: {
@@ -111,6 +116,7 @@ export async function getCourseBySlug(req: Request, res: Response) {
                 order: true,
                 duration: true,
                 isFree: true,
+                videoUrl: true,
               },
             },
           },
@@ -125,9 +131,22 @@ export async function getCourseBySlug(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
 
+    // Chi tra ve videoUrl cho bai hoc free de dam bao luong xem thu khong lam ro noi dung tra phi
+    const sanitizedCourse = {
+      ...serializeCourse(course),
+      chapters: course.chapters.map((chapter) => ({
+        ...chapter,
+        lessons: chapter.lessons.map((lesson) => ({
+          ...lesson,
+          videoUrl: lesson.isFree ? lesson.videoUrl : null,
+          sourceType: inferSourceType(lesson.videoUrl),
+        })),
+      })),
+    };
+
     const response: ApiResponse<unknown> = {
       success: true, code: 200, message: 'Course fetched successfully',
-      data: serializeCourse(course), trace_id: traceId,
+      data: sanitizedCourse, trace_id: traceId,
     };
     return res.status(200).json(response);
   } catch (err) {
@@ -156,6 +175,33 @@ export async function getInstructorCourses(req: Request, res: Response) {
   }
 }
 
+/** GET /api/instructor/courses/:id - Lay chi tiet 1 khoa hoc cua giang vien */
+export async function getInstructorCourseById(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const courseId = req.params.id;
+  try {
+    const course = await prisma.course.findUnique({
+      where: { id: courseId, instructorId },
+      include: { _count: { select: { chapters: true, enrollments: true } } },
+    });
+
+    if (!course) {
+      const notFound: ApiResponse<null> = {
+        success: false, code: 404, message: 'Course not found', data: null, trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    const response: ApiResponse<unknown> = {
+      success: true, code: 200, message: 'Course fetched',
+      data: serializeCourse(course), trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'getInstructorCourseById');
+  }
+}
 /** GET /api/courses/:id/curriculum - Lay curriculum cho giang vien/admin theo courseId */
 export async function getCourseCurriculum(req: Request, res: Response) {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -199,11 +245,22 @@ export async function getCourseCurriculum(req: Request, res: Response) {
       return res.status(403).json(forbidden);
     }
 
+    const courseWithSourceType = {
+      ...serializeCourse(course),
+      chapters: course.chapters.map((chapter) => ({
+        ...chapter,
+        lessons: chapter.lessons.map((lesson) => ({
+          ...lesson,
+          sourceType: inferSourceType(lesson.videoUrl),
+        })),
+      })),
+    };
+
     const response: ApiResponse<unknown> = {
       success: true,
       code: 200,
       message: 'Course curriculum fetched',
-      data: serializeCourse(course),
+      data: courseWithSourceType,
       trace_id: traceId,
     };
     return res.status(200).json(response);
@@ -273,6 +330,66 @@ export async function updateCourse(req: Request, res: Response) {
     let slug = course.slug;
     if (validated.title && validated.title !== course.title) {
       slug = await generateUniqueSlug(validated.title, course.id);
+    }
+
+    if (validated.status === 'PUBLISHED') {
+      const thumbnail = (validated.thumbnail ?? course.thumbnail ?? '').trim();
+      if (!thumbnail) {
+        const bad: ApiResponse<null> = {
+          success: false,
+          code: 400,
+          message: 'Khong the xuat ban khi chua co thumbnail',
+          data: null,
+          trace_id: traceId,
+        };
+        return res.status(400).json(bad);
+      }
+
+      // Kiem tra du lieu toi thieu de tranh hien thi khoa hoc rong tren trang hoc vien.
+      const [chapterCount, lessonCount, publishableLessonCount] = await prisma.$transaction([
+        prisma.chapter.count({ where: { courseId: req.params.id } }),
+        prisma.lesson.count({ where: { chapter: { courseId: req.params.id } } }),
+        prisma.lesson.count({
+          where: {
+            chapter: { courseId: req.params.id },
+            isPublished: true,
+            videoUrl: { not: null },
+          },
+        }),
+      ]);
+
+      if (chapterCount === 0) {
+        const bad: ApiResponse<null> = {
+          success: false,
+          code: 400,
+          message: 'Khong the xuat ban khi chua co chuong hoc',
+          data: null,
+          trace_id: traceId,
+        };
+        return res.status(400).json(bad);
+      }
+
+      if (lessonCount === 0) {
+        const bad: ApiResponse<null> = {
+          success: false,
+          code: 400,
+          message: 'Khong the xuat ban khi chua co bai hoc',
+          data: null,
+          trace_id: traceId,
+        };
+        return res.status(400).json(bad);
+      }
+
+      if (publishableLessonCount === 0) {
+        const bad: ApiResponse<null> = {
+          success: false,
+          code: 400,
+          message: 'Can it nhat 1 bai hoc da publish va co video de xuat ban khoa hoc',
+          data: null,
+          trace_id: traceId,
+        };
+        return res.status(400).json(bad);
+      }
     }
 
     const updated = await prisma.course.update({

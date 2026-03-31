@@ -4,7 +4,7 @@ _transform: true
 # Services - Microservices Backend
 services:
   - name: auth-service
-    url: http://host.docker.internal:3001
+    url: http://host.docker.internal:3101
     routes:
       - name: auth-route
         paths:

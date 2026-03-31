@@ -17,12 +17,14 @@ import { BookOpen, Clock, Trophy, MessageSquare, PlayCircle, LogOut, ArrowRight,
 export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { user, isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
   
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isLoading) return;
+
     if (!isAuthenticated) {
       router.push('/login');
       return;
@@ -37,7 +39,7 @@ export default function DashboardPage() {
     };
 
     fetchData();
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, router]);
 
   const handleLogout = async () => {
     await logoutAction();
@@ -45,7 +47,7 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
-  if (!user) return null;
+  if (isLoading || !user) return null;
 
   return (
     <div className="glass-page relative min-h-screen text-foreground overflow-hidden pb-20">

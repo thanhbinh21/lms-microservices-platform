@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 
-const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || 'http://localhost:8000';
+const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:8000';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -47,14 +47,36 @@ export interface LessonDto {
   order: number;
   duration: number;
   videoUrl?: string | null;
+  sourceType: 'UPLOAD' | 'YOUTUBE';
   isPublished: boolean;
   isFree: boolean;
+}
+
+export interface MediaUploadDto {
+  id: string;
+  filename: string;
+  sourceType: 'UPLOAD' | 'YOUTUBE';
+  status: 'PENDING' | 'UPLOADED' | 'PROCESSED' | 'FAILED';
+  url?: string | null;
+  lessonId?: string | null;
+}
+
+interface PresignedUploadDto {
+  mediaId: string;
+  presignedUrl: string;
+  storageKey: string;
+  expiresAt: string;
 }
 
 export interface CourseCurriculumDto {
   id: string;
   title: string;
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  slug?: string;
+  description?: string | null;
+  price?: number;
+  level?: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  instructorId?: string;
   chapters: ChapterDto[];
 }
 
@@ -98,30 +120,16 @@ export async function getPublicCoursesAction(page = 1, limit = 20) {
   );
 }
 
+export async function getPublicCourseDetailAction(slug: string) {
+  return callApi<CourseCurriculumDto>(`/course/api/courses/${slug}`, { method: 'GET' });
+}
+
 export async function getInstructorCoursesAction() {
   return callApi<CourseDto[]>(`/course/api/instructor/courses`, { method: 'GET' }, true);
 }
 
-export async function getCourseByIdAction(courseId: string): Promise<ApiResponse<CourseDto>> {
-  const response = await getInstructorCoursesAction();
-  if (!response.success || !response.data) {
-    return {
-      success: false,
-      code: response.code,
-      message: response.message,
-      data: null,
-      trace_id: response.trace_id,
-    };
-  }
-
-  const course = response.data.find((item) => item.id === courseId) || null;
-  return {
-    success: !!course,
-    code: course ? 200 : 404,
-    message: course ? 'Course fetched successfully' : 'Course not found',
-    data: course,
-    trace_id: response.trace_id,
-  };
+export async function getCourseByIdAction(courseId: string) {
+  return callApi<CourseDto>(`/course/api/instructor/courses/${courseId}`, { method: 'GET' }, true);
 }
 
 export async function getCourseCurriculumAction(courseId: string) {
@@ -175,4 +183,116 @@ export async function updateCurriculumOrderAction(courseId: string, orderedChapt
 
   revalidatePath(`/instructor/courses/${courseId}/curriculum`);
   return { success: result.success, message: result.message };
+}
+
+export async function createChapterAction(courseId: string, title: string) {
+  const result = await callApi<ChapterDto>(
+    `/course/api/courses/${courseId}/chapters`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    },
+    true,
+  );
+
+  revalidatePath(`/instructor/courses/${courseId}/curriculum`);
+  return { success: result.success, message: result.message, chapter: result.data };
+}
+
+export async function createLessonAction(courseId: string, chapterId: string, title: string, isFree = false) {
+  const result = await callApi<LessonDto>(
+    `/course/api/courses/${courseId}/chapters/${chapterId}/lessons`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ title, isFree }),
+    },
+    true,
+  );
+
+  revalidatePath(`/instructor/courses/${courseId}/curriculum`);
+  return { success: result.success, message: result.message, lesson: result.data };
+}
+
+export async function updateLessonAction(
+  courseId: string,
+  chapterId: string,
+  lessonId: string,
+  data: Partial<Pick<LessonDto, 'title' | 'duration' | 'isPublished' | 'isFree' | 'videoUrl' | 'sourceType'>>,
+) {
+  const result = await callApi<LessonDto>(
+    `/course/api/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    },
+    true,
+  );
+
+  revalidatePath(`/instructor/courses/${courseId}/curriculum`);
+  return { success: result.success, message: result.message, lesson: result.data };
+}
+
+export async function requestLessonUploadAction(params: {
+  filename: string;
+  mimeType: string;
+  size: number;
+  courseId: string;
+  lessonId: string;
+}) {
+  return callApi<PresignedUploadDto>(
+    `/media/api/upload/presigned`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        filename: params.filename,
+        mimeType: params.mimeType,
+        size: params.size,
+        type: 'VIDEO',
+        courseId: params.courseId,
+        lessonId: params.lessonId,
+      }),
+    },
+    true,
+  );
+}
+
+export async function confirmLessonUploadAction(mediaId: string) {
+  return callApi<MediaUploadDto>(
+    `/media/api/upload/complete`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ mediaId }),
+    },
+    true,
+  );
+}
+
+export async function registerYoutubeMediaAction(params: {
+  title: string;
+  youtubeUrl: string;
+  courseId: string;
+  lessonId: string;
+}) {
+  return callApi<MediaUploadDto>(
+    `/media/api/upload/external`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        filename: params.title,
+        sourceType: 'YOUTUBE',
+        externalUrl: params.youtubeUrl,
+        courseId: params.courseId,
+        lessonId: params.lessonId,
+      }),
+    },
+    true,
+  );
+}
+
+export async function getLessonPlaybackAction(lessonId: string, requireAuth = false) {
+  return callApi<{ lessonId: string; courseId: string; videoUrl: string; sourceType: 'UPLOAD' | 'YOUTUBE'; isFree: boolean; duration: number }>(
+    `/course/api/lessons/${lessonId}/playback`,
+    { method: 'GET' },
+    requireAuth,
+  );
 }

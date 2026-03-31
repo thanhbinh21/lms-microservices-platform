@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { loginAction } from '@/app/actions/auth';
 import { useAppDispatch } from '@/lib/redux/hooks';
 import { setUser } from '@/lib/redux/authSlice';
-import { Loader2, QrCode, LogIn, AlertCircle } from 'lucide-react';
+import { Loader2, QrCode, LogIn } from 'lucide-react';
 import Link from 'next/link';
 import {
   Form,
@@ -21,6 +21,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { mapUiErrorMessage, mapUiSuccessMessage } from '@/lib/ui-notification';
+import { StatusMessage } from '@/components/ui/status-message';
 
 // Override schema inline if needed, but assuming standard loginSchema format exists
 const loginSchema = z.object({
@@ -61,18 +63,19 @@ export default function LoginForm() {
           accessToken: result.accessToken,
         }));
 
-        setSuccess('Đăng nhập thành công! Đang chuyển hướng...');
+        setSuccess(mapUiSuccessMessage(result.message, 'Đăng nhập thành công! Đang chuyển hướng...'));
+        const redirectPath = result.user.role === 'INSTRUCTOR' ? '/instructor/courses' : '/dashboard';
         
-        // 3. Redirect
+        // Dieu huong theo vai tro de giang vien vao thang khu vuc quan ly khoa hoc.
         setTimeout(() => {
-          router.push('/dashboard');
+          router.push(redirectPath);
         }, 800);
       } else {
         // API Error logic
-        setError(result.message || 'Tài khoản hoặc mật khẩu không chính xác.');
+        setError(mapUiErrorMessage(result.message, 'Tài khoản hoặc mật khẩu không chính xác.'));
       }
     } catch (err) {
-      setError('Lỗi kết nối máy chủ. Vui lòng thử lại sau.');
+      setError(mapUiErrorMessage(err, 'Lỗi kết nối máy chủ. Vui lòng thử lại sau.'));
       console.error('Login error:', err);
     } finally {
       setIsLoading(false);
@@ -162,19 +165,10 @@ export default function LoginForm() {
             </div>
 
             {/* Error State: API Failed */}
-            {error && (
-              <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3.5 flex items-start gap-3 animate-in fade-in zoom-in-95 duration-300">
-                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                <p className="text-sm font-semibold text-destructive">{error}</p>
-              </div>
-            )}
+            {error && <StatusMessage type="error" message={error} />}
 
             {/* Success State */}
-            {success && (
-              <div className="rounded-xl bg-green-500/10 border border-green-500/20 p-3.5 flex items-center justify-center animate-in fade-in zoom-in-95 duration-300">
-                <p className="text-sm font-bold text-green-700">{success}</p>
-              </div>
-            )}
+            {success && <StatusMessage type="success" message={success} />}
 
             {/* Submit Button */}
             <Button 

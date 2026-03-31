@@ -3,11 +3,12 @@
 import { cookies } from 'next/headers';
 import { loginSchema, registerSchema, type LoginInput, type RegisterInput } from '@/lib/schemas/auth.schema';
 
-const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || 'http://localhost:8000';
+const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:8000';
 const AUTH_PREFIX = process.env.NEXT_PUBLIC_AUTH_PREFIX || '/auth';
 
 interface AuthResponse {
   success: boolean;
+  code?: number;
   message?: string;
   user?: {
     id: string;
@@ -16,6 +17,94 @@ interface AuthResponse {
     role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
   };
   accessToken?: string;
+}
+
+type UserRole = 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
+
+interface TokenPayload {
+  userId: string;
+  email: string;
+  role: string;
+  exp?: number;
+}
+
+function normalizeRole(role: string): UserRole {
+  const normalized = role.toUpperCase();
+  if (normalized === 'INSTRUCTOR') return 'INSTRUCTOR';
+  if (normalized === 'ADMIN') return 'ADMIN';
+  return 'STUDENT';
+}
+
+function decodeTokenPayload(token: string): TokenPayload | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8')) as TokenPayload;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+async function clearAuthCookies() {
+  const cookieStore = await cookies();
+  cookieStore.delete('accessToken');
+  cookieStore.delete('refreshToken');
+  cookieStore.delete('userName');
+}
+
+async function writeAuthCookies(params: { accessToken?: string; refreshToken?: string; userName?: string }) {
+  const cookieStore = await cookies();
+
+  if (params.accessToken) {
+    cookieStore.set('accessToken', params.accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60,
+      path: '/',
+    });
+  }
+
+  if (params.refreshToken) {
+    cookieStore.set('refreshToken', params.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60,
+      path: '/',
+    });
+  }
+
+  if (params.userName) {
+    // Luu ten de hydrate UI sau refresh token ma khong can goi them API profile.
+    cookieStore.set('userName', params.userName, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60,
+      path: '/',
+    });
+  }
+}
+
+async function refreshWithToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string } | null> {
+  const response = await fetch(`${GATEWAY_URL}${AUTH_PREFIX}/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refreshToken }),
+  });
+
+  const result = await response.json();
+  if (!response.ok || !result.success) return null;
+
+  const nextAccessToken = result?.data?.accessToken as string | undefined;
+  const nextRefreshToken = result?.data?.refreshToken as string | undefined;
+  if (!nextAccessToken || !nextRefreshToken) return null;
+
+  return { accessToken: nextAccessToken, refreshToken: nextRefreshToken };
 }
 
 export async function loginAction(data: LoginInput): Promise<AuthResponse> {
@@ -44,31 +133,11 @@ export async function loginAction(data: LoginInput): Promise<AuthResponse> {
     // Extract data from backend response structure
     const { user, accessToken, refreshToken } = result.data;
 
-    // Set HTTP-only cookies for tokens
-    const cookieStore = await cookies();
-    
-    if (accessToken) {
-      cookieStore.set('accessToken', accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 15 * 60, // 15 minutes
-        path: '/',
-      });
-    }
-
-    if (refreshToken) {
-      cookieStore.set('refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60, // 7 days
-        path: '/',
-      });
-    }
+    await writeAuthCookies({ accessToken, refreshToken, userName: user?.name });
 
     return {
       success: true,
+      code: 200,
       user,
       accessToken,
     };
@@ -110,31 +179,11 @@ export async function registerAction(data: RegisterInput): Promise<AuthResponse>
     // Extract data from backend response structure
     const { user, accessToken, refreshToken } = result.data;
 
-    // Set HTTP-only cookies for tokens
-    const cookieStore = await cookies();
-    
-    if (accessToken) {
-      cookieStore.set('accessToken', accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 15 * 60, // 15 minutes
-        path: '/',
-      });
-    }
-
-    if (refreshToken) {
-      cookieStore.set('refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60, // 7 days
-        path: '/',
-      });
-    }
+    await writeAuthCookies({ accessToken, refreshToken, userName: user?.name });
 
     return {
       success: true,
+      code: 200,
       user,
       accessToken,
     };
@@ -143,6 +192,70 @@ export async function registerAction(data: RegisterInput): Promise<AuthResponse>
     return {
       success: false,
       message: error instanceof Error ? error.message : 'An error occurred',
+    };
+  }
+}
+
+export async function restoreSessionAction(): Promise<AuthResponse> {
+  try {
+    const cookieStore = await cookies();
+    const currentAccessToken = cookieStore.get('accessToken')?.value;
+    const currentRefreshToken = cookieStore.get('refreshToken')?.value;
+    const savedUserName = cookieStore.get('userName')?.value;
+
+    if (!currentAccessToken && !currentRefreshToken) {
+      return { success: false, code: 401, message: 'Khong tim thay phien dang nhap' };
+    }
+
+    let accessToken = currentAccessToken;
+    let refreshToken = currentRefreshToken;
+
+    const currentPayload = accessToken ? decodeTokenPayload(accessToken) : null;
+    const isAccessExpired = currentPayload?.exp ? currentPayload.exp * 1000 <= Date.now() : true;
+
+    if (!accessToken || !currentPayload || isAccessExpired) {
+      if (!refreshToken) {
+        await clearAuthCookies();
+        return { success: false, code: 401, message: 'Phien dang nhap da het han' };
+      }
+
+      const refreshed = await refreshWithToken(refreshToken);
+      if (!refreshed) {
+        await clearAuthCookies();
+        return { success: false, code: 401, message: 'Khong the lam moi phien dang nhap' };
+      }
+
+      accessToken = refreshed.accessToken;
+      refreshToken = refreshed.refreshToken;
+      await writeAuthCookies({ accessToken, refreshToken });
+    }
+
+    const payload = accessToken ? decodeTokenPayload(accessToken) : null;
+    if (!payload) {
+      await clearAuthCookies();
+      return { success: false, code: 401, message: 'Token khong hop le' };
+    }
+
+    const userName = savedUserName?.trim() || payload.email.split('@')[0] || 'User';
+
+    return {
+      success: true,
+      code: 200,
+      accessToken,
+      user: {
+        id: payload.userId,
+        email: payload.email,
+        name: userName,
+        role: normalizeRole(payload.role),
+      },
+    };
+  } catch (error) {
+    console.error('Restore session error:', error);
+    await clearAuthCookies();
+    return {
+      success: false,
+      code: 500,
+      message: 'Khong the khoi phuc phien dang nhap',
     };
   }
 }
@@ -162,9 +275,7 @@ export async function logoutAction(): Promise<{ success: boolean }> {
       });
     }
 
-    // Clear cookies
-    cookieStore.delete('accessToken');
-    cookieStore.delete('refreshToken');
+    await clearAuthCookies();
 
     return { success: true };
   } catch (error) {

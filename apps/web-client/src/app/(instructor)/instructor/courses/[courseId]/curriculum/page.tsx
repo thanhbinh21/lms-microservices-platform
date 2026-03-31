@@ -6,13 +6,25 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, GripVertical, Plus, Settings, Video, AlignLeft, Edit3, Trash2 } from 'lucide-react';
+import { ArrowLeft, GripVertical, Plus, Video, AlignLeft, Edit3, Trash2, UploadCloud, Link2 } from 'lucide-react';
 import Link from 'next/link';
-import { getCourseCurriculumAction, updateCurriculumOrderAction } from '@/app/actions/instructor';
+import {
+  getCourseCurriculumAction,
+  updateCurriculumOrderAction,
+  createChapterAction,
+  createLessonAction,
+  updateLessonAction,
+  requestLessonUploadAction,
+  confirmLessonUploadAction,
+  registerYoutubeMediaAction,
+} from '@/app/actions/instructor';
 
 interface LessonView {
   id: string;
   title: string;
+  videoUrl?: string | null;
+  sourceType: 'UPLOAD' | 'YOUTUBE';
+  isFree: boolean;
   type: 'video' | 'text';
 }
 
@@ -23,11 +35,27 @@ interface ChapterView {
 }
 
 export default function CurriculumEditorPage() {
-  const router = useRouter();
   const params = useParams();
   const [chapters, setChapters] = useState<ChapterView[]>([]);
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [uploadingLessonId, setUploadingLessonId] = useState<string>('');
+  const [newChapterTitle, setNewChapterTitle] = useState('');
+  const [selectedLessonKey, setSelectedLessonKey] = useState('');
+  const [youtubeUrlInput, setYoutubeUrlInput] = useState('');
+
+  const allLessons = chapters.flatMap((chapter) =>
+    chapter.lessons.map((lesson) => ({
+      chapterId: chapter.id,
+      chapterTitle: chapter.title,
+      lessonId: lesson.id,
+      lessonTitle: lesson.title,
+      lesson,
+      key: `${chapter.id}::${lesson.id}`,
+    })),
+  );
+
+  const selectedLesson = allLessons.find((item) => item.key === selectedLessonKey);
 
   useEffect(() => {
     setMounted(true); // Prevent SSR mismatch with DragDropContext
@@ -41,6 +69,9 @@ export default function CurriculumEditorPage() {
           lessons: chapter.lessons.map((lesson) => ({
             id: lesson.id,
             title: lesson.title,
+            videoUrl: lesson.videoUrl,
+            sourceType: lesson.sourceType,
+            isFree: lesson.isFree,
             type: lesson.videoUrl ? 'video' : 'text',
           })),
         }));
@@ -66,8 +97,282 @@ export default function CurriculumEditorPage() {
     }
   };
 
-  const addChapter = () => {
-    setChapters([...chapters, { id: `ch_new_${Date.now()}`, title: 'Chương mới', lessons: [] }]);
+  const addChapter = async () => {
+    if (newChapterTitle.trim().length < 2) {
+      window.alert('Tên chương cần ít nhất 2 ký tự');
+      return;
+    }
+
+    const courseId = String(params.courseId);
+    const result = await createChapterAction(courseId, newChapterTitle.trim());
+    if (!result.success || !result.chapter) {
+      window.alert(result.message || 'Khong tao duoc chuong');
+      return;
+    }
+
+    const chapter = result.chapter;
+
+    setChapters((prev) => [
+      ...prev,
+      {
+        id: chapter.id,
+        title: chapter.title,
+        lessons: [],
+      },
+    ]);
+    setNewChapterTitle('');
+  };
+
+  const addLesson = async (chapterId: string) => {
+    const title = window.prompt('Nhap ten bai hoc moi');
+    if (!title || title.trim().length < 2) return;
+
+    const isFree = window.confirm('Danh dau bai hoc nay la mien phi?');
+    const courseId = String(params.courseId);
+    const result = await createLessonAction(courseId, chapterId, title.trim(), isFree);
+
+    if (!result.success || !result.lesson) {
+      window.alert(result.message || 'Khong tao duoc bai hoc');
+      return;
+    }
+
+    const lesson = result.lesson;
+
+    setChapters((prev) =>
+      prev.map((chapter) =>
+        chapter.id === chapterId
+          ? {
+              ...chapter,
+              lessons: [
+                ...chapter.lessons,
+                {
+                  id: lesson.id,
+                  title: lesson.title,
+                  isFree: lesson.isFree,
+                  videoUrl: lesson.videoUrl,
+                  sourceType: lesson.sourceType,
+                  type: lesson.videoUrl ? 'video' : 'text',
+                },
+              ],
+            }
+          : chapter,
+      ),
+    );
+  };
+
+  const uploadLessonVideo = async (chapterId: string, lessonId: string, file?: File | null) => {
+    if (!file) return;
+
+    const courseId = String(params.courseId);
+    setUploadingLessonId(lessonId);
+
+    try {
+      const presigned = await requestLessonUploadAction({
+        filename: file.name,
+        mimeType: file.type || 'video/mp4',
+        size: file.size,
+        courseId,
+        lessonId,
+      });
+
+      if (!presigned.success || !presigned.data) {
+        window.alert(presigned.message || 'Khong tao duoc phien upload');
+        return;
+      }
+
+      if (presigned.data.presignedUrl.includes('/api/upload/local/')) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadResponse = await fetch(presigned.data.presignedUrl, {
+          method: 'PUT',
+          body: formData,
+        });
+        if (!uploadResponse.ok) {
+          window.alert('Upload local that bai');
+          return;
+        }
+      } else {
+        const uploadResponse = await fetch(presigned.data.presignedUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        });
+        if (!uploadResponse.ok) {
+          window.alert('Upload S3 that bai');
+          return;
+        }
+      }
+
+      const confirmed = await confirmLessonUploadAction(presigned.data.mediaId);
+      if (!confirmed.success || !confirmed.data?.url) {
+        window.alert(confirmed.message || 'Khong xac nhan duoc upload');
+        return;
+      }
+
+      const updated = await updateLessonAction(courseId, chapterId, lessonId, {
+        videoUrl: confirmed.data.url,
+        sourceType: 'UPLOAD',
+      });
+
+      if (!updated.success || !updated.lesson) {
+        window.alert(updated.message || 'Khong cap nhat duoc bai hoc sau upload');
+        return;
+      }
+
+      setChapters((prev) =>
+        prev.map((chapter) =>
+          chapter.id !== chapterId
+            ? chapter
+            : {
+                ...chapter,
+                lessons: chapter.lessons.map((lesson) =>
+                  lesson.id !== lessonId
+                    ? lesson
+                    : {
+                        ...lesson,
+                        videoUrl: updated.lesson?.videoUrl,
+                        sourceType: updated.lesson?.sourceType || 'UPLOAD',
+                        type: updated.lesson?.videoUrl ? 'video' : 'text',
+                      },
+                ),
+              },
+        ),
+      );
+    } finally {
+      setUploadingLessonId('');
+    }
+  };
+
+  const attachYoutubeForSelectedLesson = async () => {
+    if (!selectedLesson) {
+      window.alert('Vui lòng chọn bài học cần gắn video');
+      return;
+    }
+
+    if (!youtubeUrlInput.trim()) {
+      window.alert('Vui lòng nhập URL YouTube');
+      return;
+    }
+
+    const courseId = String(params.courseId);
+    const result = await updateLessonAction(courseId, selectedLesson.chapterId, selectedLesson.lessonId, {
+      sourceType: 'YOUTUBE',
+      videoUrl: youtubeUrlInput.trim(),
+    });
+
+    if (!result.success || !result.lesson) {
+      window.alert(result.message || 'Không cập nhật được YouTube URL cho bài học');
+      return;
+    }
+
+    await registerYoutubeMediaAction({
+      title: selectedLesson.lessonTitle,
+      youtubeUrl: youtubeUrlInput.trim(),
+      courseId,
+      lessonId: selectedLesson.lessonId,
+    });
+
+    setChapters((prev) =>
+      prev.map((chapter) =>
+        chapter.id !== selectedLesson.chapterId
+          ? chapter
+          : {
+              ...chapter,
+              lessons: chapter.lessons.map((lesson) =>
+                lesson.id !== selectedLesson.lessonId
+                  ? lesson
+                  : {
+                      ...lesson,
+                      videoUrl: result.lesson?.videoUrl,
+                      sourceType: 'YOUTUBE',
+                      type: result.lesson?.videoUrl ? 'video' : 'text',
+                    },
+              ),
+            },
+      ),
+    );
+
+    setYoutubeUrlInput('');
+    window.alert('Đã gắn video YouTube cho bài học');
+  };
+
+  const editLesson = async (
+    chapterId: string,
+    lessonId: string,
+    currentTitle: string,
+    currentUrl?: string | null,
+    currentIsFree = false,
+    currentSourceType: 'UPLOAD' | 'YOUTUBE' = 'UPLOAD',
+  ) => {
+    const nextTitle = window.prompt('Cap nhat ten bai hoc', currentTitle);
+    if (!nextTitle || nextTitle.trim().length < 2) return;
+
+    const isYoutube = window.confirm(
+      `Nguon hien tai la ${currentSourceType}. Bam OK de dung YOUTUBE URL, Cancel de dung UPLOAD URL.`,
+    );
+
+    let nextVideoUrl = currentUrl || '';
+    if (isYoutube) {
+      const input = window.prompt('Nhap URL YouTube cho bai hoc', currentUrl || '');
+      if (input === null) return;
+      nextVideoUrl = input;
+    } else {
+      const input = window.prompt('Nhap URL video upload (co the de trong)', currentUrl || '');
+      if (input === null) return;
+      nextVideoUrl = input;
+    }
+
+    const nextIsFree = window.confirm(
+      `Bai hoc nay ${currentIsFree ? 'dang' : 'chua'} la mien phi. Bam OK de dat MIEN PHI, Cancel de dat TINH PHI.`,
+    );
+
+    const courseId = String(params.courseId);
+    const payload: { title: string; isFree: boolean; videoUrl?: string; sourceType: 'UPLOAD' | 'YOUTUBE' } = {
+      title: nextTitle.trim(),
+      isFree: nextIsFree,
+      sourceType: isYoutube ? 'YOUTUBE' : 'UPLOAD',
+    };
+
+    if (nextVideoUrl.trim().length > 0) {
+      payload.videoUrl = nextVideoUrl.trim();
+    }
+
+    const result = await updateLessonAction(courseId, chapterId, lessonId, payload);
+    if (!result.success || !result.lesson) {
+      window.alert(result.message || 'Khong cap nhat duoc bai hoc');
+      return;
+    }
+
+    if (isYoutube && nextVideoUrl.trim().length > 0) {
+      await registerYoutubeMediaAction({
+        title: nextTitle.trim(),
+        youtubeUrl: nextVideoUrl.trim(),
+        courseId,
+        lessonId,
+      });
+    }
+
+    setChapters((prev) =>
+      prev.map((chapter) =>
+        chapter.id !== chapterId
+          ? chapter
+          : {
+              ...chapter,
+              lessons: chapter.lessons.map((lesson) =>
+                lesson.id !== lessonId
+                  ? lesson
+                  : {
+                      ...lesson,
+                      title: result.lesson?.title || lesson.title,
+                      isFree: Boolean(result.lesson?.isFree),
+                      videoUrl: result.lesson?.videoUrl,
+                      sourceType: result.lesson?.sourceType || lesson.sourceType,
+                      type: result.lesson?.videoUrl ? 'video' : 'text',
+                    },
+              ),
+            },
+      ),
+    );
   };
 
   if (!mounted) return null;
@@ -84,10 +389,81 @@ export default function CurriculumEditorPage() {
           <h1 className="text-3xl font-bold tracking-tight">Soạn giáo trình</h1>
           <p className="text-muted-foreground mt-1 text-sm font-medium">Kéo thả để sắp xếp chương và bài học theo logic của bạn.</p>
         </div>
-        <Button className="rounded-xl shadow-md font-bold px-6" onClick={addChapter}>
-          <Plus className="mr-2 h-5 w-5" /> Thêm phần mới
-        </Button>
+        <div className="flex items-center gap-2">
+          <Input
+            value={newChapterTitle}
+            onChange={(event) => setNewChapterTitle(event.target.value)}
+            placeholder="Nhập tên chương mới..."
+            className="w-64 bg-white"
+          />
+          <Button className="rounded-xl shadow-md font-bold px-6" onClick={addChapter}>
+            <Plus className="mr-2 h-5 w-5" /> Thêm phần mới
+          </Button>
+        </div>
       </div>
+
+      <Card className="mb-8 rounded-2xl border-white/60 bg-white/70 backdrop-blur-xl shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">Trung tâm upload video bài học</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700">Bài học mục tiêu</label>
+            <select
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+              value={selectedLessonKey}
+              onChange={(event) => setSelectedLessonKey(event.target.value)}
+            >
+              <option value="">Chọn bài học</option>
+              {allLessons.map((item) => (
+                <option key={item.key} value={item.key}>
+                  {item.chapterTitle} - {item.lessonTitle}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700">Upload file video</label>
+            <label className="inline-flex h-11 w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 text-sm font-semibold text-slate-600 hover:border-primary hover:text-primary">
+              <UploadCloud className="mr-2 size-4" /> Chọn file để tải lên
+              <input
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime,video/x-msvideo"
+                className="hidden"
+                onChange={(event) => {
+                  if (!selectedLesson) {
+                    window.alert('Vui lòng chọn bài học trước khi upload');
+                    event.currentTarget.value = '';
+                    return;
+                  }
+                  const file = event.target.files?.[0];
+                  uploadLessonVideo(selectedLesson.chapterId, selectedLesson.lessonId, file);
+                  event.currentTarget.value = '';
+                }}
+              />
+            </label>
+            {uploadingLessonId && (
+              <p className="text-xs text-primary font-semibold">Đang upload video cho bài học...</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700">Gắn YouTube URL</label>
+            <div className="flex gap-2">
+              <Input
+                value={youtubeUrlInput}
+                onChange={(event) => setYoutubeUrlInput(event.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="bg-white"
+              />
+              <Button variant="outline" onClick={attachYoutubeForSelectedLesson}>
+                <Link2 className="mr-2 size-4" /> Gắn
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="max-w-4xl">
         <DragDropContext onDragEnd={onDragEnd}>
@@ -134,16 +510,49 @@ export default function CurriculumEditorPage() {
                                         {lesson.type === 'video' ? <Video className="size-4" /> : <AlignLeft className="size-4" />}
                                      </div>
                                      <span className="font-bold text-sm text-slate-700">{lesson.title}</span>
+                                     <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 ${lesson.sourceType === 'YOUTUBE' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                                       {lesson.sourceType}
+                                     </span>
+                                     <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 ${lesson.isFree ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                       {lesson.isFree ? 'FREE' : 'PAID'}
+                                     </span>
                                   </div>
-                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary"><Edit3 className="size-4" /></Button>
+                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                    <label className="inline-flex">
+                                      <input
+                                        type="file"
+                                        accept="video/mp4,video/webm,video/quicktime,video/x-msvideo"
+                                        className="hidden"
+                                        onChange={(event) => {
+                                          const file = event.target.files?.[0];
+                                          uploadLessonVideo(chapter.id, lesson.id, file);
+                                          event.currentTarget.value = '';
+                                        }}
+                                      />
+                                      <span className="inline-flex h-8 items-center rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-500 hover:border-primary hover:text-primary cursor-pointer">
+                                        {uploadingLessonId === lesson.id ? 'Dang upload...' : 'Upload'}
+                                      </span>
+                                    </label>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-slate-400 hover:text-primary"
+                                      onClick={() => editLesson(chapter.id, lesson.id, lesson.title, lesson.videoUrl, lesson.isFree, lesson.sourceType)}
+                                    >
+                                      <Edit3 className="size-4" />
+                                    </Button>
                                   </div>
                                </div>
                              ))
                            )}
 
                            <div className="pt-2">
-                              <Button variant="outline" size="sm" className="rounded-lg w-full border-dashed border-2 py-5 font-bold text-slate-500 hover:text-primary hover:border-primary/50 hover:bg-primary/5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-lg w-full border-dashed border-2 py-5 font-bold text-slate-500 hover:text-primary hover:border-primary/50 hover:bg-primary/5"
+                                onClick={() => addLesson(chapter.id)}
+                              >
                                 <Plus className="size-4 mr-2" /> Thêm Bài Học
                               </Button>
                            </div>

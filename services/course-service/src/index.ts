@@ -11,6 +11,7 @@ import {
   updateCourse,
   deleteCourse,
   getInstructorCourses,
+  getInstructorCourseById,
   getCourseCurriculum,
 } from './controllers/course.controller';
 import {
@@ -23,6 +24,7 @@ import {
   createLesson,
   updateLesson,
   deleteLesson,
+  getLessonPlayback,
 } from './controllers/lesson.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 
@@ -62,6 +64,7 @@ app.get('/api/courses/:slug', getCourseBySlug);
 // ─── Instructor Routes (Kong injects x-user-id, x-user-role) ─────────────────
 // requireRole middleware: validates header exists + role check, sets res.locals.userId
 app.get('/api/instructor/courses', requireAuth, getInstructorCourses);
+app.get('/api/instructor/courses/:id', requireAuth, getInstructorCourseById);
 app.get('/api/courses/:id/curriculum', ...requireRole('instructor', 'admin'), getCourseCurriculum);
 app.post('/api/courses', ...requireRole('instructor', 'admin'), createCourse);
 app.put('/api/courses/:id', ...requireRole('instructor', 'admin'), updateCourse);
@@ -77,6 +80,7 @@ app.put('/api/courses/:courseId/chapters/reorder', ...requireRole('instructor', 
 app.post('/api/courses/:courseId/chapters/:chapterId/lessons', ...requireRole('instructor', 'admin'), createLesson);
 app.put('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), updateLesson);
 app.delete('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), deleteLesson);
+app.get('/api/lessons/:lessonId/playback', getLessonPlayback);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {

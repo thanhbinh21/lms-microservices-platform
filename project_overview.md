@@ -92,68 +92,58 @@ pnpm prisma migrate dev
 
 ## 5. Roadmap Dự Án (Tiến độ thực hiện)
 
-Dự án được chia thành 15 giai đoạn (Phases) theo chuẩn "Vertical Slice Architecture".
+Dự án được chia thành 20 giai đoạn (Phases) theo chuẩn "Vertical Slice Architecture".
 
 ### Phase 1-4: Foundation (Nền tảng) ✅ COMPLETED
-- [x] **Phase 1:** Setup Monorepo (Turborepo), Docker Compose (Kafka, Redis) + Neon Serverless PostgreSQL [5]. ✅ Completed: Jan 21, 2026
-- [x] **Phase 2:** Setup API Gateway (Kong) & Shared Packages (Logger, Types) [5]. ✅ Completed: Jan 21, 2026
-- [x] **Phase 3:** Build **Auth Service** (Login, Register, JWT, Session Redis) [5]. ✅ Completed: Jan 25, 2026
-- [x] **Phase 4:** Build Frontend Base (Next.js 16, Shadcn UI, Redux, Login/Register Forms) [6]. ✅ Completed: Jan 25, 2026 ✅ **VERIFIED: Production-Ready**
+- [x] **Phase 1:** Setup Monorepo (Turborepo), Docker Compose (Kafka, Redis) + Neon Serverless PostgreSQL. ✅ Completed: Jan 21, 2026
+- [x] **Phase 2:** Setup API Gateway (Kong DB-less) & Shared Packages (Logger, Types, Env Validator). ✅ Completed: Jan 21, 2026
+- [x] **Phase 3:** Build **Auth Service** (Login, Register, JWT pair, Session Redis, Refresh Token rotation). ✅ Completed: Jan 25, 2026
+- [x] **Phase 4:** Build Frontend Base (Next.js 15, Shadcn UI, Redux, Login/Register Forms, Be Vietnam Pro font). ✅ Completed: Jan 25, 2026 ✅ **VERIFIED: Production-Ready**
 
-### Phase 5-9: Core LMS & Media
-- [x] **Phase 5:** Build **Course Service DB** & CRUD API [6]. ✅ Completed: Feb 28, 2026
-- [x] **Phase 6:** Build **Media Service** (API Presigned URL S3/VideoCipher) [6]. ✅ Completed: Feb 28, 2026
-- [x] **Phase 6.1:** Code Audit & Production Hardening (Security fixes, Vietnamese comments, optimizations) ✅ Completed: Mar 01, 2026
-- [ ] **Phase 7:** Frontend Instructor UI (Drag & Drop Curriculum) [7].
-  - QA update: Smoke test build on Mar 19, 2026 found role enum mismatch in instructor layout and multiple instructor/dashboard screens still using mock data.
-  - QC fix update: Aligned integration smoke test auth health target from port 3001 to 3101; `pnpm test:integration` now passes 5/5 on Mar 19, 2026.
-- [ ] **Phase 8:** Frontend Public UI (Course Listing, Detail with BFF Aggregation) [7].
-  - Progress update: Completed public landing page NexEdu UI (intro page) on Mar 19, 2026.
-  - Progress update: Applied white-theme glassmorphism + Be Vietnam Pro typography for landing page on Mar 19, 2026.
-  - QC update: Flow test on Mar 19, 2026 shows Landing/Register/Login/Dashboard pages return 200, but register via Gateway timeout on /auth/register and login API fails with Prisma P2002 (duplicate refresh token) in auth-service.
-  - QC fix update: Resolved /auth/register timeout via Gateway by rehydrating proxy request body and fixed refresh token duplication by adding unique jwtid for refresh tokens; retest via Gateway register/login successful on Mar 19, 2026.
-- [ ] **Phase 9:** Build **Payment Service DB** (Orders & Audit Transactions Table) [8].
+### Phase 5-8: Core LMS & Media ✅ COMPLETED 
+- [x] **Phase 5:** Build **Course Service DB** & CRUD API (Course, Chapter, Lesson, Enrollment models). ✅ Completed: Feb 28, 2026
+- [x] **Phase 6:** Build **Media Service** (Presigned URL upload, YouTube external, local storage provider). ✅ Completed: Feb 28, 2026
+- [x] **Phase 6.1:** Code Audit & Production Hardening (Security fixes, Vietnamese comments, optimizations). ✅ Completed: Mar 01, 2026
+- [x] **Phase 7:** Frontend Instructor UI (7.1-7.4, 7.6-7.7 completed). ✅ Completed: Mar 31, 2026
+- [x] **Phase 8:** Frontend Public UI (8.1-8.4 completed). ✅ Completed: Mar 23, 2026
 
-### Phase 10-12: Commerce & Payments (VNPay)
-- [ ] **Phase 10:** Tích hợp **VNPay** (API Create URL & IPN Webhook) [8].
-- [ ] **Phase 11:** Kafka Setup (Producer: `payment.order.completed`) [8].
-- [ ] **Phase 12:** Kafka Consumer (Enrollment Logic in Course Service + Retry Mechanism) [8].
+### Phase 9: Optimization & Technical Debt 🔧
+- [ ] **Phase 9.1:** Backend Cleanup — Gỡ Node Gateway (chỉ dùng Kong), Prisma migrations (sourceType, category, lastLoginAt), fix N+1, graceful shutdown.
+- [ ] **Phase 9.2:** Frontend Cleanup — SharedNavbar/Footer, `/courses/[slug]` route, Phase 7.5 (edit/delete chapter/lesson), ErrorBoundary, loading.tsx, mobile menu, active sidebar.
+- [ ] **Phase 9.3:** DX Improvements — `pnpm run setup` bootstrap, turbo pipeline cho Prisma, `.nvmrc`, cleanup test files, nâng cấp 2 agent files.
 
-### Phase 13-15: Learning & Polish
-- [ ] **Phase 13:** Learning UI (Video Player, Progress Tracking API) [9].
-- [ ] **Phase 14:** **Notification Service** (Email Worker consuming Kafka events) [9].
-- [ ] **Phase 15:** Deployment & Audit (Dockerize, Audit Logs Check) [9].
+### Phase 10-13: Commerce & Payments (VNPay + Kafka)
+- [ ] **Phase 10:** Build **Payment Service DB** & Order CRUD (Order, Transaction, VNPayAudit models, price verification).
+- [ ] **Phase 11:** Tích hợp **VNPay** (Create URL, IPN Webhook, Return URL, checksum, JSONB audit).
+- [ ] **Phase 12:** Kafka Producer — Upgrade `@lms/kafka-client` (typed events, retry, DLQ), Payment publish `payment.order.completed`.
+- [ ] **Phase 13:** Kafka Consumer — Enrollment idempotent + Retry mechanism + DLQ admin + **Rating/Review model & API**.
+
+### Phase 14-16: Learning Experience
+- [ ] **Phase 14:** Student Learning UI — `/learn/[courseId]` layout, LessonProgress model, video player, progress tracking, Review UI.
+- [ ] **Phase 15:** **Notification Service** — Kafka consumer, Nodemailer (dev) + Resend (prod), email templates, notification bell UI.
+- [ ] **Phase 16:** Student Dashboard — `/dashboard` real data, "Khoá học của tôi", progress cards, learning streak.
+
+### Phase 17-19: Advanced Features
+- [ ] **Phase 17:** Search, Filter & Category System — Full-text search, category model, filter sidebar, sort options.
+- [ ] **Phase 18:** Instructor Analytics Dashboard — Revenue charts, KPI cards, top courses table, enrollment trends.
+- [ ] **Phase 19:** **Admin Dashboard** — `apps/admin-dashboard` (Vite + React), user/course/order/review management, DLQ monitor.
+
+### Phase 20: Deployment & Production Hardening 🚀
+- [ ] **Phase 20:** Dockerize all services, docker-compose.prod.yml, CI/CD (GitHub Actions), Nginx + SSL, monitoring, backup strategy.
 
 ---
 
 ## 6. Ghi Chú Quan Trọng (Decisions & Assumptions)
 
 ### Architecture & Database
-*   **Data Aggregation:** Không dùng JOIN giữa các DB. Frontend sẽ gọi song song các API (Auth, Course) và gộp dữ liệu tại Server Actions [10].
-*   **Prisma Singleton:** Implemented Global Variable pattern trong `packages/db-prisma` để ngăn "too many connections" khi Next.js HMR reload code [Phase 3]. ✅
+*   **Data Aggregation:** Không dùng JOIN giữa các DB. Frontend sẽ gọi song song các API (Auth, Course) và gộp dữ liệu tại Server Actions.
+*   **Prisma Singleton:** Implemented Global Variable pattern trong `packages/db-prisma` để ngăn "too many connections" khi Next.js HMR reload code.
 *   **Neon Cold Start:** Database sẽ auto-pause sau 5 phút idle. Request đầu tiên sau khi ngủ sẽ chậm hơn (~2-3s).
 
 ### Environment & Validation
-*   **T3 Env Pattern:** Package `env-validator` sử dụng Zod để validate `.env` ngay lúc runtime. App sẽ crash với error message rõ ràng nếu thiếu biến [Phase 3]. ✅
-*   **Restart Required:** Khi thay đổi `.env` (JWT_SECRET, DATABASE_URL), phải restart server để thay đổi có hiệu lực.
-*   **Environment File Locations:** 
-    - Root `.env`: Shared infrastructure config (Kafka, Redis, all DB URLs)
-    - `services/auth-service/.env`: Auth-specific config (DATABASE_URL, JWT_SECRET, PORT)
-    - `apps/web-client/.env.local`: Frontend config (NEXT_PUBLIC_GATEWAY_URL)
-    - ⚠️ **Critical:** JWT_SECRET must match between Gateway and Auth Service
-*   **Env Sync Update (Mar 19, 2026):** Da dong bo file `.env` cho Gateway/Auth/Course/Media/Web client, sua typo bien root env va dong nhat JWT cho Gateway + Auth de chay local.
-*   **Port Override (Mar 19, 2026):** Auth Service doi PORT tu 3001 sang 3101 de tranh xung dot cong; Gateway da cap nhat AUTH_SERVICE_URL tuong ung.
-*   **Runtime Verification (Mar 19, 2026):** Da run full stack voi Docker infra + service/web local, health check Gateway/Auth/Course/Media va web page deu tra 200.
+*   **T3 Env Pattern:** Package `env-validator` sử dụng Zod để validate `.env` ngay lúc runtime. App sẽ crash với error message rõ ràng nếu thiếu biến.
+*   **Gateway Unification:** Đã gỡ bỏ hoàn toàn `api-gateway` (Node), chỉ sử dụng Kong làm API Gateway trung tâm. 
 
-### Docker & Deployment
-*   **.dockerignore:** Đã exclude `node_modules`, `.git`, `.env` để tránh build context quá nặng [Phase 3]. ✅
-*   **IP Whitelisting:** Neon cho phép truy cập từ mọi IP. Docker container cần internet để connect tới Neon.
-
-### Security & Tokens
-*   **JWT Architecture:** Access Token (15min) + Refresh Token (7 days). Refresh token stored in PostgreSQL + Session cached in Redis.
-*   **Session Redis:** TTL 7 days, automatically cleanup on logout hoặc token expiry.
-*   **Password Hashing:** Bcrypt với salt rounds = 10.
-
-### Payments & Events
-*   **VNPay Checksum:** Phải sắp xếp tham số theo bảng chữ cái trước khi hash để tránh lỗi `Invalid Checksum` [11].
-*   **Kafka DLQ:** Nếu xử lý đơn hàng thất bại 3 lần, message sẽ chuyển vào Dead Letter Queue để admin xử lý.
+### Frontend Conventions (Next.js App Router)
+*   **Server Actions for API Calls:** All API calls from Next.js to Microservices are done via Server Actions (`actions/`) using the internal `GATEWAY_URL`.
+*   **Client vs Server Components:** Limit `"use client"` as much as possible, mostly used for simple state hooks or highly interactive elements. Do not pass complex API functionality directly down tree.

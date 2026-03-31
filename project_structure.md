@@ -9,7 +9,6 @@
 ├── apps
 │   ├── web-client          # Next.js 15 (Student + Instructor UI)
 │   ├── admin-dashboard    # React/Vite (Admin)
-│   ├── api-gateway        # Nginx/Kong or Node Proxy
 │
 ├── services
 │   ├── auth-service
