@@ -529,7 +529,7 @@ export default function CurriculumEditorPage() {
                 className="hidden"
                 onChange={(event) => {
                   if (!selectedLesson) {
-                    window.alert('Vui lòng chọn bài học trước khi upload');
+                    showStatus('error', 'Vui lòng chọn bài học trước khi upload video.');
                     event.currentTarget.value = '';
                     return;
                   }

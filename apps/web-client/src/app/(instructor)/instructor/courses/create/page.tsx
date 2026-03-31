@@ -11,6 +11,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { createCourseAction } from '@/app/actions/instructor';
+import { StatusMessage } from '@/components/ui/status-message';
 
 const formSchema = z.object({
   title: z.string().min(3, { message: "Tiêu đề phải có ít nhất 3 ký tự." }),
@@ -76,9 +77,7 @@ export default function CreateCoursePage() {
               {form.formState.errors.title && (
                  <p className="text-sm text-destructive font-bold">{form.formState.errors.title.message}</p>
               )}
-              {submitError && (
-                <p className="text-sm text-destructive font-bold">{submitError}</p>
-              )}
+              {submitError && <StatusMessage type="error" message={submitError} />}
             </div>
           </form>
         </CardContent>

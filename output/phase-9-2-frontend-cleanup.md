@@ -138,3 +138,46 @@ Ket qua:
 - Thong bao loi/thanh cong dong nhat theo UI component.
 - Co du lieu mau day du de QA regression nhanh cho flow tao/chinh sua khoa hoc.
 - Build xac nhan pass: `pnpm --filter web-client build`.
+
+## 11. Chuan hoa status UI toan he thong
+Muc tieu:
+- Kiem tra he thong da co component thong bao status dung chung chua.
+- Chuan hoa cac thong bao trang thai theo design token thay vi thong bao native roi rac.
+
+Xu ly:
+- Xac nhan component dung chung da ton tai: `apps/web-client/src/components/ui/status-message.tsx`.
+- Cap nhat style `StatusMessage` theo token he thong:
+   - Success: su dung `primary` tone (`bg-primary/10`, `border-primary/25`, `text-primary`).
+   - Error: su dung `destructive` tone (`bg-destructive/10`, `border-destructive/25`, `text-destructive`).
+- Cap nhat `apps/web-client/src/app/(instructor)/instructor/courses/create/page.tsx` de su dung `StatusMessage` thay cho `<p className="text-destructive">` thu cong.
+- Loai bo alert native con sot lai trong curriculum upload center, thay bang `showStatus(...)`.
+
+Ket qua audit:
+- Da khong con `window.alert` trong `apps/web-client/src/**`.
+- Cac man hinh dang su dung `StatusMessage`: login, register, course settings, curriculum, create course.
+- Van con `window.confirm/window.prompt` trong curriculum editor cho cac thao tac xac nhan/chinh sua nhanh; day la scope UI interaction va co the tiep tuc chuyen sang Dialog cua Shadcn o buoc tiep theo.
+
+Kiem thu:
+- `pnpm --filter web-client build` pass sau khi chuan hoa status UI.
+
+## 12. Dong bo UI theo design-tokens
+Muc tieu:
+- Dong bo hieu ung giao dien tren cac layout dung chung de tang do nhat quan va trai nghiem visual.
+
+Xu ly:
+- Cap nhat `apps/web-client/src/app/globals.css` theo token `glassmorphism-heavy`:
+   - Tang cuong nen `glass-page` voi gradient + grid overlay.
+   - Chuan hoa `glass-panel` theo cac gia tri da dinh nghia trong token (background, blur+saturate, border, shadow, shine overlay).
+   - Them `glass-navbar` utility va typography utility (`token-page-title`, `token-section-title`, `token-body`).
+- Cap nhat `apps/web-client/src/components/shared/shared-navbar.tsx`:
+   - Dung `glass-navbar` cho thanh dieu huong.
+   - Mobile menu dung `glass-panel` de dong bo mat kinh.
+- Cap nhat `apps/web-client/src/components/shared/shared-footer.tsx`:
+   - Chuyen footer sang `glass-panel`, can chinh spacing/typography theo token.
+- Cap nhat `apps/web-client/src/app/(instructor)/layout.tsx`:
+   - Dung `glass-page` + `glass-navbar` + `glass-panel` cho shell giang vien.
+
+Ket qua:
+- Header/footer/layout giang vien dong nhat cung 1 he visual token.
+- Hieu ung blur, border, shadow va nen duoc chuan hoa o tang dung chung thay vi style roi rac.
+- Build xac nhan pass: `pnpm --filter web-client build`.

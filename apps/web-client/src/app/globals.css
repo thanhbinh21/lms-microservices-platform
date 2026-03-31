@@ -50,35 +50,74 @@
 /* Dark mode is disabled manually as per requirement for White Theme */
 
 body {
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
+  background:
+    radial-gradient(60% 60% at 12% 8%, rgba(184, 212, 248, 0.48), transparent 72%),
+    radial-gradient(55% 55% at 92% 12%, rgba(214, 232, 255, 0.42), transparent 70%),
+    linear-gradient(145deg, #b8d4f8 0%, #d6e8ff 36%, #e8f2ff 68%, #c8dcf8 100%);
+  color: #071a45;
   font-family: var(--font-be-vietnam-pro), sans-serif;
 }
 
 .hero-glow {
   background:
-    radial-gradient(58% 46% at 18% 20%, hsl(var(--primary) / 0.2), transparent 64%),
-    radial-gradient(45% 40% at 85% 12%, hsl(var(--primary) / 0.07), transparent 70%);
+    radial-gradient(58% 46% at 18% 20%, hsl(var(--primary) / 0.32), transparent 64%),
+    radial-gradient(45% 40% at 85% 12%, hsl(var(--primary) / 0.2), transparent 70%);
 }
 
 .glass-page {
   background:
-    radial-gradient(40% 60% at 90% -10%, hsl(var(--primary) / 0.08), transparent 70%),
-    radial-gradient(50% 50% at -10% 40%, hsl(var(--primary) / 0.05), transparent 70%),
-    hsl(var(--background));
+    radial-gradient(50% 50% at 90% -5%, rgba(184, 212, 248, 0.55), transparent 68%),
+    radial-gradient(58% 58% at -10% 42%, rgba(214, 232, 255, 0.48), transparent 70%),
+    linear-gradient(rgba(50, 100, 220, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(50, 100, 220, 0.1) 1px, transparent 1px),
+    linear-gradient(145deg, #b8d4f8 0%, #d6e8ff 36%, #e8f2ff 68%, #c8dcf8 100%);
+  background-size: auto, auto, 40px 40px, 40px 40px, auto;
 }
 
 .glass-panel {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.4));
-  border-top: 1px solid rgba(255, 255, 255, 0.9);
-  border-left: 1px solid rgba(255, 255, 255, 0.8);
-  border-right: 1px solid rgba(255, 255, 255, 0.3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  background: rgba(200, 224, 255, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(28px) saturate(220%);
+  -webkit-backdrop-filter: blur(28px) saturate(220%);
   box-shadow:
-    0 16px 40px -8px rgba(0, 50, 200, 0.08),
-    inset 0 2px 20px rgba(255, 255, 255, 0.5);
+    0 10px 48px rgba(29, 78, 216, 0.22),
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    inset 0 1.5px 0 rgba(255, 255, 255, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48%;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.glass-navbar {
+  background: rgba(180, 210, 255, 0.35);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(20px) saturate(200%);
+  -webkit-backdrop-filter: blur(20px) saturate(200%);
+}
+
+.token-page-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.token-section-title {
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.token-body {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
 }
 
 .animate-fade-up {

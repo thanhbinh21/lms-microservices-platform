@@ -52,8 +52,8 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
-      <div className="fixed top-0 z-40 flex w-full items-center justify-between border-b border-border bg-white/80 px-4 py-3 backdrop-blur-xl md:hidden">
+    <div className="glass-page flex min-h-screen text-foreground">
+      <div className="glass-navbar fixed top-0 z-40 flex w-full items-center justify-between px-4 py-3 md:hidden">
         <Link href="/" className="flex items-center gap-2">
           <Image src="/nexedu-logo.svg" alt="NexEdu Logo" width={28} height={28} />
           <span className="text-sm font-bold">NexEdu Studio</span>
@@ -73,12 +73,12 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-40 h-screen w-72 border-r border-border bg-white/95 backdrop-blur-xl transition-transform duration-200 md:sticky md:w-64 md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`glass-panel fixed left-0 top-0 z-40 h-screen w-72 border-r border-white/50 transition-transform duration-200 md:sticky md:w-64 md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="p-6 pt-20 md:pt-6">
           <Link href="/" className="mb-8 flex items-center gap-2" onClick={() => setMobileOpen(false)}>
             <Image src="/nexedu-logo.svg" alt="NexEdu Logo" width={32} height={32} />
-            <span className="text-xl font-bold">NexEdu Studio</span>
+            <span className="token-section-title">NexEdu Studio</span>
           </Link>
 
           <div className="space-y-1">
@@ -120,7 +120,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
 
       {/* Sidebar */}
       {/* Main Content Area */}
-      <main className="min-h-screen flex-1 overflow-x-hidden bg-slate-50/50 pb-20 pt-16 md:pt-0">
+      <main className="min-h-screen flex-1 overflow-x-hidden pb-20 pt-16 md:pt-0">
          {children}
       </main>
     </div>

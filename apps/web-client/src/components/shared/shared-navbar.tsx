@@ -25,7 +25,7 @@ export function SharedNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/40 bg-white/50 backdrop-blur-xl shadow-sm">
+    <header className="glass-navbar sticky top-0 z-40 shadow-sm">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-8">
         <Link href="/" className="flex items-center gap-2">
           <Image src="/nexedu-logo.svg" alt="Logo NexEdu" width={40} height={40} priority />
@@ -37,7 +37,7 @@ export function SharedNavbar() {
             <Link
               key={item.href}
               href={item.href}
-              className={isActive(pathname, item.href) ? 'text-primary border-b-2 border-primary pb-1' : 'hover:text-primary transition-colors pb-1'}
+              className={isActive(pathname, item.href) ? 'border-b-2 border-primary pb-1 text-primary' : 'pb-1 transition-colors hover:text-primary'}
             >
               {item.label}
             </Link>
@@ -66,14 +66,14 @@ export function SharedNavbar() {
       </div>
 
       {mobileOpen && (
-        <div className="md:hidden border-t border-white/50 bg-white/80 backdrop-blur-xl px-4 py-4">
+        <div className="glass-panel md:hidden border-t border-white/50 px-4 py-4">
           <div className="flex flex-col gap-2">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className={isActive(pathname, item.href) ? 'rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary' : 'rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground'}
+                className={isActive(pathname, item.href) ? 'rounded-md bg-primary/10 px-3 py-2 text-sm font-semibold text-primary' : 'rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground'}
               >
                 {item.label}
               </Link>
