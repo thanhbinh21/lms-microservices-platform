@@ -55,6 +55,7 @@ export async function register(req: Request, res: Response) {
         password: hashedPassword,
         name: validatedData.name,
         role: validatedData.role,
+        sourceType: 'CREDENTIALS',
       },
       select: {
         id: true,

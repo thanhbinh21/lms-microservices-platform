@@ -34,12 +34,6 @@ services:
           - /course
         strip_path: true
     plugins:
-      - name: jwt
-        config:
-          secret_is_base64: false
-          key_claim_name: kid
-          claims_to_verify:
-            - exp
       - name: rate-limiting
         config:
           minute: 100
@@ -48,8 +42,8 @@ services:
         config:
           add:
             headers:
-              - x-user-id:$(headers.x-user-id)
-              - x-user-role:$(headers.x-user-role)
+              - "x-user-id:$(headers['x-user-id'])"
+              - "x-user-role:$(headers['x-user-role'])"
       - name: correlation-id
         config:
           header_name: x-trace-id
@@ -78,8 +72,8 @@ services:
         config:
           add:
             headers:
-              - x-user-id:$(headers.x-user-id)
-              - x-user-role:$(headers.x-user-role)
+              - "x-user-id:$(headers['x-user-id'])"
+              - "x-user-role:$(headers['x-user-role'])"
       - name: correlation-id
         config:
           header_name: x-trace-id
@@ -108,8 +102,8 @@ services:
         config:
           add:
             headers:
-              - x-user-id:$(headers.x-user-id)
-              - x-user-role:$(headers.x-user-role)
+              - "x-user-id:$(headers['x-user-id'])"
+              - "x-user-role:$(headers['x-user-role'])"
       - name: correlation-id
         config:
           header_name: x-trace-id
@@ -138,8 +132,8 @@ services:
         config:
           add:
             headers:
-              - x-user-id:$(headers.x-user-id)
-              - x-user-role:$(headers.x-user-role)
+              - "x-user-id:$(headers['x-user-id'])"
+              - "x-user-role:$(headers['x-user-role'])"
       - name: correlation-id
         config:
           header_name: x-trace-id

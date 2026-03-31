@@ -5,9 +5,16 @@ import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, Image as ImageIcon, List, Settings } from 'lucide-react';
+import { ArrowLeft, Image as ImageIcon, List, Settings, UploadCloud } from 'lucide-react';
 import Link from 'next/link';
-import { getCourseByIdAction, updateCourseAction, type CourseDto } from '@/app/actions/instructor';
+import {
+  getCourseByIdAction,
+  updateCourseAction,
+  requestCourseThumbnailUploadAction,
+  confirmLessonUploadAction,
+  type CourseDto,
+} from '@/app/actions/instructor';
+import { StatusMessage } from '@/components/ui/status-message';
 
 export default function CourseSettingsPage() {
   const router = useRouter();
@@ -20,6 +27,14 @@ export default function CourseSettingsPage() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('0');
   const [thumbnail, setThumbnail] = useState('');
+  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
+  const [statusType, setStatusType] = useState<'success' | 'error'>('success');
+  const [statusMessage, setStatusMessage] = useState('');
+
+  const showStatus = (type: 'success' | 'error', message: string) => {
+    setStatusType(type);
+    setStatusMessage(message);
+  };
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -40,18 +55,82 @@ export default function CourseSettingsPage() {
   
   const handleSave = async () => {
     setIsSaving(true);
+    setStatusMessage('');
     const courseId = String(params.courseId);
-    await updateCourseAction(courseId, {
+    const result = await updateCourseAction(courseId, {
       title,
       description,
       price: Number(price),
       thumbnail: thumbnail.trim() || null,
     });
+    if (!result.success) {
+      showStatus('error', result.message || 'Không lưu được thay đổi.');
+      setIsSaving(false);
+      return;
+    }
+    showStatus('success', 'Đã lưu thay đổi khóa học.');
     setIsSaving(false);
+  };
+
+  const uploadThumbnail = async (file?: File | null) => {
+    if (!file) return;
+
+    const courseId = String(params.courseId);
+    setIsUploadingThumbnail(true);
+    setStatusMessage('');
+
+    try {
+      const presigned = await requestCourseThumbnailUploadAction({
+        filename: file.name,
+        mimeType: file.type || 'image/jpeg',
+        size: file.size,
+        courseId,
+      });
+
+      if (!presigned.success || !presigned.data) {
+        showStatus('error', presigned.message || 'Không tạo được phiên upload ảnh bìa.');
+        return;
+      }
+
+      if (presigned.data.presignedUrl.includes('/api/upload/local/')) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadResponse = await fetch(presigned.data.presignedUrl, {
+          method: 'PUT',
+          body: formData,
+        });
+        if (!uploadResponse.ok) {
+          showStatus('error', 'Upload ảnh bìa thất bại.');
+          return;
+        }
+      } else {
+        const uploadResponse = await fetch(presigned.data.presignedUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        });
+        if (!uploadResponse.ok) {
+          showStatus('error', 'Upload ảnh bìa thất bại.');
+          return;
+        }
+      }
+
+      const confirmed = await confirmLessonUploadAction(presigned.data.mediaId);
+      if (!confirmed.success || !confirmed.data?.url) {
+        showStatus('error', confirmed.message || 'Không xác nhận được upload ảnh bìa.');
+        return;
+      }
+
+      setThumbnail(confirmed.data.url);
+      showStatus('success', 'Đã upload ảnh bìa. Nhấn "Lưu thay đổi" để cập nhật khóa học.');
+    } finally {
+      setIsUploadingThumbnail(false);
+    }
   };
 
   const handlePublish = async () => {
     setIsPublishing(true);
+    setStatusMessage('');
     const courseId = String(params.courseId);
 
     const result = await updateCourseAction(courseId, {
@@ -63,14 +142,14 @@ export default function CourseSettingsPage() {
     });
 
     if (!result.success) {
-      window.alert(result.message);
+      showStatus('error', result.message || 'Không thể xuất bản khóa học.');
       setIsPublishing(false);
       return;
     }
 
     setCourse((prev) => (prev ? { ...prev, status: 'PUBLISHED' } : prev));
     setIsPublishing(false);
-    window.alert('Da xuat ban khoa hoc thanh cong');
+    showStatus('success', 'Đã xuất bản khóa học thành công.');
   };
 
   if (loading) {
@@ -100,6 +179,10 @@ export default function CourseSettingsPage() {
              {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
            </Button>
         </div>
+      </div>
+
+      <div className="mb-6">
+        <StatusMessage type={statusType} message={statusMessage} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
@@ -149,8 +232,22 @@ export default function CourseSettingsPage() {
             <CardContent className="space-y-3">
               <div className="aspect-video rounded-xl bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500">
                 <ImageIcon className="w-10 h-10 mb-2 opacity-50" />
-                <span className="text-sm font-bold">Dán URL ảnh bìa (16:9)</span>
+                <span className="text-sm font-bold">Upload ảnh bìa hoặc dán URL (16:9)</span>
               </div>
+              <label className="inline-flex h-11 w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 text-sm font-semibold text-slate-600 hover:border-primary hover:text-primary">
+                <UploadCloud className="mr-2 size-4" /> {isUploadingThumbnail ? 'Đang upload...' : 'Chọn ảnh bìa để tải lên'}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={isUploadingThumbnail}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    uploadThumbnail(file);
+                    event.currentTarget.value = '';
+                  }}
+                />
+              </label>
               <Input
                 value={thumbnail}
                 onChange={(event) => setThumbnail(event.target.value)}
@@ -184,7 +281,7 @@ export default function CourseSettingsPage() {
                 className="w-full rounded-xl shadow-md font-bold"
                 variant="default"
                 onClick={handlePublish}
-                disabled={isPublishing || (course.status || 'DRAFT') === 'PUBLISHED'}
+                disabled={isPublishing || isUploadingThumbnail || (course.status || 'DRAFT') === 'PUBLISHED'}
               >
                  {isPublishing ? 'Đang xuất bản...' : (course.status || 'DRAFT') === 'PUBLISHED' ? 'Đã xuất bản' : 'Xuất bản Khóa học'}
               </Button>

@@ -1,11 +1,12 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
 import { Search, Filter, Star, Clock, User, ChevronRight, PlayCircle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SharedNavbar } from '@/components/shared/shared-navbar';
+import { SharedFooter } from '@/components/shared/shared-footer';
 import {
   getPublicCoursesAction,
   getPublicCourseDetailAction,
@@ -135,31 +136,7 @@ export default function CoursesPage() {
       <div className="absolute top-[-5%] right-[-5%] w-[40%] h-[40%] rounded-full bg-primary/10 blur-[150px] pointer-events-none" />
       <div className="absolute top-[30%] left-[-10%] w-[35%] h-[40%] rounded-full bg-blue-300/15 blur-[120px] pointer-events-none" />
 
-      {/* Header Navbar (Static for Public pages) */}
-      <header className="sticky top-0 z-40 border-b border-white/40 bg-white/50 backdrop-blur-xl shadow-sm">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/nexedu-logo.svg" alt="Logo NexEdu" width={40} height={40} priority />
-            <span className="text-xl font-bold tracking-tight">NexEdu</span>
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-muted-foreground">
-            <Link href="/" className="hover:text-primary transition-colors pb-1">Trang chủ</Link>
-            <Link href="/courses" className="text-primary border-b-2 border-primary pb-1">Khoá học</Link>
-            <Link href="#" className="hover:text-primary transition-colors pb-1">Giảng viên</Link>
-            <Link href="#" className="hover:text-primary transition-colors pb-1">Blog</Link>
-          </nav>
-
-          <div className="flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="ghost" className="font-bold">Đăng nhập</Button>
-            </Link>
-            <Link href="/register">
-              <Button className="font-bold shadow-md shadow-primary/20">Đăng ký</Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SharedNavbar />
 
       {/* Hero Section */}
       <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 relative z-10 space-y-12">
@@ -275,8 +252,10 @@ export default function CoursesPage() {
                            <span className="text-xs font-semibold text-muted-foreground line-through decoration-muted-foreground/50">{course.originalPrice}</span>
                         )}
                       </div>
-                      <Button variant="ghost" className="rounded-full size-10 p-0 text-primary hover:bg-primary/10">
-                         <ChevronRight className="w-5 h-5" />
+                      <Button asChild variant="ghost" className="rounded-full size-10 p-0 text-primary hover:bg-primary/10">
+                        <Link href={`/courses/${course.slug}`} aria-label={`Xem chi tiết ${course.title}`}>
+                          <ChevronRight className="w-5 h-5" />
+                        </Link>
                       </Button>
                     </div>
                   </div>
@@ -391,6 +370,7 @@ export default function CoursesPage() {
         </ScrollReveal>
 
       </main>
+      <SharedFooter />
     </div>
   );
 }

@@ -1,9 +1,10 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, PlayCircle, ShieldCheck, Users, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
+import { SharedNavbar } from '@/components/shared/shared-navbar';
+import { SharedFooter } from '@/components/shared/shared-footer';
 
 const featuredCourses = [
   {
@@ -67,30 +68,7 @@ export default function Home() {
       <div className="absolute top-[20%] right-[-5%] w-[30%] h-[50%] rounded-full bg-blue-400/10 blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[20%] w-[50%] h-[30%] rounded-full bg-indigo-300/15 blur-[120px] pointer-events-none" />
       
-      <header className="sticky top-0 z-40 border-b border-white/40 bg-white/50 backdrop-blur-xl shadow-sm">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 md:px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/nexedu-logo.svg" alt="Logo NexEdu" width={44} height={44} priority />
-            <span className="text-base font-semibold tracking-tight">NexEdu</span>
-          </Link>
-
-          <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
-            <a href="#kham-pha" className="hover:text-primary transition-colors">Khám phá</a>
-            <a href="#khoa-hoc" className="hover:text-primary transition-colors">Khóa học</a>
-            <a href="#cong-dong" className="hover:text-primary transition-colors">Cộng đồng</a>
-            <a href="#ho-tro" className="hover:text-primary transition-colors">Hỗ trợ</a>
-          </nav>
-
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" className="hidden sm:inline-flex">
-              <Link href="/login">Đăng nhập</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/register">Đăng ký</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <SharedNavbar />
 
       <main>
         <section id="kham-pha" className="relative overflow-hidden px-4 py-16 md:px-6 md:py-20">
@@ -301,45 +279,7 @@ export default function Home() {
         </ScrollReveal>
       </main>
 
-      <footer className="border-t border-primary/10 bg-white/80 backdrop-blur-xl px-4 py-16 md:px-6 relative z-10">
-        <div className="mx-auto grid w-full max-w-6xl gap-10 md:grid-cols-4">
-          <div className="space-y-4 md:col-span-2">
-            <div className="flex items-center gap-3">
-              <Image src="/nexedu-logo.svg" alt="Logo NexEdu" width={44} height={44} />
-              <p className="text-xl font-bold">NexEdu Academy</p>
-            </div>
-            <p className="max-w-md text-sm text-muted-foreground leading-relaxed">
-              Nền tảng học tập linh hoạt, giúp định hình năng lực nghề nghiệp bằng trải nghiệm học tập thực tế và bám sát doanh nghiệp.
-            </p>
-          </div>
-
-          <div>
-            <p className="mb-4 text-base font-bold text-foreground">Về NexEdu</p>
-            <ul className="space-y-3 text-sm text-muted-foreground font-medium">
-              <li><Link href="#" className="hover:text-primary transition-colors">Giới thiệu</Link></li>
-              <li><Link href="#" className="hover:text-primary transition-colors">Đội ngũ chuyên gia</Link></li>
-              <li><Link href="#" className="hover:text-primary transition-colors">Tuyển dụng</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <p className="mb-4 text-base font-bold text-foreground">Hỗ trợ</p>
-            <ul className="space-y-3 text-sm text-muted-foreground font-medium">
-              <li><Link href="#" className="hover:text-primary transition-colors">Trung tâm trợ giúp</Link></li>
-              <li><Link href="#" className="hover:text-primary transition-colors">Liên hệ tư vấn</Link></li>
-              <li><Link href="#" className="hover:text-primary transition-colors">Điều khoản sử dụng</Link></li>
-            </ul>
-          </div>
-        </div>
-        
-        <div className="mx-auto w-full max-w-6xl mt-16 pt-8 border-t border-primary/10 flex flex-col md:flex-row items-center justify-between text-xs font-medium text-muted-foreground">
-          <p>© 2026 NexEdu Academy. All rights reserved.</p>
-          <div className="flex gap-6 mt-4 md:mt-0">
-            <Link href="#" className="hover:text-primary transition-colors">Chính sách bảo mật</Link>
-            <Link href="#" className="hover:text-primary transition-colors">Cookie</Link>
-          </div>
-        </div>
-      </footer>
+      <SharedFooter />
     </div>
   );
 }

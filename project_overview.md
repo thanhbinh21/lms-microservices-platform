@@ -108,8 +108,8 @@ Dự án được chia thành 20 giai đoạn (Phases) theo chuẩn "Vertical Sl
 - [x] **Phase 8:** Frontend Public UI (8.1-8.4 completed). ✅ Completed: Mar 23, 2026
 
 ### Phase 9: Optimization & Technical Debt 🔧
-- [ ] **Phase 9.1:** Backend Cleanup — Gỡ Node Gateway (chỉ dùng Kong), Prisma migrations (sourceType, category, lastLoginAt), fix N+1, graceful shutdown.
-- [ ] **Phase 9.2:** Frontend Cleanup — SharedNavbar/Footer, `/courses/[slug]` route, Phase 7.5 (edit/delete chapter/lesson), ErrorBoundary, loading.tsx, mobile menu, active sidebar.
+- [x] **Phase 9.1:** Backend Cleanup — Gỡ Node Gateway (chỉ dùng Kong), Prisma migrations (sourceType, category, lastLoginAt), fix N+1, graceful shutdown. ✅ Completed: Mar 31, 2026
+- [x] **Phase 9.2:** Frontend Cleanup — SharedNavbar/Footer, `/courses/[slug]` route, Phase 7.5 (edit/delete chapter/lesson), ErrorBoundary, loading.tsx, mobile menu, active sidebar. ✅ Completed: Mar 31, 2026 (Updated hotfix: thumbnail upload + curriculum UX/status messaging + sample data seed)
 - [ ] **Phase 9.3:** DX Improvements — `pnpm run setup` bootstrap, turbo pipeline cho Prisma, `.nvmrc`, cleanup test files, nâng cấp 2 agent files.
 
 ### Phase 10-13: Commerce & Payments (VNPay + Kafka)

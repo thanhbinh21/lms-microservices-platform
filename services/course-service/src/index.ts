@@ -27,6 +27,7 @@ import {
   getLessonPlayback,
 } from './controllers/lesson.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
+import prisma from './lib/prisma';
 
 // Validate bien moi truong khi khoi dong
 validateCourseServiceEnv();
@@ -114,16 +115,30 @@ const server = app.listen(PORT, () => {
 });
 
 // Tat server an toan
-const shutdown = (signal: string) => {
+const shutdown = async (signal: string) => {
   logger.info(`${signal} - dang tat server`);
-  server.close(() => {
-    logger.info('Server closed');
-    process.exit(0);
+  const forceExitTimer = setTimeout(() => process.exit(1), 10_000);
+
+  server.close(async () => {
+    try {
+      // Dong Prisma de tra ket noi ve pool khi service bi restart/stop
+      await prisma.$disconnect();
+      clearTimeout(forceExitTimer);
+      logger.info('Server closed');
+      process.exit(0);
+    } catch (error) {
+      logger.error({ error }, 'Loi khi dong Prisma luc shutdown');
+      clearTimeout(forceExitTimer);
+      process.exit(1);
+    }
   });
-  setTimeout(() => process.exit(1), 10_000);
 };
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM');
+});
+process.on('SIGINT', () => {
+  void shutdown('SIGINT');
+});
 process.on('uncaughtException', (err) => { logger.fatal(err, 'Uncaught exception'); process.exit(1); });
 process.on('unhandledRejection', (err) => { logger.fatal(err, 'Unhandled rejection'); process.exit(1); });

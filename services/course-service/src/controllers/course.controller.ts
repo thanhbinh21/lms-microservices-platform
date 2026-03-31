@@ -36,16 +36,27 @@ function generateSlug(title: string): string {
 /** Tao slug duy nhat - them -1, -2, -3 neu bi trung */
 async function generateUniqueSlug(title: string, excludeId?: string): Promise<string> {
   const base = generateSlug(title);
-  let slug = base;
-  let counter = 1;
-  for (;;) {
-    const existing = await prisma.course.findFirst({
-      where: { slug, ...(excludeId ? { NOT: { id: excludeId } } : {}) },
-      select: { id: true },
-    });
-    if (!existing) return slug;
-    slug = `${base}-${counter++}`;
+  const existingSlugs = await prisma.course.findMany({
+    where: {
+      slug: {
+        startsWith: base,
+      },
+      ...(excludeId ? { NOT: { id: excludeId } } : {}),
+    },
+    select: { slug: true },
+  });
+
+  const slugSet = new Set(existingSlugs.map((item) => item.slug));
+  if (!slugSet.has(base)) {
+    return base;
   }
+
+  let counter = 1;
+  while (slugSet.has(`${base}-${counter}`)) {
+    counter += 1;
+  }
+
+  return `${base}-${counter}`;
 }
 
 /**

@@ -49,3 +49,36 @@
 - Typography chính: dùng Be Vietnam Pro cho toàn bộ giao diện web-client.
 - Nền chủ đạo: trắng làm base, giữ lớp gradient xanh trắng rất nhẹ để tạo chiều sâu.
 - Hạn chế dùng màu đen đậm: ưu tiên text `--foreground` sáng hơn và bóng/viền theo tông xanh.
+
+## Cập nhật sau task glassmorphism-heavy - 2026-03-31
+
+### Background
+- Nền tổng: **đậm hơn rõ rệt** — dùng multi-layer radial gradient với opacity cao hơn (0.40–0.55) thay vì 0.15–0.25.
+- Orb blur: tăng kích thước (600–650px) và opacity (0.28–0.32), `filter: blur(70–80px)`.
+- Grid overlay: tăng opacity đường kẻ lên `rgba(50,100,220,0.10)` (từ 0.06).
+- Base gradient: shift sang tông xanh đậm hơn — dùng `#b8d4f8 → #d6e8ff → #e8f2ff → #c8dcf8`.
+
+### Glass surface (cập nhật `glass-panel`)
+- Background: `rgba(200,224,255,0.42)` — tăng từ `bg-card/62` lên tông xanh có sắc rõ hơn.
+- Backdrop-filter: `blur(28px) saturate(220%)` — tăng từ blur(16px).
+- Border: `1px solid rgba(255,255,255,0.72)` — giữ border trắng cao để tạo viền kính.
+- Box-shadow: `0 10px 48px rgba(29,78,216,0.22), 0 2px 8px rgba(0,0,0,0.08), inset 0 1.5px 0 rgba(255,255,255,1)`.
+- Shine overlay: pseudo `::before` height 48%, `rgba(255,255,255,0.28→0)` gradient.
+
+### Typography (đậm hơn)
+- Heading màu: `#071a45` (navy đậm) thay vì `--foreground` nhạt.
+- Body text màu: `#2d4a80` — đủ tương phản trên nền xanh.
+- Muted text: `#4a6090`.
+- Font-weight heading: 800 cho display title, 700 cho card title.
+
+### Button
+- Primary: `background: linear-gradient(135deg, #1338b0, #2563eb)`, `box-shadow: 0 6px 28px rgba(19,56,176,0.55)`.
+- Ghost/outline: `background: rgba(255,255,255,0.55)`, `border: 1px solid rgba(255,255,255,0.9)`.
+
+### Navbar
+- Background: `rgba(180,210,255,0.35)` + `backdrop-filter: blur(20px) saturate(200%)`.
+- Border-bottom: `1px solid rgba(255,255,255,0.55)`.
+
+### Floating elements (micro-cards)
+- Dùng animation `floaty`: `translateY(0) → translateY(-10px)`, duration 3.2s ease-in-out infinite alternate.
+- Avatar: border `2.5px solid rgba(255,255,255,0.95)` để nổi bật trên nền kính.

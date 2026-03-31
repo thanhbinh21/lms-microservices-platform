@@ -1,19 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, GripVertical, Plus, Video, AlignLeft, Edit3, Trash2, UploadCloud, Link2 } from 'lucide-react';
 import Link from 'next/link';
+import { StatusMessage } from '@/components/ui/status-message';
 import {
   getCourseCurriculumAction,
   updateCurriculumOrderAction,
   createChapterAction,
+  updateChapterAction,
+  deleteChapterAction,
   createLessonAction,
   updateLessonAction,
+  deleteLessonAction,
   requestLessonUploadAction,
   confirmLessonUploadAction,
   registerYoutubeMediaAction,
@@ -43,6 +47,13 @@ export default function CurriculumEditorPage() {
   const [newChapterTitle, setNewChapterTitle] = useState('');
   const [selectedLessonKey, setSelectedLessonKey] = useState('');
   const [youtubeUrlInput, setYoutubeUrlInput] = useState('');
+  const [statusType, setStatusType] = useState<'success' | 'error'>('success');
+  const [statusMessage, setStatusMessage] = useState('');
+
+  const showStatus = (type: 'success' | 'error', message: string) => {
+    setStatusType(type);
+    setStatusMessage(message);
+  };
 
   const allLessons = chapters.flatMap((chapter) =>
     chapter.lessons.map((lesson) => ({
@@ -99,14 +110,14 @@ export default function CurriculumEditorPage() {
 
   const addChapter = async () => {
     if (newChapterTitle.trim().length < 2) {
-      window.alert('Tên chương cần ít nhất 2 ký tự');
+      showStatus('error', 'Tên chương cần ít nhất 2 ký tự.');
       return;
     }
 
     const courseId = String(params.courseId);
     const result = await createChapterAction(courseId, newChapterTitle.trim());
     if (!result.success || !result.chapter) {
-      window.alert(result.message || 'Khong tao duoc chuong');
+      showStatus('error', result.message || 'Không tạo được chương.');
       return;
     }
 
@@ -121,6 +132,7 @@ export default function CurriculumEditorPage() {
       },
     ]);
     setNewChapterTitle('');
+    showStatus('success', 'Đã thêm chương mới.');
   };
 
   const addLesson = async (chapterId: string) => {
@@ -132,7 +144,7 @@ export default function CurriculumEditorPage() {
     const result = await createLessonAction(courseId, chapterId, title.trim(), isFree);
 
     if (!result.success || !result.lesson) {
-      window.alert(result.message || 'Khong tao duoc bai hoc');
+      showStatus('error', result.message || 'Không tạo được bài học.');
       return;
     }
 
@@ -158,6 +170,79 @@ export default function CurriculumEditorPage() {
           : chapter,
       ),
     );
+
+    setSelectedLessonKey(`${chapterId}::${lesson.id}`);
+    showStatus('success', 'Đã thêm bài học. Bạn có thể upload video hoặc gắn YouTube cho bài học vừa tạo.');
+  };
+
+  const editChapter = async (chapterId: string, currentTitle: string) => {
+    const nextTitle = window.prompt('Cap nhat ten chuong', currentTitle);
+    if (!nextTitle || nextTitle.trim().length < 2) return;
+
+    const courseId = String(params.courseId);
+    const result = await updateChapterAction(courseId, chapterId, { title: nextTitle.trim() });
+
+    if (!result.success || !result.chapter) {
+      showStatus('error', result.message || 'Không cập nhật được chương.');
+      return;
+    }
+
+    setChapters((prev) =>
+      prev.map((chapter) =>
+        chapter.id === chapterId
+          ? { ...chapter, title: result.chapter?.title || chapter.title }
+          : chapter,
+      ),
+    );
+    showStatus('success', 'Đã cập nhật chương.');
+  };
+
+  const removeChapter = async (chapterId: string) => {
+    const shouldDelete = window.confirm('Ban co chac chan muon xoa chuong nay? Tat ca bai hoc ben trong se bi xoa.');
+    if (!shouldDelete) return;
+
+    const courseId = String(params.courseId);
+    const result = await deleteChapterAction(courseId, chapterId);
+
+    if (!result.success) {
+      showStatus('error', result.message || 'Không xóa được chương.');
+      return;
+    }
+
+    setChapters((prev) => prev.filter((chapter) => chapter.id !== chapterId));
+
+    if (selectedLesson && selectedLesson.chapterId === chapterId) {
+      setSelectedLessonKey('');
+      setYoutubeUrlInput('');
+    }
+    showStatus('success', 'Đã xóa chương.');
+  };
+
+  const removeLesson = async (chapterId: string, lessonId: string) => {
+    const shouldDelete = window.confirm('Ban co chac chan muon xoa bai hoc nay?');
+    if (!shouldDelete) return;
+
+    const courseId = String(params.courseId);
+    const result = await deleteLessonAction(courseId, chapterId, lessonId);
+
+    if (!result.success) {
+      showStatus('error', result.message || 'Không xóa được bài học.');
+      return;
+    }
+
+    setChapters((prev) =>
+      prev.map((chapter) =>
+        chapter.id === chapterId
+          ? { ...chapter, lessons: chapter.lessons.filter((lesson) => lesson.id !== lessonId) }
+          : chapter,
+      ),
+    );
+
+    if (selectedLesson?.lessonId === lessonId) {
+      setSelectedLessonKey('');
+      setYoutubeUrlInput('');
+    }
+    showStatus('success', 'Đã xóa bài học.');
   };
 
   const uploadLessonVideo = async (chapterId: string, lessonId: string, file?: File | null) => {
@@ -176,7 +261,7 @@ export default function CurriculumEditorPage() {
       });
 
       if (!presigned.success || !presigned.data) {
-        window.alert(presigned.message || 'Khong tao duoc phien upload');
+        showStatus('error', presigned.message || 'Không tạo được phiên upload video.');
         return;
       }
 
@@ -188,7 +273,7 @@ export default function CurriculumEditorPage() {
           body: formData,
         });
         if (!uploadResponse.ok) {
-          window.alert('Upload local that bai');
+          showStatus('error', 'Upload video thất bại.');
           return;
         }
       } else {
@@ -198,14 +283,14 @@ export default function CurriculumEditorPage() {
           body: file,
         });
         if (!uploadResponse.ok) {
-          window.alert('Upload S3 that bai');
+          showStatus('error', 'Upload video thất bại.');
           return;
         }
       }
 
       const confirmed = await confirmLessonUploadAction(presigned.data.mediaId);
       if (!confirmed.success || !confirmed.data?.url) {
-        window.alert(confirmed.message || 'Khong xac nhan duoc upload');
+        showStatus('error', confirmed.message || 'Không xác nhận được upload video.');
         return;
       }
 
@@ -215,7 +300,7 @@ export default function CurriculumEditorPage() {
       });
 
       if (!updated.success || !updated.lesson) {
-        window.alert(updated.message || 'Khong cap nhat duoc bai hoc sau upload');
+        showStatus('error', updated.message || 'Không cập nhật được bài học sau upload.');
         return;
       }
 
@@ -238,6 +323,7 @@ export default function CurriculumEditorPage() {
               },
         ),
       );
+      showStatus('success', 'Đã upload video cho bài học thành công.');
     } finally {
       setUploadingLessonId('');
     }
@@ -245,12 +331,12 @@ export default function CurriculumEditorPage() {
 
   const attachYoutubeForSelectedLesson = async () => {
     if (!selectedLesson) {
-      window.alert('Vui lòng chọn bài học cần gắn video');
+      showStatus('error', 'Vui lòng chọn bài học mục tiêu trước khi gắn YouTube.');
       return;
     }
 
     if (!youtubeUrlInput.trim()) {
-      window.alert('Vui lòng nhập URL YouTube');
+      showStatus('error', 'Vui lòng nhập URL YouTube.');
       return;
     }
 
@@ -261,7 +347,7 @@ export default function CurriculumEditorPage() {
     });
 
     if (!result.success || !result.lesson) {
-      window.alert(result.message || 'Không cập nhật được YouTube URL cho bài học');
+      showStatus('error', result.message || 'Không cập nhật được YouTube URL cho bài học.');
       return;
     }
 
@@ -293,7 +379,7 @@ export default function CurriculumEditorPage() {
     );
 
     setYoutubeUrlInput('');
-    window.alert('Đã gắn video YouTube cho bài học');
+    showStatus('success', 'Đã gắn video YouTube cho bài học.');
   };
 
   const editLesson = async (
@@ -339,7 +425,7 @@ export default function CurriculumEditorPage() {
 
     const result = await updateLessonAction(courseId, chapterId, lessonId, payload);
     if (!result.success || !result.lesson) {
-      window.alert(result.message || 'Khong cap nhat duoc bai hoc');
+      showStatus('error', result.message || 'Không cập nhật được bài học.');
       return;
     }
 
@@ -373,6 +459,7 @@ export default function CurriculumEditorPage() {
             },
       ),
     );
+    showStatus('success', 'Đã cập nhật bài học.');
   };
 
   if (!mounted) return null;
@@ -402,6 +489,10 @@ export default function CurriculumEditorPage() {
         </div>
       </div>
 
+      <div className="mb-6">
+        <StatusMessage type={statusType} message={statusMessage} />
+      </div>
+
       <Card className="mb-8 rounded-2xl border-white/60 bg-white/70 backdrop-blur-xl shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg">Trung tâm upload video bài học</CardTitle>
@@ -421,6 +512,11 @@ export default function CurriculumEditorPage() {
                 </option>
               ))}
             </select>
+            {selectedLesson ? (
+              <p className="text-xs font-semibold text-primary">Đang chọn: {selectedLesson.chapterTitle} - {selectedLesson.lessonTitle}</p>
+            ) : (
+              <p className="text-xs text-slate-500">Mẹo: Hãy thêm bài học trước, sau đó chọn bài học mục tiêu để upload/gắn YouTube.</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -488,10 +584,20 @@ export default function CurriculumEditorPage() {
                               <span className="font-bold text-lg">{chapter.title}</span>
                            </div>
                            <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="sm" className="font-semibold text-primary hover:bg-primary/10">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="font-semibold text-primary hover:bg-primary/10"
+                                onClick={() => editChapter(chapter.id, chapter.title)}
+                              >
                                 <Edit3 className="size-4 mr-1.5" /> Sửa
                               </Button>
-                              <Button variant="ghost" size="sm" className="font-semibold text-destructive hover:bg-destructive/10 px-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="font-semibold text-destructive hover:bg-destructive/10 px-2"
+                                onClick={() => removeChapter(chapter.id)}
+                              >
                                 <Trash2 className="size-4" />
                               </Button>
                            </div>
@@ -502,7 +608,7 @@ export default function CurriculumEditorPage() {
                            {chapter.lessons.length === 0 ? (
                              <p className="text-sm font-medium text-slate-400 text-center py-4">Chưa có bài học nào trong phần này.</p>
                            ) : (
-                             chapter.lessons.map((lesson, lsIdx) => (
+                             chapter.lessons.map((lesson) => (
                                <div key={lesson.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-white shadow-sm hover:border-primary/40 transition-colors group">
                                   <div className="flex items-center gap-3">
                                      <GripVertical className="size-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
@@ -525,6 +631,7 @@ export default function CurriculumEditorPage() {
                                         className="hidden"
                                         onChange={(event) => {
                                           const file = event.target.files?.[0];
+                                          setSelectedLessonKey(`${chapter.id}::${lesson.id}`);
                                           uploadLessonVideo(chapter.id, lesson.id, file);
                                           event.currentTarget.value = '';
                                         }}
@@ -540,6 +647,14 @@ export default function CurriculumEditorPage() {
                                       onClick={() => editLesson(chapter.id, lesson.id, lesson.title, lesson.videoUrl, lesson.isFree, lesson.sourceType)}
                                     >
                                       <Edit3 className="size-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-slate-400 hover:text-destructive"
+                                      onClick={() => removeLesson(chapter.id, lesson.id)}
+                                    >
+                                      <Trash2 className="size-4" />
                                     </Button>
                                   </div>
                                </div>

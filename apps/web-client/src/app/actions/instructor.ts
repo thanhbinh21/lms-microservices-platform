@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 
 const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:8000';
+const AUTH_PREFIX = process.env.NEXT_PUBLIC_AUTH_PREFIX || '/auth';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -11,6 +12,11 @@ interface ApiResponse<T> {
   message: string;
   data: T | null;
   trace_id: string;
+}
+
+interface AccessTokenPayload {
+  userId: string;
+  role: string;
 }
 
 export interface CourseDto {
@@ -85,29 +91,134 @@ async function getAccessToken() {
   return cookieStore.get('accessToken')?.value;
 }
 
+function decodeAccessToken(token: string): AccessTokenPayload | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8')) as AccessTokenPayload;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+async function writeAuthCookies(params: { accessToken?: string; refreshToken?: string }) {
+  const cookieStore = await cookies();
+
+  if (params.accessToken) {
+    cookieStore.set('accessToken', params.accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60,
+      path: '/',
+    });
+  }
+
+  if (params.refreshToken) {
+    cookieStore.set('refreshToken', params.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60,
+      path: '/',
+    });
+  }
+}
+
+async function refreshAccessToken(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  const refreshToken = cookieStore.get('refreshToken')?.value;
+
+  if (!refreshToken) {
+    return undefined;
+  }
+
+  const response = await fetch(`${GATEWAY_URL}${AUTH_PREFIX}/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refreshToken }),
+    cache: 'no-store',
+  });
+
+  const result = await response.json();
+  if (!response.ok || !result.success) {
+    return undefined;
+  }
+
+  const nextAccessToken = result?.data?.accessToken as string | undefined;
+  const nextRefreshToken = result?.data?.refreshToken as string | undefined;
+
+  if (!nextAccessToken || !nextRefreshToken) {
+    return undefined;
+  }
+
+  await writeAuthCookies({ accessToken: nextAccessToken, refreshToken: nextRefreshToken });
+  return nextAccessToken;
+}
+
 async function callApi<T>(path: string, init?: RequestInit, requireAuth = false): Promise<ApiResponse<T>> {
   const headers = new Headers(init?.headers || {});
   headers.set('Content-Type', 'application/json');
 
   if (requireAuth) {
-    const token = await getAccessToken();
+    let token = await getAccessToken();
+
+    if (!token) {
+      token = await refreshAccessToken();
+    }
+
     if (!token) {
       return {
         success: false,
         code: 401,
-        message: 'Missing access token',
+        message: 'Session expired. Please login again.',
         data: null,
         trace_id: '',
       };
     }
+
+    const decoded = decodeAccessToken(token);
+    if (!decoded?.userId) {
+      return {
+        success: false,
+        code: 401,
+        message: 'Invalid access token payload.',
+        data: null,
+        trace_id: '',
+      };
+    }
+
     headers.set('Authorization', `Bearer ${token}`);
+    headers.set('x-user-id', decoded.userId);
+    headers.set('x-user-role', (decoded.role || '').toLowerCase());
   }
 
-  const response = await fetch(`${GATEWAY_URL}${path}`, {
+  let response = await fetch(`${GATEWAY_URL}${path}`, {
     ...init,
     headers,
     cache: 'no-store',
   });
+
+  if (requireAuth && response.status === 401) {
+    const refreshedToken = await refreshAccessToken();
+
+    if (refreshedToken) {
+      const decoded = decodeAccessToken(refreshedToken);
+      headers.set('Authorization', `Bearer ${refreshedToken}`);
+      if (decoded?.userId) {
+        headers.set('x-user-id', decoded.userId);
+        headers.set('x-user-role', (decoded.role || '').toLowerCase());
+      }
+      response = await fetch(`${GATEWAY_URL}${path}`, {
+        ...init,
+        headers,
+        cache: 'no-store',
+      });
+    }
+  }
 
   const result = await response.json();
   return result as ApiResponse<T>;
@@ -199,6 +310,33 @@ export async function createChapterAction(courseId: string, title: string) {
   return { success: result.success, message: result.message, chapter: result.data };
 }
 
+export async function updateChapterAction(courseId: string, chapterId: string, data: Partial<Pick<ChapterDto, 'title' | 'isPublished'>>) {
+  const result = await callApi<ChapterDto>(
+    `/course/api/courses/${courseId}/chapters/${chapterId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    },
+    true,
+  );
+
+  revalidatePath(`/instructor/courses/${courseId}/curriculum`);
+  return { success: result.success, message: result.message, chapter: result.data };
+}
+
+export async function deleteChapterAction(courseId: string, chapterId: string) {
+  const result = await callApi<null>(
+    `/course/api/courses/${courseId}/chapters/${chapterId}`,
+    {
+      method: 'DELETE',
+    },
+    true,
+  );
+
+  revalidatePath(`/instructor/courses/${courseId}/curriculum`);
+  return { success: result.success, message: result.message };
+}
+
 export async function createLessonAction(courseId: string, chapterId: string, title: string, isFree = false) {
   const result = await callApi<LessonDto>(
     `/course/api/courses/${courseId}/chapters/${chapterId}/lessons`,
@@ -232,6 +370,19 @@ export async function updateLessonAction(
   return { success: result.success, message: result.message, lesson: result.data };
 }
 
+export async function deleteLessonAction(courseId: string, chapterId: string, lessonId: string) {
+  const result = await callApi<null>(
+    `/course/api/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}`,
+    {
+      method: 'DELETE',
+    },
+    true,
+  );
+
+  revalidatePath(`/instructor/courses/${courseId}/curriculum`);
+  return { success: result.success, message: result.message };
+}
+
 export async function requestLessonUploadAction(params: {
   filename: string;
   mimeType: string;
@@ -250,6 +401,28 @@ export async function requestLessonUploadAction(params: {
         type: 'VIDEO',
         courseId: params.courseId,
         lessonId: params.lessonId,
+      }),
+    },
+    true,
+  );
+}
+
+export async function requestCourseThumbnailUploadAction(params: {
+  filename: string;
+  mimeType: string;
+  size: number;
+  courseId: string;
+}) {
+  return callApi<PresignedUploadDto>(
+    `/media/api/upload/presigned`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        filename: params.filename,
+        mimeType: params.mimeType,
+        size: params.size,
+        type: 'IMAGE',
+        courseId: params.courseId,
       }),
     },
     true,

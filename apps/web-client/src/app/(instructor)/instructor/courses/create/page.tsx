@@ -19,6 +19,7 @@ const formSchema = z.object({
 export default function CreateCoursePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -27,13 +28,18 @@ export default function CreateCoursePage() {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
+    setSubmitError('');
     try {
       const result = await createCourseAction(values.title);
       if (result.success && result.courseId) {
         router.push(`/instructor/courses/${result.courseId}`);
+        return;
       }
+
+      setSubmitError(result.message || 'Không thể tạo khóa học. Vui lòng thử lại.');
     } catch (error) {
       console.error(error);
+      setSubmitError('Đã có lỗi hệ thống khi tạo khóa học. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
     }
@@ -69,6 +75,9 @@ export default function CreateCoursePage() {
               />
               {form.formState.errors.title && (
                  <p className="text-sm text-destructive font-bold">{form.formState.errors.title.message}</p>
+              )}
+              {submitError && (
+                <p className="text-sm text-destructive font-bold">{submitError}</p>
               )}
             </div>
           </form>
