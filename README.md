@@ -10,6 +10,7 @@ Event-Driven Learning Management System built with Microservices Architecture
 - [Project Structure](#project-structure)
 - [Services](#services)
 - [Getting Started](#getting-started)
+- [Quick Start (Verified)](#quick-start-verified)
 - [Database Setup](#database-setup)
 - [API Documentation](#api-documentation)
 - [Development](#development)
@@ -27,7 +28,7 @@ Production-ready Learning Management System (LMS) designed for online course man
 - **Payment Integration**: VNPay payment gateway for secure course enrollment
 - **Event-Driven Architecture**: Kafka-based event streaming for reliable asynchronous processing
 - **Learning Progress Tracking**: Monitor student progress and course completion
-- **Media Management**: Video hosting with presigned URLs (S3/VideoCipher integration)
+- **Media Management**: Video hosting with presigned uploads (local + S3 provider)
 - **Notification System**: Email notifications for enrollment, completion, and important events
 
 ### Architecture Characteristics
@@ -41,7 +42,7 @@ Production-ready Learning Management System (LMS) designed for online course man
 ## Tech Stack
 
 ### Frontend
-- **Next.js 15**: React framework with App Router and Server Actions
+- **Next.js 16**: React framework with App Router and Server Actions
 - **Shadcn UI**: Component library built on Radix UI
 - **TailwindCSS**: Utility-first CSS framework
 - **Redux Toolkit**: State management
@@ -64,7 +65,7 @@ Production-ready Learning Management System (LMS) designed for online course man
 
 ### Payment & External Services
 - **VNPay**: Vietnam payment gateway integration
-- **AWS S3 / VideoCipher**: Video hosting and delivery
+- **AWS S3**: Optional media storage backend
 
 ## Architecture
 
@@ -81,7 +82,7 @@ Production-ready Learning Management System (LMS) designed for online course man
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│              Next.js 15 (Frontend + BFF)            │
+│              Next.js 16 (Frontend + BFF)            │
 │                    Port: 3000                       │
 │   - Student UI (Dashboard, Learning, Courses)      │
 │   - Instructor UI (Curriculum Builder)             │
@@ -104,7 +105,7 @@ Production-ready Learning Management System (LMS) designed for online course man
 ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
 │  Auth    │ │ Course   │ │ Payment  │ │  Media   │
 │ Service  │ │ Service  │ │ Service  │ │ Service  │
-│  :3001   │ │  :3002   │ │  :3003   │ │  :3004   │
+│  :3101   │ │  :3002   │ │  :3003   │ │  :3004   │
 └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘
      │            │            │            │
      ▼            ▼            ▼            ▼
@@ -199,12 +200,7 @@ This pattern maintains service independence while providing rich UI experiences.
 ```
 olms-microservices/
 ├── apps/
-│   ├── api-gateway/              # Kong Gateway (optional custom middleware)
-│   │   └── src/
-│   │       ├── index.ts
-│   │       └── middleware/       # Auth, error handling, tracing
-│   │
-│   └── web-client/               # Next.js 15 Frontend
+│   └── web-client/               # Next.js 16 Frontend
 │       ├── src/
 │       │   ├── app/              # App Router pages
 │       │   │   ├── login/        # Login page
@@ -220,7 +216,7 @@ olms-microservices/
 │       └── public/               # Static assets
 │
 ├── services/
-│   ├── auth-service/             # Authentication & JWT (Port 3001)
+│   ├── auth-service/             # Authentication & JWT (Port 3101 in Kong route)
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma     # User, Session, RefreshToken models
 │   │   │   └── migrations/
@@ -290,7 +286,7 @@ olms-microservices/
 
 ### Directory Responsibilities
 
-- **apps/**: Frontend applications and API Gateway configuration
+- **apps/**: Frontend applications
 - **services/**: Backend microservices (each with independent database)
 - **packages/**: Shared libraries used across multiple services
 
@@ -298,7 +294,7 @@ olms-microservices/
 
 ### Auth Service (COMPLETED - Phase 3)
 
-**Port**: 3001  
+**Port**: 3101 (via Kong route in current workspace)  
 **Database**: `auth_db` (Neon PostgreSQL)  
 **Status**: Production Ready
 
@@ -316,7 +312,7 @@ olms-microservices/
 - `POST /logout` - Invalidate session and refresh token
 
 **Database Models:**
-- `User`: id, email, password (hashed), fullName, role, createdAt, updatedAt
+- `User`: id, email, password (hashed), name, role, sourceType, lastLoginAt, createdAt, updatedAt
 - `Session`: id, userId, refreshToken, expiresAt, createdAt
 - `RefreshToken`: id, token (hashed), userId, expiresAt, isActive
 
@@ -341,15 +337,15 @@ olms-microservices/
 - Instructor course ownership
 - Course pricing and metadata
 
-**API Endpoints:**
-- `POST /courses` - Create new course (Instructor only)
-- `GET /courses` - List courses with filters
-- `GET /courses/:id` - Get course details with curriculum
-- `PUT /courses/:id` - Update course (Owner only)
-- `DELETE /courses/:id` - Delete course (Owner only)
-- `POST /courses/:id/chapters` - Add chapter to curriculum
-- `POST /chapters/:id/lessons` - Add lesson to chapter
-- `POST /courses/:id/enroll` - Enroll student (internal use)
+**API Endpoints (service paths):**
+- `GET /api/courses` - List public courses
+- `GET /api/courses/:slug` - Get course details by slug
+- `GET /api/instructor/courses` - List instructor courses (auth)
+- `POST /api/courses` - Create course (Instructor/Admin)
+- `PUT /api/courses/:id` - Update course (Instructor/Admin)
+- `DELETE /api/courses/:id` - Delete course (Instructor/Admin)
+- `POST /api/courses/:courseId/chapters` - Add chapter
+- `POST /api/courses/:courseId/chapters/:chapterId/lessons` - Add lesson
 
 **Database Models:**
 - `Course`: id, title, description, price, instructorId, status, createdAt
@@ -371,24 +367,24 @@ olms-microservices/
 **Status**: Production Ready
 
 **Responsibilities:**
-- Generate presigned URLs for S3/VideoCipher
+- Generate presigned upload requests
 - Track media metadata (size, type, duration)
-- Support multiple storage backends (S3, local, VideoCipher)
-- Media access control and expiry
+- Support storage backends (local, S3)
+- Media access control and cleanup
 
-**API Endpoints:**
-- `POST /upload` - Upload media file (Instructor only)
-- `GET /media/:id` - Get media metadata
-- `GET /media/:id/url` - Get presigned URL (authenticated)
-- `DELETE /media/:id` - Delete media (Owner only)
+**API Endpoints (service paths):**
+- `POST /api/upload/presigned` - Request upload target
+- `POST /api/upload/complete` - Confirm uploaded asset
+- `POST /api/upload/external` - Register external media
+- `GET /api/media/:id` - Get media metadata
+- `DELETE /api/media/:id` - Delete media (Instructor/Admin)
 
 **Database Models:**
-- `Media`: id, filename, storageKey, storageType, mimeType, size, duration, uploaderId, createdAt
+- `MediaAsset`: id, lessonId, courseId, storageProvider, storageKey, mimeType, size, uploaderId, status
 
 **Storage Backends:**
-- AWS S3: Production video hosting
 - Local Storage: Development environment
-- VideoCipher: DRM-protected video delivery (future)
+- AWS S3: Optional external storage
 
 **Security:**
 - Presigned URLs expire after 1 hour
@@ -442,6 +438,45 @@ olms-microservices/
 - **Neon Account** (for PostgreSQL databases)
 - **Git** for version control
 
+## Quick Start (Verified)
+
+This is the shortest verified flow for this workspace state.
+
+1. Install dependencies
+```bash
+pnpm install
+```
+
+2. Prepare env files
+```bash
+cp .env.example .env
+cp services/auth-service/.env.example services/auth-service/.env
+cp services/course-service/.env.example services/course-service/.env
+cp services/media-service/.env.example services/media-service/.env
+```
+
+3. Create web client env file manually at `apps/web-client/.env.local`
+```env
+GATEWAY_URL=http://localhost:8000
+NEXT_PUBLIC_AUTH_PREFIX=/auth
+```
+
+4. Align auth service port with Kong route
+```env
+# services/auth-service/.env
+PORT=3101
+```
+
+5. Start infra, migrate DB, run dev
+```bash
+pnpm run docker:up
+cd services/auth-service && pnpm prisma:migrate && pnpm prisma:generate
+cd ../course-service && pnpm prisma:migrate && pnpm prisma:generate
+cd ../media-service && pnpm prisma:migrate && pnpm prisma:generate
+cd ../../
+pnpm dev
+```
+
 ### Installation Steps
 
 #### 1. Clone Repository
@@ -470,7 +505,7 @@ cp .env.example .env
 
 # Auth Service
 cp services/auth-service/.env.example services/auth-service/.env
-# Edit: DATABASE_URL, JWT_SECRET, JWT_REFRESH_SECRET, REDIS_URL, PORT=3001
+# Edit: DATABASE_URL, JWT_SECRET, JWT_REFRESH_SECRET, REDIS_URL, PORT=3101
 
 # Course Service
 cp services/course-service/.env.example services/course-service/.env
@@ -480,9 +515,10 @@ cp services/course-service/.env.example services/course-service/.env
 cp services/media-service/.env.example services/media-service/.env
 # Edit: DATABASE_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, PORT=3004
 
-# Web Client
-cp apps/web-client/.env.local.example apps/web-client/.env.local
-# Edit: NEXT_PUBLIC_GATEWAY_URL=http://localhost:8000
+# Web Client (create manually)
+# apps/web-client/.env.local
+# GATEWAY_URL=http://localhost:8000
+# NEXT_PUBLIC_AUTH_PREFIX=/auth
 ```
 
 **Critical Configuration:**
@@ -556,7 +592,7 @@ pnpm dev
 
 - Web Client: http://localhost:3000
 - Kong Gateway: http://localhost:8000
-- Auth Service: http://localhost:3001/health
+- Auth Service: http://localhost:3101/health
 - Course Service: http://localhost:3002/health
 - Media Service: http://localhost:3004/health
 
@@ -650,7 +686,7 @@ interface ApiResponse<T> {
     "user": {
       "id": "user_123",
       "email": "student@example.com",
-      "role": "student"
+      "role": "STUDENT"
     }
   },
   "trace_id": "550e8400-e29b-41d4-a716-446655440000"
@@ -693,8 +729,8 @@ Content-Type: application/json
 {
   "email": "student@example.com",
   "password": "SecurePass123!",
-  "fullName": "John Doe",
-  "role": "student"
+  "name": "John Doe",
+  "role": "STUDENT"
 }
 ```
 
@@ -736,19 +772,19 @@ All course endpoints are prefixed with `/course`:
 
 #### List Courses
 ```http
-GET /course/courses?page=1&limit=10&status=published
+GET /course/api/courses?page=1&limit=10
 Authorization: Bearer <access_token>
 ```
 
 #### Get Course Details
 ```http
-GET /course/courses/:id
+GET /course/api/courses/:slug
 Authorization: Bearer <access_token>
 ```
 
 #### Create Course (Instructor only)
 ```http
-POST /course/courses
+POST /course/api/courses
 Authorization: Bearer <access_token>
 Content-Type: application/json
 
@@ -800,9 +836,16 @@ pnpm test
 pnpm lint
 ```
 
-**Type check:**
+**Run integration smoke tests:**
 ```bash
-pnpm type-check
+pnpm run test:integration
+```
+
+**Docker helpers:**
+```bash
+pnpm run docker:up
+pnpm run docker:down
+pnpm run docker:health
 ```
 
 ### Service-Specific Commands
@@ -825,7 +868,6 @@ pnpm start
 pnpm prisma:migrate       # Run migrations
 pnpm prisma:generate      # Generate Prisma Client
 pnpm prisma:studio        # Open Prisma Studio GUI
-pnpm prisma:seed          # Seed database (if configured)
 ```
 
 ### Docker Commands
@@ -1004,12 +1046,12 @@ This applies pending migrations without creating new ones.
 - [x] **Phase 1**: Setup Monorepo (Turborepo), Docker Compose, Neon PostgreSQL (Jan 21, 2026)
 - [x] **Phase 2**: Setup API Gateway (Kong) & Shared Packages (Logger, Types) (Jan 21, 2026)
 - [x] **Phase 3**: Build Auth Service (Login, Register, JWT, Session Redis) (Jan 25, 2026)
-- [x] **Phase 4**: Build Frontend Base (Next.js 15, Shadcn UI, Redux, Login/Register) (Jan 25, 2026)
+- [x] **Phase 4**: Build Frontend Base (Next.js, Shadcn UI, Redux, Login/Register) (Jan 25, 2026)
 
 ### Phase 5-9: Core LMS & Media (IN PROGRESS)
 
 - [x] **Phase 5**: Build Course Service DB & CRUD API (Feb 28, 2026)
-- [x] **Phase 6**: Build Media Service (Presigned URL S3/VideoCipher) (Feb 28, 2026)
+- [x] **Phase 6**: Build Media Service (Presigned upload flow) (Feb 28, 2026)
 - [x] **Phase 6.1**: Code Audit & Production Hardening (Mar 1, 2026)
 - [ ] **Phase 7**: Frontend Instructor UI (Drag & Drop Curriculum Builder)
 - [ ] **Phase 8**: Frontend Public UI (Course Listing, Detail with BFF Aggregation)
@@ -1081,7 +1123,7 @@ Package `env-validator` uses Zod to validate environment variables at runtime. A
 **Environment File Locations:**
 - Root `.env`: Shared infrastructure (Kafka, Redis)
 - `services/<service>/.env`: Service-specific config
-- `apps/web-client/.env.local`: Frontend config (NEXT_PUBLIC_ prefix for browser)
+- `apps/web-client/.env.local`: Next.js config for server actions (`GATEWAY_URL`) and optional public prefix (`NEXT_PUBLIC_AUTH_PREFIX`)
 
 **Restart Required:**  
 Changing `.env` files requires service restart for changes to take effect.
@@ -1105,6 +1147,6 @@ Neon allows connections from any IP by default. Docker containers require intern
 
 ---
 
-**Last Updated**: March 8, 2026  
-**Project Status**: Phase 6.1 Completed (7/15 phases)  
+**Last Updated**: April 1, 2026  
+**Project Status**: Auth/Course/Media services and web-client are active; Payment/Notification remain planned.  
 **License**: MIT

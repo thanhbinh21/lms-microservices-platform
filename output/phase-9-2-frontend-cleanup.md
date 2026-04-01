@@ -181,3 +181,28 @@ Ket qua:
 - Header/footer/layout giang vien dong nhat cung 1 he visual token.
 - Hieu ung blur, border, shadow va nen duoc chuan hoa o tang dung chung thay vi style roi rac.
 - Build xac nhan pass: `pnpm --filter web-client build`.
+
+## 13. Quyet dinh ky thuat bo sung - chuyen media provider sang Cloudinary Free
+Muc tieu thay doi:
+- Don gian hoa van hanh media service va giam chi phi khoi tao ban dau.
+- Dat mot provider mac dinh ro rang cho image/video truoc khi vao phase thanh toan.
+
+Pham vi tai lieu/roadmap da cap nhat:
+- `project_overview.md`
+- `project_structure.md`
+
+Quyet dinh ky thuat quan trong:
+- Cloudinary Free la provider mac dinh cho media upload/delivery.
+- Local storage van giu lai lam fallback cho local development/test.
+- S3/VideoCipher duoc xem la huong mo rong tuong lai, khong con nam trong flow uu tien hien tai.
+- Them roadmap `Phase 9.8 - Media Provider Unification` de team chuyen doi code/config theo lo trinh co kiem soat.
+
+Huong dan migrate/deploy (du kien cho Phase 9.8):
+1. Bo sung env cloudinary cho media-service (`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`).
+2. Cap nhat storage provider resolver theo thu tu uu tien: `cloudinary` -> `local`.
+3. Verify upload image/video qua presigned/direct upload flow va URL tra ve.
+4. Cap nhat test integration cho media upload path.
+
+Tac dong den roadmap:
+- Learning Experience (Phase 14-16) tiep tuc duoc uu tien truoc block Commerce & Payments.
+- Co bo sample courses + video free som ket hop voi provider Cloudinary de hoc vien trai nghiem truoc.

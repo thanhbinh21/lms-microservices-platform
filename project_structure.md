@@ -51,6 +51,10 @@ Gateway → Microservices
 Microservices → Neon PostgreSQL (serverless)
 Payment → Kafka → Course/Notification  
 
+Media flow (updated):
+- Upload/Image/Video URL: Web Client -> Gateway -> Media Service -> Cloudinary Free
+- Local storage chi dung fallback cho local development/test
+
 ## BFF Pattern
 
 Next.js Server Actions:
@@ -79,3 +83,10 @@ Next.js Server Actions:
 - VNPay checksum required
 - Use JSONB audit logs
 - DB connections use SSL (sslmode=require)
+
+## Media Provider Rules
+
+- Default provider: Cloudinary Free
+- Keep provider abstraction in media-service de co the doi provider sau nay
+- Local provider chi dung cho dev/test, khong la production path
+- S3/VideoCipher khong con la provider uu tien trong roadmap hien tai
