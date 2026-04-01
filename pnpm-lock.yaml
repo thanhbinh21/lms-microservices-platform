@@ -203,9 +203,6 @@ importers:
 
   services/auth-service:
     dependencies:
-      '@lms/db-prisma':
-        specifier: workspace:*
-        version: link:../../packages/db-prisma
       '@lms/env-validator':
         specifier: workspace:*
         version: link:../../packages/env-validator
