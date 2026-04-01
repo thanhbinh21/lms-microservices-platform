@@ -1,0 +1,12 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nexeduGradient" x1="64" y1="420" x2="448" y2="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1E1B7A" />
+      <stop offset="0.56" stop-color="#1D4ED8" />
+      <stop offset="1" stop-color="#06B6D4" />
+    </linearGradient>
+  </defs>
+  <path d="M88 370L160 158C167 137 180 122 199 114C218 106 239 108 256 120L285 141L315 80L433 42L345 305C334 341 310 368 276 382C243 396 208 394 178 377L88 370Z" fill="url(#nexeduGradient)" />
+  <path d="M126 329L152 249L262 191L224 316C220 327 212 336 201 340L126 329Z" fill="#1D3DA6" fill-opacity="0.85" />
+  <path d="M138 230L278 160C287 155 299 158 303 168C307 178 302 189 293 194L153 264C144 269 132 266 128 256C124 246 129 235 138 230Z" fill="#EAF3FF" />
+</svg>

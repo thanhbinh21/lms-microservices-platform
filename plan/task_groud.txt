@@ -1,0 +1,35 @@
+Mục tiêu là chia theo domain để giảm conflict và vẫn bám đúng dependency của roadmap.
+
+Workstream 1: Auth Role Governance (Phase 9.4, 9.5, 9.6)
+BA: Chốt rule đăng ký luôn là STUDENT, policy nâng cấp INSTRUCTOR, xử lý stale session sau đổi role.
+DEV: Refactor register contract, thêm API Become Educator, cập nhật UI Register/Profile/Dashboard theo role mới.
+QC: Test luồng register -> become educator -> vào instructor area; test chặn 403 khi chưa nâng cấp.
+DOC: Ghi thay đổi auth flow + role policy vào output và cập nhật roadmap phase tương ứng.
+Phụ thuộc: Không bị chặn, nên làm đầu tiên.
+
+Workstream 2: Learning Core + Student Dashboard (Phase 14, 16)
+BA: Chốt chỉ số học tập và trạng thái cần hiển thị ở dashboard.
+DEV: Xây trang học learn course, lesson progress, nối dashboard bằng dữ liệu thật qua BFF Server Actions.
+QC: Test học tiếp tục giữa chừng, cập nhật progress, hiển thị đúng khóa học của tôi.
+DOC: Ghi rõ data flow học tập end-to-end vào output.
+Phụ thuộc: Có thể chạy song song với Workstream 1, chỉ cần đồng bộ role state cuối.
+
+Workstream 3: Commerce Backbone (Phase 10, 11, 12, 13 phần enrollment)
+BA: Chốt order state machine, chuẩn callback VNPay, idempotency cho enrollment.
+DEV: Dựng payment service, tích hợp VNPay create-url/IPN, publish sự kiện payment.order.completed, retry và DLQ.
+QC: Test payment success/fail, retry topic, duplicate event không tạo enrollment trùng.
+DOC: Ghi event schema, migration, và chiến lược retry/DLQ vào output.
+Phụ thuộc: Có thể phát triển backend song song, nhưng là nguồn contract cho Workstream 4.
+
+Workstream 4: Notification + Seed Content + Media Unification (Phase 9.7, 9.8, 15, 13 phần notify)
+BA: Chốt policy seed course mẫu có bài free, policy cloudinary/local fallback, danh mục email template.
+DEV: Làm seed nội dung mẫu, chuẩn hóa media provider cloudinary + local fallback dev/test, dựng notification consumer nhận event thanh toán.
+QC: Test upload media đúng provider, test enrollment event -> gửi email/notification đúng.
+DOC: Ghi flow media và notification E2E vào output.
+Phụ thuộc: Cần Workstream 3 chốt event contract trước khi code consumer.
+
+Thứ tự chạy khuyến nghị
+Tuần 1: Workstream 1 và 2 chạy song song.
+Tuần 2: Workstream 3 bắt đầu full flow payment-event.
+Tuần 3: Workstream 4 vào phần consumer sau khi Workstream 3 freeze schema event.
+Tuần 4: Integration test toàn hệ thống + chốt roadmap update.

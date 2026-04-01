@@ -19,10 +19,9 @@ out
 .env.test.local
 .env.production.local
 
-# Sensitive files - DO NOT COMMIT
-READMECODE.md
-project_structure.md
+# Sensitive files 
 .github/
+.plan/
 
 # Logs
 logs
