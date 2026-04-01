@@ -8,7 +8,7 @@ import { logger } from '@lms/logger';
 import { validateMediaServiceEnv } from '@lms/env-validator';
 import type { ApiResponse } from '@lms/types';
 import { requireAuth, requireRole } from './middleware/require-auth';
-import { requestPresignedUpload, confirmUpload } from './controllers/upload.controller';
+import { requestPresignedUpload, confirmUpload, registerExternalMedia } from './controllers/upload.controller';
 import { getMediaAsset, getMediaByLesson, getMediaByCourse, deleteMediaAsset } from './controllers/media.controller';
 import { getStorageProvider } from './storage';
 import { LocalStorageProvider } from './storage/local.storage';
@@ -47,6 +47,7 @@ app.get('/health', (_req: Request, res: Response) => {
 // Route upload (chi giang vien/admin)
 app.post('/api/upload/presigned', ...requireRole('instructor', 'admin'), requestPresignedUpload);
 app.post('/api/upload/complete', ...requireRole('instructor', 'admin'), confirmUpload);
+app.post('/api/upload/external', ...requireRole('instructor', 'admin'), registerExternalMedia);
 
 // Route upload local (chi dung khi STORAGE_PROVIDER=local)
 if ((process.env.STORAGE_PROVIDER || 'local') === 'local') {
@@ -66,7 +67,7 @@ if ((process.env.STORAGE_PROVIDER || 'local') === 'local') {
 
   app.put(
     '/api/upload/local/:storageKey(*)',
-    requireAuth,
+    // Route local upload danh cho dev: cho phep browser upload truc tiep qua URL tam thoi
     upload.single('file'),
     async (req: Request, res: Response) => {
       const traceId = (req.headers['x-trace-id'] as string) || '';
@@ -172,9 +173,24 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
 const uploadDir = process.env.LOCAL_UPLOAD_DIR || './uploads';
 fs.mkdir(uploadDir, { recursive: true }).catch(() => {});
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(
     { port: PORT, storage: process.env.STORAGE_PROVIDER || 'local' },
     `Media Service da khoi dong tren port ${PORT}`,
   );
 });
+
+// Tat server an toan
+const shutdown = (signal: string) => {
+  logger.info(`${signal} - dang tat server`);
+  server.close(() => {
+    logger.info('Server closed');
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10_000);
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('uncaughtException', (err) => { logger.fatal(err, 'Uncaught exception'); process.exit(1); });
+process.on('unhandledRejection', (err) => { logger.fatal(err, 'Unhandled rejection'); process.exit(1); });

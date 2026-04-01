@@ -21,12 +21,29 @@ const confirmUploadSchema = z.object({
   mediaId: z.string().uuid('Media ID khong hop le'),
 });
 
+const externalMediaSchema = z.object({
+  filename: z.string().min(1, 'Ten file la bat buoc'),
+  sourceType: z.enum(['YOUTUBE']),
+  externalUrl: z.string().url('External URL khong hop le'),
+  courseId: z.string().uuid('Course ID khong hop le').optional(),
+  lessonId: z.string().uuid('Lesson ID khong hop le').optional(),
+});
+
 // MIME types cho phep theo loai media
 const ALLOWED_MIME_TYPES: Record<string, string[]> = {
   VIDEO: ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'],
   IMAGE: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
   DOCUMENT: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
 };
+
+function isYoutubeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.includes('youtube.com') || parsed.hostname.includes('youtu.be');
+  } catch {
+    return false;
+  }
+}
 
 // ─── Controllers ──────────────────────────────────────────────────────────────
 
@@ -120,6 +137,68 @@ export async function requestPresignedUpload(req: Request, res: Response) {
       return res.status(400).json(bad);
     }
     return handlePrismaError(err, res, traceId, 'requestPresignedUpload');
+  }
+}
+
+/**
+ * POST /api/upload/external
+ * Luu media tham chieu toi video ngoai (uu tien YouTube) de tranh upload file lon.
+ */
+export async function registerExternalMedia(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const uploaderId = res.locals.userId as string;
+
+  try {
+    const parsed = externalMediaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const bad: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: parsed.error.errors[0].message,
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(bad);
+    }
+
+    const { filename, sourceType, externalUrl, courseId, lessonId } = parsed.data;
+
+    if (sourceType === 'YOUTUBE' && !isYoutubeUrl(externalUrl)) {
+      const bad: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: 'YouTube URL khong hop le',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(bad);
+    }
+
+    const media = await prisma.mediaAsset.create({
+      data: {
+        filename,
+        storageKey: `external/${uploaderId}/${crypto.randomUUID()}`,
+        mimeType: 'text/uri-list',
+        size: 0,
+        type: 'VIDEO',
+        status: 'UPLOADED',
+        uploaderId,
+        courseId: courseId ?? null,
+        lessonId: lessonId ?? null,
+        url: externalUrl,
+      },
+    });
+
+    const response: ApiResponse<typeof media> = {
+      success: true,
+      code: 201,
+      message: 'External media registered successfully',
+      data: media,
+      trace_id: traceId,
+    };
+    return res.status(201).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'registerExternalMedia');
   }
 }
 

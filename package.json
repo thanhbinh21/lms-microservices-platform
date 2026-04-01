@@ -11,6 +11,7 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
+    "test:integration": "vitest run",
     "lint": "turbo run lint",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
@@ -18,8 +19,11 @@
     "docker:health": "docker-compose ps"
   },
   "devDependencies": {
+    "@types/supertest": "^7.2.0",
+    "supertest": "^7.2.2",
     "turbo": "^2.0.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.0"
   },
   "packageManager": "pnpm@8.15.0",
   "engines": {

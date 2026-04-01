@@ -5,6 +5,7 @@ import { logger } from '@lms/logger';
 import type { ApiResponse } from '@lms/types';
 import { initRedis, closeRedis } from './lib/redis.js';
 import { initEnv } from './lib/env.js';
+import prisma from './lib/prisma.js';
 import { register } from './controllers/register.controller.js';
 import { login } from './controllers/login.controller.js';
 import { refresh } from './controllers/refresh.controller.js';
@@ -15,6 +16,8 @@ const env = initEnv();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+let server: ReturnType<typeof app.listen> | null = null;
+let shuttingDown = false;
 
 // Middleware bao mat
 app.use(helmet());
@@ -88,7 +91,7 @@ async function startServer() {
     // Ket noi Redis
     await initRedis(env.REDIS_URL);
 
-    app.listen(PORT, () => {
+    server = app.listen(PORT, () => {
       logger.info({ port: PORT }, 'Auth Service da khoi dong');
     });
   } catch (error) {
@@ -97,17 +100,45 @@ async function startServer() {
   }
 }
 
-// Tat server an toan
-process.on('SIGINT', async () => {
-  logger.info('Dang tat Auth Service...');
-  await closeRedis();
-  process.exit(0);
+// Tat server an toan de tranh mat request dang xu ly va ro ri ket noi
+async function shutdown(signal: 'SIGINT' | 'SIGTERM') {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+
+  logger.info({ signal }, 'Dang tat Auth Service...');
+
+  const forceExitTimer = setTimeout(() => {
+    logger.error({ signal }, 'Auth Service shutdown timeout, force exit');
+    process.exit(1);
+  }, 10_000);
+
+  try {
+    if (server) {
+      await new Promise<void>((resolve) => {
+        server?.close(() => resolve());
+      });
+    }
+
+    await closeRedis();
+    await prisma.$disconnect();
+
+    clearTimeout(forceExitTimer);
+    process.exit(0);
+  } catch (error) {
+    logger.error({ error, signal }, 'Loi khi tat Auth Service');
+    clearTimeout(forceExitTimer);
+    process.exit(1);
+  }
+}
+
+process.on('SIGINT', () => {
+  void shutdown('SIGINT');
 });
 
-process.on('SIGTERM', async () => {
-  logger.info('Dang tat Auth Service...');
-  await closeRedis();
-  process.exit(0);
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM');
 });
 
 startServer();

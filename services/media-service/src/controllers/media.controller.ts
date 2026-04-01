@@ -5,6 +5,11 @@ import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
 import { getStorageProvider } from '../storage';
 
+function inferSourceType(url?: string | null): 'UPLOAD' | 'YOUTUBE' {
+  if (!url) return 'UPLOAD';
+  return url.includes('youtube.com') || url.includes('youtu.be') ? 'YOUTUBE' : 'UPLOAD';
+}
+
 /**
  * GET /api/media/:id
  * Lay thong tin metadata cua media asset
@@ -39,10 +44,15 @@ export async function getMediaAsset(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
 
-    const response: ApiResponse<typeof media> = {
+    const mediaWithSourceType = {
+      ...media,
+      sourceType: inferSourceType(media.url),
+    };
+
+    const response: ApiResponse<typeof mediaWithSourceType> = {
       success: true, code: 200,
       message: 'Media asset fetched',
-      data: media,
+      data: mediaWithSourceType,
       trace_id: traceId,
     };
     return res.status(200).json(response);
@@ -76,10 +86,15 @@ export async function getMediaByLesson(req: Request, res: Response) {
       orderBy: { createdAt: 'desc' },
     });
 
-    const response: ApiResponse<typeof assets> = {
+    const assetsWithSourceType = assets.map((asset) => ({
+      ...asset,
+      sourceType: inferSourceType(asset.url),
+    }));
+
+    const response: ApiResponse<typeof assetsWithSourceType> = {
       success: true, code: 200,
       message: 'Lesson media fetched',
-      data: assets,
+      data: assetsWithSourceType,
       trace_id: traceId,
     };
     return res.status(200).json(response);
@@ -116,10 +131,15 @@ export async function getMediaByCourse(req: Request, res: Response) {
       orderBy: { createdAt: 'desc' },
     });
 
-    const response: ApiResponse<typeof assets> = {
+    const assetsWithSourceType = assets.map((asset) => ({
+      ...asset,
+      sourceType: inferSourceType(asset.url),
+    }));
+
+    const response: ApiResponse<typeof assetsWithSourceType> = {
       success: true, code: 200,
       message: 'Course media fetched',
-      data: assets,
+      data: assetsWithSourceType,
       trace_id: traceId,
     };
     return res.status(200).json(response);

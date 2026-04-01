@@ -11,6 +11,8 @@ import {
   updateCourse,
   deleteCourse,
   getInstructorCourses,
+  getInstructorCourseById,
+  getCourseCurriculum,
 } from './controllers/course.controller';
 import {
   createChapter,
@@ -22,8 +24,10 @@ import {
   createLesson,
   updateLesson,
   deleteLesson,
+  getLessonPlayback,
 } from './controllers/lesson.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
+import prisma from './lib/prisma';
 
 // Validate bien moi truong khi khoi dong
 validateCourseServiceEnv();
@@ -61,6 +65,8 @@ app.get('/api/courses/:slug', getCourseBySlug);
 // ─── Instructor Routes (Kong injects x-user-id, x-user-role) ─────────────────
 // requireRole middleware: validates header exists + role check, sets res.locals.userId
 app.get('/api/instructor/courses', requireAuth, getInstructorCourses);
+app.get('/api/instructor/courses/:id', requireAuth, getInstructorCourseById);
+app.get('/api/courses/:id/curriculum', ...requireRole('instructor', 'admin'), getCourseCurriculum);
 app.post('/api/courses', ...requireRole('instructor', 'admin'), createCourse);
 app.put('/api/courses/:id', ...requireRole('instructor', 'admin'), updateCourse);
 app.delete('/api/courses/:id', ...requireRole('instructor', 'admin'), deleteCourse);
@@ -75,6 +81,7 @@ app.put('/api/courses/:courseId/chapters/reorder', ...requireRole('instructor', 
 app.post('/api/courses/:courseId/chapters/:chapterId/lessons', ...requireRole('instructor', 'admin'), createLesson);
 app.put('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), updateLesson);
 app.delete('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), deleteLesson);
+app.get('/api/lessons/:lessonId/playback', getLessonPlayback);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {
@@ -108,16 +115,30 @@ const server = app.listen(PORT, () => {
 });
 
 // Tat server an toan
-const shutdown = (signal: string) => {
+const shutdown = async (signal: string) => {
   logger.info(`${signal} - dang tat server`);
-  server.close(() => {
-    logger.info('Server closed');
-    process.exit(0);
+  const forceExitTimer = setTimeout(() => process.exit(1), 10_000);
+
+  server.close(async () => {
+    try {
+      // Dong Prisma de tra ket noi ve pool khi service bi restart/stop
+      await prisma.$disconnect();
+      clearTimeout(forceExitTimer);
+      logger.info('Server closed');
+      process.exit(0);
+    } catch (error) {
+      logger.error({ error }, 'Loi khi dong Prisma luc shutdown');
+      clearTimeout(forceExitTimer);
+      process.exit(1);
+    }
   });
-  setTimeout(() => process.exit(1), 10_000);
 };
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM');
+});
+process.on('SIGINT', () => {
+  void shutdown('SIGINT');
+});
 process.on('uncaughtException', (err) => { logger.fatal(err, 'Uncaught exception'); process.exit(1); });
 process.on('unhandledRejection', (err) => { logger.fatal(err, 'Unhandled rejection'); process.exit(1); });

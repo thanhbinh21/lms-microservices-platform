@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { logger } from '@lms/logger';
 
@@ -41,6 +42,8 @@ export function generateRefreshToken(
   const options: SignOptions = {
     expiresIn: (expiresIn || process.env.JWT_REFRESH_EXPIRY || DEFAULT_REFRESH_EXPIRY) as SignOptions['expiresIn'],
     algorithm: 'HS256',
+    // Them jwtid de moi refresh token la duy nhat, tranh xung dot unique khi tao nhanh
+    jwtid: crypto.randomUUID(),
   };
   const token = jwt.sign({ ...payload, type: 'refresh' }, secret, options);
   logger.debug({ userId: payload.userId }, 'Refresh token da tao');
