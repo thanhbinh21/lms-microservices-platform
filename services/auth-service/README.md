@@ -97,9 +97,10 @@ Authorization: Bearer <accessToken>
 ## Setup
 
 1. Copy `.env.example` to `.env` and configure:
-   - DATABASE_URL (Neon connection string)
-   - REDIS_URL
-   - JWT_SECRET (minimum 32 characters)
+  - DATABASE_URL (Neon pooled connection string)
+  - DIRECT_URL (Neon direct connection string)
+  - REDIS_URL
+  - JWT_SECRET (minimum 32 characters)
 
 2. Install dependencies:
 ```bash
@@ -116,4 +117,4 @@ pnpm prisma:migrate
 pnpm dev
 ```
 
-Server runs on http://localhost:3001
+Server runs on http://localhost:3101
