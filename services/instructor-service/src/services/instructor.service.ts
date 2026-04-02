@@ -1,13 +1,54 @@
-const axios = require('axios');
-const prisma = require('../utils/prisma');
-const { getAuthServiceBaseUrl } = require('../utils/resolveAuthServiceUrl');
+import axios from 'axios';
+import type { InstructorRequest } from '../generated/prisma';
+import { prisma } from '../utils/prisma';
+import { getAuthServiceBaseUrl } from '../utils/resolveAuthServiceUrl';
 
-async function uploadMediaIfProvided(fieldValue, token) {
+export interface AuthUserContext {
+  userId: string;
+  role: string;
+  email?: string;
+}
+
+export interface CreateInstructorRequestPayload {
+  fullName: string;
+  phone: string;
+  email?: string;
+  expertise: string;
+  specialization?: string;
+  experienceYears: number;
+  bio: string;
+  courseTitle: string;
+  courseCategory: string;
+  courseDescription: string;
+  dateOfBirth?: string;
+  address?: string;
+  currentJob?: string;
+  github?: string;
+  linkedin?: string;
+  website?: string;
+  youtube?: string;
+  cvFile?: string;
+  certificateFile?: string;
+  identityCard?: string;
+  avatar?: string;
+  targetStudents?: string;
+}
+
+function throwHttp(statusCode: number, message: string): never {
+  const err = new Error(message) as Error & { statusCode: number };
+  err.statusCode = statusCode;
+  throw err;
+}
+
+async function uploadMediaIfProvided(fieldValue: string | undefined, token: string): Promise<string | null> {
   if (!fieldValue) return null;
 
+  const base = process.env.MEDIA_SERVICE_URL?.replace(/\/$/, '');
+  if (!base) return fieldValue;
+
   try {
-    const response = await axios.post(
-      `${process.env.MEDIA_SERVICE_URL}/api/upload/external`,
+    const response = await axios.post<{ success?: boolean; data?: { url?: string } }>(
+      `${base}/api/upload/external`,
       { sourceUrl: fieldValue },
       {
         headers: {
@@ -19,26 +60,31 @@ async function uploadMediaIfProvided(fieldValue, token) {
     if (response.data?.success) {
       return response.data?.data?.url || fieldValue;
     }
-  } catch (_error) {
+  } catch {
     return fieldValue;
   }
 
   return fieldValue;
 }
 
-async function getPendingRequestByUserId(userId) {
+export async function getPendingRequestByUserId(userId: string): Promise<InstructorRequest | null> {
   return prisma.instructorRequest.findFirst({
     where: { userId, status: 'pending' },
     orderBy: { createdAt: 'desc' },
   });
 }
 
-async function createInstructorRequest(payload, user, token) {
+export async function createInstructorRequest(
+  payload: CreateInstructorRequestPayload,
+  user: AuthUserContext,
+  token: string,
+): Promise<InstructorRequest> {
   const existingPending = await getPendingRequestByUserId(user.userId);
   if (existingPending) {
-    const err = new Error('Bạn đã có hồ sơ đang chờ duyệt. Vui lòng đợi kết quả trước khi gửi lại.');
-    err.statusCode = 409;
-    throw err;
+    throwHttp(
+      409,
+      'Bạn đã có hồ sơ đang chờ duyệt. Vui lòng đợi kết quả trước khi gửi lại.',
+    );
   }
 
   const cvFile = await uploadMediaIfProvided(payload.cvFile, token);
@@ -76,19 +122,24 @@ async function createInstructorRequest(payload, user, token) {
   });
 }
 
-async function getAllRequests() {
+export async function getAllRequests(): Promise<InstructorRequest[]> {
   return prisma.instructorRequest.findMany({
     orderBy: { createdAt: 'desc' },
   });
 }
 
-async function getRequestById(id) {
+export async function getRequestById(id: string): Promise<InstructorRequest | null> {
   return prisma.instructorRequest.findUnique({
     where: { id },
   });
 }
 
-async function getRequestStats() {
+export async function getRequestStats(): Promise<{
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+}> {
   const [total, pending, approved, rejected] = await Promise.all([
     prisma.instructorRequest.count(),
     prisma.instructorRequest.count({ where: { status: 'pending' } }),
@@ -98,17 +149,13 @@ async function getRequestStats() {
   return { total, pending, approved, rejected };
 }
 
-async function approveRequest(id, token) {
+export async function approveRequest(id: string, token: string): Promise<InstructorRequest> {
   const found = await prisma.instructorRequest.findUnique({ where: { id } });
   if (!found) {
-    const err = new Error('Không tìm thấy đơn đăng ký');
-    err.statusCode = 404;
-    throw err;
+    throwHttp(404, 'Không tìm thấy đơn đăng ký');
   }
   if (found.status !== 'pending') {
-    const err = new Error('Đơn này đã được xử lý');
-    err.statusCode = 400;
-    throw err;
+    throwHttp(400, 'Đơn này đã được xử lý');
   }
 
   const request = await prisma.instructorRequest.update({
@@ -132,17 +179,13 @@ async function approveRequest(id, token) {
   return request;
 }
 
-async function rejectRequest(id) {
+export async function rejectRequest(id: string): Promise<InstructorRequest> {
   const found = await prisma.instructorRequest.findUnique({ where: { id } });
   if (!found) {
-    const err = new Error('Không tìm thấy đơn đăng ký');
-    err.statusCode = 404;
-    throw err;
+    throwHttp(404, 'Không tìm thấy đơn đăng ký');
   }
   if (found.status !== 'pending') {
-    const err = new Error('Đơn này đã được xử lý');
-    err.statusCode = 400;
-    throw err;
+    throwHttp(400, 'Đơn này đã được xử lý');
   }
 
   return prisma.instructorRequest.update({
@@ -150,13 +193,3 @@ async function rejectRequest(id) {
     data: { status: 'rejected' },
   });
 }
-
-module.exports = {
-  createInstructorRequest,
-  getAllRequests,
-  getRequestById,
-  getPendingRequestByUserId,
-  getRequestStats,
-  approveRequest,
-  rejectRequest,
-};

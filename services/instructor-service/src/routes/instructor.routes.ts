@@ -1,17 +1,17 @@
-const express = require('express');
-const verifyToken = require('../middlewares/verifyToken');
-const roleGuard = require('../middlewares/roleGuard');
-const {
+import { Router, type IRouter } from 'express';
+import {
+  approve,
   createRequest,
   getMyRequest,
-  getStats,
-  getRequests,
   getRequest,
-  approve,
+  getRequests,
+  getStats,
   reject,
-} = require('../controllers/instructor.controller');
+} from '../controllers/instructor.controller';
+import { roleGuard } from '../middlewares/roleGuard';
+import { verifyToken } from '../middlewares/verifyToken';
 
-const router = express.Router();
+const router: IRouter = Router();
 
 router.post('/request', verifyToken, roleGuard(['STUDENT']), createRequest);
 router.get('/my-request', verifyToken, roleGuard(['STUDENT']), getMyRequest);
@@ -21,4 +21,4 @@ router.get('/requests/:id', verifyToken, roleGuard(['ADMIN']), getRequest);
 router.put('/approve/:id', verifyToken, roleGuard(['ADMIN']), approve);
 router.put('/reject/:id', verifyToken, roleGuard(['ADMIN']), reject);
 
-module.exports = router;
+export default router;

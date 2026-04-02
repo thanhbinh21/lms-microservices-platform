@@ -47,7 +47,7 @@ export function ProfileSettings() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const normalizedRole = (user?.role || '').toUpperCase();
   const isAdmin = normalizedRole === 'ADMIN';
-  const canAccessInstructorStudio = normalizedRole === 'INSTRUCTOR' || normalizedRole === 'ADMIN';
+  const canAccessInstructorStudio = normalizedRole === 'INSTRUCTOR';
 
   const tabParam = searchParams.get('tab') as TabId | null;
   const requestId = searchParams.get('requestId');

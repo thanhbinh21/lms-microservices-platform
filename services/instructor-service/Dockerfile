@@ -8,9 +8,10 @@ RUN npm install
 COPY . .
 
 RUN npx prisma generate
+RUN npm run build
 
 EXPOSE 5006
 
 ENV LISTEN_PORT=5006
 
-CMD ["npm", "run", "start"]
+CMD ["node", "dist/server.js"]

@@ -1,17 +1,15 @@
-require('dotenv').config();
-const app = require('./app');
-const prisma = require('./utils/prisma');
+import 'dotenv/config';
+import app from './app';
+import { prisma } from './utils/prisma';
 
 const PORT = Number(process.env.PORT || 3006);
 const LISTEN_PORT = Number(process.env.LISTEN_PORT || PORT);
 
 const server = app.listen(LISTEN_PORT, () => {
-  // eslint-disable-next-line no-console
   console.log(`instructor-service running on port ${LISTEN_PORT}`);
 });
 
-async function shutdown(signal) {
-  // eslint-disable-next-line no-console
+async function shutdown(signal: string) {
   console.log(`Received ${signal}. Shutting down instructor-service...`);
   server.close(async () => {
     await prisma.$disconnect();

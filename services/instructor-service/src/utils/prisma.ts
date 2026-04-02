@@ -1,8 +1,10 @@
-const { PrismaClient } = require('../generated/prisma');
+import { PrismaClient } from '../generated/prisma';
 
-const globalForPrisma = globalThis;
+const globalForPrisma = globalThis as typeof globalThis & {
+  prismaInstructor?: PrismaClient;
+};
 
-const prisma =
+export const prisma =
   globalForPrisma.prismaInstructor ??
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
@@ -11,5 +13,3 @@ const prisma =
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prismaInstructor = prisma;
 }
-
-module.exports = prisma;

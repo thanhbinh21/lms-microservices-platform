@@ -31,8 +31,7 @@ export function SharedNavbar() {
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const normalizedRole = (user?.role || '').toUpperCase();
   const canBecomeInstructor = isAuthenticated && !!user && normalizedRole === 'STUDENT';
-  const canAccessInstructorStudio =
-    isAuthenticated && !!user && (normalizedRole === 'INSTRUCTOR' || normalizedRole === 'ADMIN');
+  const canAccessInstructorStudio = isAuthenticated && !!user && normalizedRole === 'INSTRUCTOR';
 
   const handleLogout = async () => {
     await logoutAction();
