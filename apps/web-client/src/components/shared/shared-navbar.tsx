@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Menu, X } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+import { Clapperboard, LogOut, Menu, X } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { logoutAction } from '@/app/actions/auth';
+import { logout } from '@/lib/redux/authSlice';
+import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 
 const navItems = [
   { label: 'Trang chủ', href: '/' },
@@ -22,7 +25,21 @@ function isActive(pathname: string, href: string): boolean {
 
 export function SharedNavbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const normalizedRole = (user?.role || '').toUpperCase();
+  const canBecomeInstructor = isAuthenticated && !!user && normalizedRole === 'STUDENT';
+  const canAccessInstructorStudio =
+    isAuthenticated && !!user && (normalizedRole === 'INSTRUCTOR' || normalizedRole === 'ADMIN');
+
+  const handleLogout = async () => {
+    await logoutAction();
+    dispatch(logout());
+    router.push('/login');
+    router.refresh();
+  };
 
   return (
     <header className="glass-navbar sticky top-0 z-40 shadow-sm">
@@ -45,12 +62,51 @@ export function SharedNavbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-4">
-          <Link href="/login">
-            <Button variant="ghost" className="font-bold">Đăng nhập</Button>
-          </Link>
-          <Link href="/register">
-            <Button className="font-bold shadow-md shadow-primary/20">Đăng ký</Button>
-          </Link>
+          {isAuthenticated && user ? (
+            <>
+              <Link
+                href="/profile"
+                className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white/50"
+              >
+                <span className="text-sm font-semibold text-foreground">Xin chào, {user.name}</span>
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/80 bg-primary/10 text-sm font-bold text-primary shadow-sm">
+                  {user.name?.charAt(0) || 'U'}
+                </span>
+              </Link>
+              {canAccessInstructorStudio && (
+                <Link href="/instructor">
+                  <Button variant="outline" className="gap-2 border-primary/30 font-bold">
+                    <Clapperboard className="size-4 shrink-0" />
+                    Studio
+                  </Button>
+                </Link>
+              )}
+              {canBecomeInstructor && (
+                <Link href="/become-instructor">
+                  <Button className="font-bold shadow-md shadow-primary/20">Đăng ký làm Giảng viên</Button>
+                </Link>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:bg-transparent hover:text-primary"
+                onClick={handleLogout}
+                aria-label="Đăng xuất"
+              >
+                <LogOut className="size-5 shrink-0" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link href="/login">
+                <Button variant="ghost" className="font-bold">Đăng nhập</Button>
+              </Link>
+              <Link href="/register">
+                <Button className="font-bold shadow-md shadow-primary/20">Đăng ký</Button>
+              </Link>
+            </>
+          )}
         </div>
 
         <Button
@@ -79,13 +135,51 @@ export function SharedNavbar() {
               </Link>
             ))}
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <Link href="/login" onClick={() => setMobileOpen(false)}>
-              <Button variant="outline" className="w-full">Đăng nhập</Button>
-            </Link>
-            <Link href="/register" onClick={() => setMobileOpen(false)}>
-              <Button className="w-full">Đăng ký</Button>
-            </Link>
+          <div className="mt-4 grid grid-cols-1 gap-2">
+            {isAuthenticated && user ? (
+              <>
+                <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
+                  <Button variant="outline" className="w-full">Dashboard</Button>
+                </Link>
+                <Link href="/profile" onClick={() => setMobileOpen(false)}>
+                  <Button variant="outline" className="w-full font-bold">Hồ sơ & tài khoản</Button>
+                </Link>
+                {canAccessInstructorStudio && (
+                  <Link href="/instructor" onClick={() => setMobileOpen(false)}>
+                    <Button variant="outline" className="w-full gap-2 border-primary/30 font-bold">
+                      <Clapperboard className="size-4 shrink-0" />
+                      Studio giảng viên
+                    </Button>
+                  </Link>
+                )}
+                {canBecomeInstructor && (
+                  <Link href="/become-instructor" onClick={() => setMobileOpen(false)}>
+                    <Button className="w-full">Đăng ký GV</Button>
+                  </Link>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="flex h-11 w-full items-center justify-center text-muted-foreground hover:bg-transparent hover:text-primary"
+                  onClick={async () => {
+                    setMobileOpen(false);
+                    await handleLogout();
+                  }}
+                  aria-label="Đăng xuất"
+                >
+                  <LogOut className="size-5 shrink-0" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" onClick={() => setMobileOpen(false)}>
+                  <Button variant="outline" className="w-full">Đăng nhập</Button>
+                </Link>
+                <Link href="/register" onClick={() => setMobileOpen(false)}>
+                  <Button className="w-full">Đăng ký</Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

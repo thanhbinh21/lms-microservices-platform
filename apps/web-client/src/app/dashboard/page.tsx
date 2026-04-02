@@ -3,20 +3,16 @@
 import { useAppSelector } from '@/lib/redux/hooks';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { logoutAction } from '@/app/actions/auth';
 import { getDashboardData } from '@/app/actions/dashboard';
-import { useAppDispatch } from '@/lib/redux/hooks';
-import { logout } from '@/lib/redux/authSlice';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
-import Image from 'next/image';
 import Link from 'next/link';
-import { BookOpen, Clock, Trophy, MessageSquare, PlayCircle, LogOut, ArrowRight, Loader2 } from 'lucide-react';
+import { SharedNavbar } from '@/components/shared/shared-navbar';
+import { BookOpen, Clock, Trophy, MessageSquare, PlayCircle, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const dispatch = useAppDispatch();
   const { user, isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
   
   const [data, setData] = useState<any>(null);
@@ -41,12 +37,6 @@ export default function DashboardPage() {
     fetchData();
   }, [isAuthenticated, isLoading, router]);
 
-  const handleLogout = async () => {
-    await logoutAction();
-    dispatch(logout());
-    router.push('/login');
-  };
-
   if (isLoading || !user) return null;
 
   return (
@@ -55,35 +45,25 @@ export default function DashboardPage() {
       <div className="absolute top-[-10%] right-10 w-[40%] h-[40%] rounded-full bg-primary/10 blur-[120px] pointer-events-none" />
       <div className="absolute top-[40%] left-[-10%] w-[30%] h-[50%] rounded-full bg-indigo-300/15 blur-[100px] pointer-events-none" />
 
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-40 border-b border-white/40 bg-white/50 backdrop-blur-xl shadow-sm">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-8">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <Image src="/nexedu-logo.svg" alt="Logo NexEdu" width={44} height={44} priority />
-            <span className="text-xl font-bold tracking-tight">NexEdu</span>
+      <SharedNavbar />
+
+      {/* Thanh dieu huong noi bo Dashboard — giong trang chu, dung chung header co nut Dang ky lam Giang vien + Dang xuat */}
+      <div className="relative z-30 border-b border-white/40 bg-white/40 backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-center gap-x-8 gap-y-2 px-4 py-2.5 text-sm font-semibold text-muted-foreground md:justify-start md:px-8">
+          <Link href="/dashboard" className="border-b-2 border-primary pb-0.5 text-primary">
+            Tổng quan
           </Link>
-
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-muted-foreground">
-            <Link href="/dashboard" className="text-primary border-b-2 border-primary pb-1">Tổng quan</Link>
-            <Link href="#" className="hover:text-primary transition-colors pb-1">Khóa học của tôi</Link>
-            <Link href="#" className="hover:text-primary transition-colors pb-1">Chứng chỉ</Link>
-            <Link href="#" className="hover:text-primary transition-colors pb-1">Cộng đồng</Link>
-          </nav>
-
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex flex-col items-end">
-              <span className="text-sm font-bold leading-none">{user.name}</span>
-              <span className="text-xs text-muted-foreground mt-1 tracking-wide">{user.role}</span>
-            </div>
-            <div className="size-10 rounded-full bg-primary/10 border-2 border-white shadow-sm flex items-center justify-center text-primary font-bold">
-              {user.name?.charAt(0) || 'U'}
-            </div>
-            <Button onClick={handleLogout} variant="ghost" size="icon" className="hover:bg-destructive/10 hover:text-destructive">
-              <LogOut className="size-5" />
-            </Button>
-          </div>
+          <Link href="#" className="pb-0.5 transition-colors hover:text-primary">
+            Khóa học của tôi
+          </Link>
+          <Link href="#" className="pb-0.5 transition-colors hover:text-primary">
+            Chứng chỉ
+          </Link>
+          <Link href="#" className="pb-0.5 transition-colors hover:text-primary">
+            Cộng đồng
+          </Link>
         </div>
-      </header>
+      </div>
 
       <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 space-y-10 relative z-10">
         

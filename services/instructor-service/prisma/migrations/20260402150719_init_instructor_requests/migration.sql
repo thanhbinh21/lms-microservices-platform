@@ -1,0 +1,31 @@
+-- CreateTable
+CREATE TABLE "instructor_requests" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "fullName" TEXT NOT NULL,
+    "phone" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "dateOfBirth" TIMESTAMP(3),
+    "address" TEXT,
+    "expertise" TEXT NOT NULL,
+    "specialization" TEXT NOT NULL,
+    "experienceYears" INTEGER NOT NULL,
+    "currentJob" TEXT,
+    "bio" TEXT NOT NULL,
+    "github" TEXT,
+    "linkedin" TEXT,
+    "website" TEXT,
+    "youtube" TEXT,
+    "cvFile" TEXT,
+    "certificateFile" TEXT,
+    "identityCard" TEXT,
+    "avatar" TEXT,
+    "courseTitle" TEXT NOT NULL,
+    "courseCategory" TEXT NOT NULL,
+    "courseDescription" TEXT NOT NULL,
+    "targetStudents" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "instructor_requests_pkey" PRIMARY KEY ("id")
+);

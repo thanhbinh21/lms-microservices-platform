@@ -1,10 +1,12 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { ArrowRight, PlayCircle, ShieldCheck, Users, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
+import { InstructorRequestFlash } from '@/components/home/InstructorRequestFlash';
 
 const featuredCourses = [
   {
@@ -69,6 +71,10 @@ export default function Home() {
       <div className="absolute bottom-[-10%] left-[20%] w-[50%] h-[30%] rounded-full bg-indigo-300/15 blur-[120px] pointer-events-none" />
       
       <SharedNavbar />
+
+      <Suspense fallback={null}>
+        <InstructorRequestFlash />
+      </Suspense>
 
       <main>
         <section id="kham-pha" className="relative overflow-hidden px-4 py-16 md:px-6 md:py-20">

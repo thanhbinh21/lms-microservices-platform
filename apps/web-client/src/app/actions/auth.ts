@@ -28,11 +28,26 @@ interface TokenPayload {
   exp?: number;
 }
 
-function normalizeRole(role: string): UserRole {
+function normalizeRole(role?: string | null): UserRole {
+  if (!role) return 'STUDENT';
   const normalized = role.toUpperCase();
   if (normalized === 'INSTRUCTOR') return 'INSTRUCTOR';
   if (normalized === 'ADMIN') return 'ADMIN';
   return 'STUDENT';
+}
+
+function normalizeUserFromApi(user: {
+  id: string;
+  email: string;
+  name: string;
+  role?: string;
+}): NonNullable<AuthResponse['user']> {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: normalizeRole(user.role ?? 'STUDENT'),
+  };
 }
 
 function decodeTokenPayload(token: string): TokenPayload | null {
@@ -138,7 +153,7 @@ export async function loginAction(data: LoginInput): Promise<AuthResponse> {
     return {
       success: true,
       code: 200,
-      user,
+      user: normalizeUserFromApi(user),
       accessToken,
     };
   } catch (error) {
@@ -184,7 +199,7 @@ export async function registerAction(data: RegisterInput): Promise<AuthResponse>
     return {
       success: true,
       code: 200,
-      user,
+      user: normalizeUserFromApi(user),
       accessToken,
     };
   } catch (error) {
@@ -210,30 +225,31 @@ export async function restoreSessionAction(): Promise<AuthResponse> {
     let accessToken = currentAccessToken;
     let refreshToken = currentRefreshToken;
 
-    const currentPayload = accessToken ? decodeTokenPayload(accessToken) : null;
-    const isAccessExpired = currentPayload?.exp ? currentPayload.exp * 1000 <= Date.now() : true;
-
-    if (!accessToken || !currentPayload || isAccessExpired) {
-      if (!refreshToken) {
-        await clearAuthCookies();
-        return { success: false, code: 401, message: 'Phien dang nhap da het han' };
-      }
-
+    // Co refresh token thi lam moi truoc: JWT moi lay role tu DB (sau admin duyet giang vien / doi vai tro).
+    if (refreshToken) {
       const refreshed = await refreshWithToken(refreshToken);
-      if (!refreshed) {
-        await clearAuthCookies();
-        return { success: false, code: 401, message: 'Khong the lam moi phien dang nhap' };
+      if (refreshed) {
+        accessToken = refreshed.accessToken;
+        refreshToken = refreshed.refreshToken;
+        await writeAuthCookies({ accessToken, refreshToken });
       }
-
-      accessToken = refreshed.accessToken;
-      refreshToken = refreshed.refreshToken;
-      await writeAuthCookies({ accessToken, refreshToken });
     }
 
-    const payload = accessToken ? decodeTokenPayload(accessToken) : null;
+    if (!accessToken) {
+      await clearAuthCookies();
+      return { success: false, code: 401, message: 'Phien dang nhap da het han' };
+    }
+
+    const payload = decodeTokenPayload(accessToken);
     if (!payload) {
       await clearAuthCookies();
       return { success: false, code: 401, message: 'Token khong hop le' };
+    }
+
+    const isExpired = payload.exp ? payload.exp * 1000 <= Date.now() : true;
+    if (isExpired) {
+      await clearAuthCookies();
+      return { success: false, code: 401, message: 'Phien dang nhap da het han' };
     }
 
     const userName = savedUserName?.trim() || payload.email.split('@')[0] || 'User';
