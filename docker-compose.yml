@@ -85,6 +85,18 @@ services:
     depends_on:
       - redis
 
+  instructor-service:
+    build: ./services/instructor-service
+    container_name: lms-instructor-service
+    ports:
+      - "5006:5006"
+    environment:
+      - DATABASE_URL_INSTRUCTOR=${DATABASE_URL_INSTRUCTOR}
+      - AUTH_SERVICE_URL=http://host.docker.internal:3101
+      - MEDIA_SERVICE_URL=http://host.docker.internal:3004
+      - JWT_SECRET=${JWT_SECRET}
+      - LISTEN_PORT=5006
+
   # NOTE: PostgreSQL databases moved to Neon Serverless
   # Setup instructions: See README.md "Database Setup" section
   # Connection strings should be configured in .env file

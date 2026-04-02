@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+// Tao DB tren Neon: https://console.neon.tech — tao project moi, copy connection string vao DATABASE_URL_INSTRUCTOR, roi chay: pnpm prisma:migrate
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_INSTRUCTOR")
+}
+
+model InstructorRequest {
+  id                String   @id @default(uuid())
+  userId            String
+  fullName          String
+  phone             String
+  email             String
+  dateOfBirth       DateTime?
+  address           String?
+  expertise         String
+  specialization    String
+  experienceYears   Int
+  currentJob        String?
+  bio               String
+  github            String?
+  linkedin          String?
+  website           String?
+  youtube           String?
+  cvFile            String?
+  certificateFile   String?
+  identityCard      String?
+  avatar            String?
+  courseTitle       String
+  courseCategory    String
+  courseDescription String
+  targetStudents    String?
+  status            String   @default("pending")
+  createdAt         DateTime @default(now())
+
+  @@map("instructor_requests")
+}

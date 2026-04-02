@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev:kill-ports": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-dev-ports.ps1",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
