@@ -10,6 +10,7 @@ import Link from 'next/link';
 import {
   getCourseByIdAction,
   updateCourseAction,
+  publishCourseAction,
   requestCourseThumbnailUploadAction,
   confirmLessonUploadAction,
   type CourseDto,
@@ -56,18 +57,41 @@ export default function CourseSettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     setStatusMessage('');
+
+    const parsedPrice = Number(price);
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      showStatus('error', 'Giá bán phải là số lớn hơn hoặc bằng 0.');
+      setIsSaving(false);
+      return;
+    }
+
+    const payload: Partial<CourseDto> = {
+      title: title.trim(),
+      description: description.trim(),
+      price: parsedPrice,
+    };
+
+    if (thumbnail.trim()) {
+      payload.thumbnail = thumbnail.trim();
+    }
+
     const courseId = String(params.courseId);
-    const result = await updateCourseAction(courseId, {
-      title,
-      description,
-      price: Number(price),
-      thumbnail: thumbnail.trim() || null,
-    });
+    const result = await updateCourseAction(courseId, payload);
+
     if (!result.success) {
       showStatus('error', result.message || 'Không lưu được thay đổi.');
       setIsSaving(false);
       return;
     }
+
+    if (result.data) {
+      setCourse(result.data);
+      setTitle(result.data.title);
+      setDescription(result.data.description || '');
+      setPrice(String(result.data.price));
+      setThumbnail(result.data.thumbnail || thumbnail);
+    }
+
     showStatus('success', 'Đã lưu thay đổi khóa học.');
     setIsSaving(false);
   };
@@ -133,13 +157,7 @@ export default function CourseSettingsPage() {
     setStatusMessage('');
     const courseId = String(params.courseId);
 
-    const result = await updateCourseAction(courseId, {
-      title,
-      description,
-      price: Number(price),
-      thumbnail: thumbnail.trim() || null,
-      status: 'PUBLISHED',
-    });
+    const result = await publishCourseAction(courseId, thumbnail.trim() || undefined);
 
     if (!result.success) {
       showStatus('error', result.message || 'Không thể xuất bản khóa học.');
@@ -147,7 +165,7 @@ export default function CourseSettingsPage() {
       return;
     }
 
-    setCourse((prev) => (prev ? { ...prev, status: 'PUBLISHED' } : prev));
+    setCourse((prev) => (prev ? { ...prev, status: 'PUBLISHED', thumbnail: result.data?.thumbnail ?? prev.thumbnail } : prev));
     setIsPublishing(false);
     showStatus('success', 'Đã xuất bản khóa học thành công.');
   };
@@ -230,9 +248,19 @@ export default function CourseSettingsPage() {
               <CardTitle>Ảnh bìa (Thumbnail)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="aspect-video rounded-xl bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500">
-                <ImageIcon className="w-10 h-10 mb-2 opacity-50" />
-                <span className="text-sm font-bold">Upload ảnh bìa hoặc dán URL (16:9)</span>
+              <div className="aspect-video rounded-xl bg-slate-100 border-2 border-dashed border-slate-300 overflow-hidden flex items-center justify-center text-slate-500">
+                {thumbnail.trim() ? (
+                  <img
+                    src={thumbnail}
+                    alt="thumbnail preview"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center">
+                    <ImageIcon className="w-10 h-10 mb-2 opacity-50" />
+                    <span className="text-sm font-bold">Upload ảnh bìa tỷ lệ 16:9</span>
+                  </div>
+                )}
               </div>
               <label className="inline-flex h-11 w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 text-sm font-semibold text-slate-600 hover:border-primary hover:text-primary">
                 <UploadCloud className="mr-2 size-4" /> {isUploadingThumbnail ? 'Đang upload...' : 'Chọn ảnh bìa để tải lên'}
@@ -248,19 +276,6 @@ export default function CourseSettingsPage() {
                   }}
                 />
               </label>
-              <Input
-                value={thumbnail}
-                onChange={(event) => setThumbnail(event.target.value)}
-                className="h-11 rounded-xl bg-white/70"
-                placeholder="https://..."
-              />
-              {thumbnail.trim() && (
-                <img
-                  src={thumbnail}
-                  alt="thumbnail preview"
-                  className="w-full aspect-video rounded-xl object-cover border border-slate-200"
-                />
-              )}
             </CardContent>
           </Card>
 

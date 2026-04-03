@@ -23,6 +23,10 @@ const updateCourseSchema = z.object({
   thumbnail: z.string().url().optional(),
 });
 
+const publishCourseSchema = z.object({
+  thumbnail: z.string().url().optional(),
+});
+
 // Tao slug tu tieu de
 function generateSlug(title: string): string {
   return title
@@ -69,6 +73,63 @@ function serializeCourse<T extends { price: unknown }>(course: T): Omit<T, 'pric
 function inferSourceType(videoUrl?: string | null): 'UPLOAD' | 'YOUTUBE' {
   if (!videoUrl) return 'UPLOAD';
   return videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') ? 'YOUTUBE' : 'UPLOAD';
+}
+
+async function validateCourseBeforePublish(courseId: string, thumbnail: string, traceId: string): Promise<ApiResponse<null> | null> {
+  if (!thumbnail.trim()) {
+    return {
+      success: false,
+      code: 400,
+      message: 'Khong the xuat ban khi chua co thumbnail',
+      data: null,
+      trace_id: traceId,
+    };
+  }
+
+  // Kiem tra du lieu toi thieu de tranh hien thi khoa hoc rong tren trang hoc vien.
+  const [chapterCount, lessonCount, publishableLessonCount] = await prisma.$transaction([
+    prisma.chapter.count({ where: { courseId } }),
+    prisma.lesson.count({ where: { chapter: { courseId } } }),
+    prisma.lesson.count({
+      where: {
+        chapter: { courseId },
+        isPublished: true,
+        videoUrl: { not: null },
+      },
+    }),
+  ]);
+
+  if (chapterCount === 0) {
+    return {
+      success: false,
+      code: 400,
+      message: 'Khong the xuat ban khi chua co chuong hoc',
+      data: null,
+      trace_id: traceId,
+    };
+  }
+
+  if (lessonCount === 0) {
+    return {
+      success: false,
+      code: 400,
+      message: 'Khong the xuat ban khi chua co bai hoc',
+      data: null,
+      trace_id: traceId,
+    };
+  }
+
+  if (publishableLessonCount === 0) {
+    return {
+      success: false,
+      code: 400,
+      message: 'Can it nhat 1 bai hoc da publish va co video de xuat ban khoa hoc',
+      data: null,
+      trace_id: traceId,
+    };
+  }
+
+  return null;
 }
 
 // ─── Controllers ──────────────────────────────────────────────────────────────
@@ -344,62 +405,10 @@ export async function updateCourse(req: Request, res: Response) {
     }
 
     if (validated.status === 'PUBLISHED') {
-      const thumbnail = (validated.thumbnail ?? course.thumbnail ?? '').trim();
-      if (!thumbnail) {
-        const bad: ApiResponse<null> = {
-          success: false,
-          code: 400,
-          message: 'Khong the xuat ban khi chua co thumbnail',
-          data: null,
-          trace_id: traceId,
-        };
-        return res.status(400).json(bad);
-      }
-
-      // Kiem tra du lieu toi thieu de tranh hien thi khoa hoc rong tren trang hoc vien.
-      const [chapterCount, lessonCount, publishableLessonCount] = await prisma.$transaction([
-        prisma.chapter.count({ where: { courseId: req.params.id } }),
-        prisma.lesson.count({ where: { chapter: { courseId: req.params.id } } }),
-        prisma.lesson.count({
-          where: {
-            chapter: { courseId: req.params.id },
-            isPublished: true,
-            videoUrl: { not: null },
-          },
-        }),
-      ]);
-
-      if (chapterCount === 0) {
-        const bad: ApiResponse<null> = {
-          success: false,
-          code: 400,
-          message: 'Khong the xuat ban khi chua co chuong hoc',
-          data: null,
-          trace_id: traceId,
-        };
-        return res.status(400).json(bad);
-      }
-
-      if (lessonCount === 0) {
-        const bad: ApiResponse<null> = {
-          success: false,
-          code: 400,
-          message: 'Khong the xuat ban khi chua co bai hoc',
-          data: null,
-          trace_id: traceId,
-        };
-        return res.status(400).json(bad);
-      }
-
-      if (publishableLessonCount === 0) {
-        const bad: ApiResponse<null> = {
-          success: false,
-          code: 400,
-          message: 'Can it nhat 1 bai hoc da publish va co video de xuat ban khoa hoc',
-          data: null,
-          trace_id: traceId,
-        };
-        return res.status(400).json(bad);
+      const thumbnail = validated.thumbnail ?? course.thumbnail ?? '';
+      const publishValidationError = await validateCourseBeforePublish(req.params.id, thumbnail, traceId);
+      if (publishValidationError) {
+        return res.status(publishValidationError.code).json(publishValidationError);
       }
     }
 
@@ -421,6 +430,82 @@ export async function updateCourse(req: Request, res: Response) {
       return res.status(400).json(bad);
     }
     return handlePrismaError(err, res, traceId, 'updateCourse');
+  }
+}
+
+/** POST /api/courses/:id/publish - Xuat ban khoa hoc (chi owner/admin) */
+export async function publishCourse(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = res.locals.userRole as string;
+
+  try {
+    const payload = publishCourseSchema.parse(req.body ?? {});
+    const course = await prisma.course.findUnique({ where: { id: req.params.id } });
+    if (!course) {
+      const notFound: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Khong tim thay khoa hoc',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    if (course.instructorId !== instructorId && userRole !== 'admin') {
+      const forbidden: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: 'Khong co quyen - khong phai khoa hoc cua ban',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
+    }
+
+    if (course.status === 'PUBLISHED') {
+      const alreadyPublished: ApiResponse<unknown> = {
+        success: true,
+        code: 200,
+        message: 'Course already published',
+        data: serializeCourse(course),
+        trace_id: traceId,
+      };
+      return res.status(200).json(alreadyPublished);
+    }
+
+    const nextThumbnail = payload.thumbnail?.trim() || course.thumbnail || '';
+    const publishValidationError = await validateCourseBeforePublish(course.id, nextThumbnail, traceId);
+    if (publishValidationError) {
+      return res.status(publishValidationError.code).json(publishValidationError);
+    }
+
+    const publishedCourse = await prisma.course.update({
+      where: { id: course.id },
+      data: { status: 'PUBLISHED', thumbnail: nextThumbnail },
+    });
+
+    const response: ApiResponse<unknown> = {
+      success: true,
+      code: 200,
+      message: 'Course published successfully',
+      data: serializeCourse(publishedCourse),
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const bad: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: err.errors[0].message,
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(bad);
+    }
+    return handlePrismaError(err, res, traceId, 'publishCourse');
   }
 }
 

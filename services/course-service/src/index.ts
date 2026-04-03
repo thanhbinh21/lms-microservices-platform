@@ -9,6 +9,7 @@ import {
   getCourseBySlug,
   createCourse,
   updateCourse,
+  publishCourse,
   deleteCourse,
   getInstructorCourses,
   getInstructorCourseById,
@@ -69,6 +70,7 @@ app.get('/api/instructor/courses/:id', requireAuth, getInstructorCourseById);
 app.get('/api/courses/:id/curriculum', ...requireRole('instructor', 'admin'), getCourseCurriculum);
 app.post('/api/courses', ...requireRole('instructor', 'admin'), createCourse);
 app.put('/api/courses/:id', ...requireRole('instructor', 'admin'), updateCourse);
+app.post('/api/courses/:id/publish', ...requireRole('instructor', 'admin'), publishCourse);
 app.delete('/api/courses/:id', ...requireRole('instructor', 'admin'), deleteCourse);
 
 // Chapter routes

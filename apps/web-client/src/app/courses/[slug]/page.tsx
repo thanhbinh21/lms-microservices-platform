@@ -28,6 +28,12 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
 
   const course = result.data;
   const totalLessons = course.chapters.reduce((acc, chapter) => acc + chapter.lessons.length, 0);
+  const totalChapters = course.chapters.length;
+  const instructorDisplayName = `Giảng viên #${(course.instructorId || '').slice(0, 8)}`;
+  const formattedPrice = `${Number(course.price || 0).toLocaleString('vi-VN')}đ`;
+  const updatedLabel = course.updatedAt || course.createdAt
+    ? new Date(course.updatedAt || course.createdAt || Date.now()).toLocaleDateString('vi-VN')
+    : '-';
 
   return (
     <div className="glass-page min-h-screen text-foreground relative overflow-hidden">
@@ -62,6 +68,32 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
               </span>
             </div>
           </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 text-sm">
+            <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Giảng viên</p>
+              <p className="mt-1 font-bold text-slate-800">{instructorDisplayName}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cấp độ</p>
+              <p className="mt-1 font-bold text-slate-800">{course.level}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Giá khóa học</p>
+              <p className="mt-1 font-bold text-primary">{formattedPrice}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Số chương</p>
+              <p className="mt-1 font-bold text-slate-800">{totalChapters}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tổng bài học</p>
+              <p className="mt-1 font-bold text-slate-800">{totalLessons}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cập nhật</p>
+              <p className="mt-1 font-bold text-slate-800">{updatedLabel}</p>
+            </div>
+          </CardContent>
         </Card>
 
         <section className="space-y-4">

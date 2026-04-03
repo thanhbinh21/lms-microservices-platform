@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { PlusCircle, MoreHorizontal, FileEdit, Trash2, Eye } from 'lucide-react';
-import Link from 'next/link';
+import { PlusCircle, MoreHorizontal, FileEdit, Eye } from 'lucide-react';
 import { List, BookOpen } from 'lucide-react';
 import { getInstructorCoursesAction, type CourseDto } from '@/app/actions/instructor';
 
@@ -70,7 +69,11 @@ export default function InstructorCoursesPage() {
         )}
 
         {!loading && courses.map(course => (
-          <Card key={course.id} className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md shadow-sm hover:shadow-md transition-shadow">
+          <Card
+            key={course.id}
+            className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => router.push(`/instructor/courses/${course.id}/detail`)}
+          >
             <CardContent className="p-6 flex items-center justify-between">
               <div className="space-y-1">
                 <div className="flex items-center gap-3">
@@ -89,13 +92,25 @@ export default function InstructorCoursesPage() {
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
-                <Button variant="outline" size="sm" className="rounded-lg shadow-sm font-semibold" onClick={() => router.push(`/instructor/courses/${course.id}`)}>
+                <Button variant="outline" size="sm" className="rounded-lg shadow-sm font-semibold" onClick={(event) => {
+                  event.stopPropagation();
+                  router.push(`/instructor/courses/${course.id}/detail`);
+                }}>
+                  <Eye className="w-4 h-4 mr-2" /> Chi tiết
+                </Button>
+                <Button variant="outline" size="sm" className="rounded-lg shadow-sm font-semibold" onClick={(event) => {
+                  event.stopPropagation();
+                  router.push(`/instructor/courses/${course.id}`);
+                }}>
                   <FileEdit className="w-4 h-4 mr-2" /> Cấu hình
                 </Button>
-                <Button variant="outline" size="sm" className="rounded-lg shadow-sm font-semibold" onClick={() => router.push(`/instructor/courses/${course.id}/curriculum`)}>
+                <Button variant="outline" size="sm" className="rounded-lg shadow-sm font-semibold" onClick={(event) => {
+                  event.stopPropagation();
+                  router.push(`/instructor/courses/${course.id}/curriculum`);
+                }}>
                   <List className="w-4 h-4 mr-2" /> Chương trình
                 </Button>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={(event) => event.stopPropagation()}>
                   <MoreHorizontal className="w-5 h-5" />
                 </Button>
               </div>
