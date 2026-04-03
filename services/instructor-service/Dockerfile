@@ -3,7 +3,9 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package.json package-lock.json* pnpm-lock.yaml* ./
-RUN npm install
+# --ignore-scripts: postinstall trỏ ../../scripts (monorepo) — không tồn tại trong image này.
+# Prisma generate chạy ở bước RUN bên dưới.
+RUN npm install --ignore-scripts
 
 COPY . .
 
