@@ -132,6 +132,8 @@ export interface CourseCurriculumDto {
   price?: number;
   level?: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
   instructorId?: string;
+  createdAt?: string;
+  updatedAt?: string;
   chapters: ChapterDto[];
 }
 
@@ -456,7 +458,22 @@ export async function updateCourseAction(courseId: string, data: Partial<CourseD
   );
 
   revalidatePath(`/instructor/courses/${courseId}`);
-  return { success: result.success, message: result.message };
+  return { success: result.success, message: result.message, data: result.data };
+}
+
+export async function publishCourseAction(courseId: string, thumbnail?: string) {
+  const result = await callApi<CourseDto>(
+    `/course/api/courses/${courseId}/publish`,
+    {
+      method: 'POST',
+      body: JSON.stringify(thumbnail ? { thumbnail } : {}),
+    },
+    true,
+  );
+
+  revalidatePath(`/instructor/courses/${courseId}`);
+  revalidatePath('/courses');
+  return { success: result.success, message: result.message, data: result.data };
 }
 
 export async function updateCurriculumOrderAction(courseId: string, orderedChapterIds: string[]) {
