@@ -29,6 +29,7 @@ interface LessonView {
   videoUrl?: string | null;
   sourceType: 'UPLOAD' | 'YOUTUBE';
   isFree: boolean;
+  isPublished: boolean;
   type: 'video' | 'text';
 }
 
@@ -36,6 +37,36 @@ interface ChapterView {
   id: string;
   title: string;
   lessons: LessonView[];
+}
+
+function getYoutubeEmbedUrl(url?: string | null): string | null {
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace('www.', '');
+
+    if (host === 'youtu.be') {
+      const videoId = parsed.pathname.replace('/', '').trim();
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+    }
+
+    if (host === 'youtube.com' || host === 'm.youtube.com') {
+      const videoId = parsed.searchParams.get('v')?.trim();
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+
+      const shortsMatch = parsed.pathname.match(/^\/shorts\/([^/?#]+)/);
+      if (shortsMatch?.[1]) {
+        return `https://www.youtube.com/embed/${shortsMatch[1]}`;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 export default function CurriculumEditorPage() {
@@ -49,6 +80,8 @@ export default function CurriculumEditorPage() {
   const [youtubeUrlInput, setYoutubeUrlInput] = useState('');
   const [statusType, setStatusType] = useState<'success' | 'error'>('success');
   const [statusMessage, setStatusMessage] = useState('');
+  const [isCreatingDemoLessons, setIsCreatingDemoLessons] = useState(false);
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
 
   const showStatus = (type: 'success' | 'error', message: string) => {
     setStatusType(type);
@@ -69,6 +102,10 @@ export default function CurriculumEditorPage() {
   const selectedLesson = allLessons.find((item) => item.key === selectedLessonKey);
 
   useEffect(() => {
+    setIsPreviewExpanded(false);
+  }, [selectedLessonKey]);
+
+  useEffect(() => {
     setMounted(true); // Prevent SSR mismatch with DragDropContext
     const fetchCurriculum = async () => {
       const courseId = String(params.courseId);
@@ -83,6 +120,7 @@ export default function CurriculumEditorPage() {
             videoUrl: lesson.videoUrl,
             sourceType: lesson.sourceType,
             isFree: lesson.isFree,
+            isPublished: lesson.isPublished,
             type: lesson.videoUrl ? 'video' : 'text',
           })),
         }));
@@ -161,6 +199,7 @@ export default function CurriculumEditorPage() {
                   id: lesson.id,
                   title: lesson.title,
                   isFree: lesson.isFree,
+                  isPublished: lesson.isPublished,
                   videoUrl: lesson.videoUrl,
                   sourceType: lesson.sourceType,
                   type: lesson.videoUrl ? 'video' : 'text',
@@ -173,6 +212,69 @@ export default function CurriculumEditorPage() {
 
     setSelectedLessonKey(`${chapterId}::${lesson.id}`);
     showStatus('success', 'Đã thêm bài học. Bạn có thể upload video hoặc gắn YouTube cho bài học vừa tạo.');
+  };
+
+  const createDemoObjectiveLessons = async () => {
+    setIsCreatingDemoLessons(true);
+    setStatusMessage('');
+
+    try {
+      const courseId = String(params.courseId);
+      let targetChapter = chapters[0];
+
+      if (!targetChapter) {
+        const chapterResult = await createChapterAction(courseId, 'Chuong demo: Muc tieu khoa hoc');
+        if (!chapterResult.success || !chapterResult.chapter) {
+          showStatus('error', chapterResult.message || 'Không tạo được chương demo.');
+          return;
+        }
+
+        targetChapter = {
+          id: chapterResult.chapter.id,
+          title: chapterResult.chapter.title,
+          lessons: [],
+        };
+
+        setChapters([targetChapter]);
+      }
+
+      const demoTitles = ['Muc tieu 1: Lo trinh khoa hoc', 'Muc tieu 2: Ky nang dat duoc', 'Muc tieu 3: Du an thuc hanh'];
+      const createdLessons: LessonView[] = [];
+
+      for (let index = 0; index < demoTitles.length; index += 1) {
+        const lessonResult = await createLessonAction(courseId, targetChapter.id, demoTitles[index], index === 0);
+        if (!lessonResult.success || !lessonResult.lesson) {
+          showStatus('error', lessonResult.message || 'Không tạo được đủ 3 bài học demo.');
+          return;
+        }
+
+        createdLessons.push({
+          id: lessonResult.lesson.id,
+          title: lessonResult.lesson.title,
+          videoUrl: lessonResult.lesson.videoUrl,
+          sourceType: lessonResult.lesson.sourceType,
+          isFree: lessonResult.lesson.isFree,
+          isPublished: lessonResult.lesson.isPublished,
+          type: lessonResult.lesson.videoUrl ? 'video' : 'text',
+        });
+      }
+
+      setChapters((prev) =>
+        prev.map((chapter) =>
+          chapter.id === targetChapter?.id
+            ? { ...chapter, lessons: [...chapter.lessons, ...createdLessons] }
+            : chapter,
+        ),
+      );
+
+      if (createdLessons[0]) {
+        setSelectedLessonKey(`${targetChapter.id}::${createdLessons[0].id}`);
+      }
+
+      showStatus('success', 'Đã tạo 3 bài học mục tiêu demo.');
+    } finally {
+      setIsCreatingDemoLessons(false);
+    }
   };
 
   const editChapter = async (chapterId: string, currentTitle: string) => {
@@ -372,6 +474,7 @@ export default function CurriculumEditorPage() {
                       videoUrl: result.lesson?.videoUrl,
                       sourceType: 'YOUTUBE',
                       type: result.lesson?.videoUrl ? 'video' : 'text',
+                      isPublished: Boolean(result.lesson?.isPublished),
                     },
               ),
             },
@@ -454,12 +557,47 @@ export default function CurriculumEditorPage() {
                       videoUrl: result.lesson?.videoUrl,
                       sourceType: result.lesson?.sourceType || lesson.sourceType,
                       type: result.lesson?.videoUrl ? 'video' : 'text',
+                      isPublished: Boolean(result.lesson?.isPublished),
                     },
               ),
             },
       ),
     );
     showStatus('success', 'Đã cập nhật bài học.');
+  };
+
+  const toggleLessonPublished = async (chapterId: string, lesson: LessonView) => {
+    const courseId = String(params.courseId);
+    const nextPublished = !lesson.isPublished;
+
+    if (nextPublished && !lesson.videoUrl) {
+      showStatus('error', 'Không thể publish bài học khi chưa có video URL.');
+      return;
+    }
+
+    const result = await updateLessonAction(courseId, chapterId, lesson.id, {
+      isPublished: nextPublished,
+    });
+
+    if (!result.success || !result.lesson) {
+      showStatus('error', result.message || 'Không cập nhật được trạng thái bài học.');
+      return;
+    }
+
+    setChapters((prev) =>
+      prev.map((chapter) =>
+        chapter.id !== chapterId
+          ? chapter
+          : {
+              ...chapter,
+              lessons: chapter.lessons.map((item) =>
+                item.id !== lesson.id ? item : { ...item, isPublished: Boolean(result.lesson?.isPublished) },
+              ),
+            },
+      ),
+    );
+
+    showStatus('success', nextPublished ? 'Đã publish bài học.' : 'Đã ẩn bài học khỏi khóa học.');
   };
 
   if (!mounted) return null;
@@ -484,7 +622,15 @@ export default function CurriculumEditorPage() {
             className="w-64 bg-white"
           />
           <Button className="rounded-xl shadow-md font-bold px-6" onClick={addChapter}>
-            <Plus className="mr-2 h-5 w-5" /> Thêm phần mới
+            <Plus className="mr-2 h-5 w-5" /> Thêm chương mới
+          </Button>
+          <Button
+            variant="outline"
+            className="rounded-xl font-bold"
+            onClick={createDemoObjectiveLessons}
+            disabled={isCreatingDemoLessons}
+          >
+            {isCreatingDemoLessons ? 'Đang tạo demo...' : 'Tạo 3 bài học mục tiêu demo'}
           </Button>
         </div>
       </div>
@@ -561,6 +707,74 @@ export default function CurriculumEditorPage() {
         </CardContent>
       </Card>
 
+      {selectedLesson && (
+        <Card className="mb-8 rounded-2xl border-white/60 bg-white/70 backdrop-blur-xl shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Chi tiết bài học đang chọn</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-slate-500 font-semibold">Chương</p>
+              <p className="font-bold text-slate-800">{selectedLesson.chapterTitle}</p>
+            </div>
+            <div>
+              <p className="text-slate-500 font-semibold">Tiêu đề bài học</p>
+              <p className="font-bold text-slate-800">{selectedLesson.lessonTitle}</p>
+            </div>
+            <div>
+              <p className="text-slate-500 font-semibold">Nguồn</p>
+              <p className="font-bold text-slate-800">{selectedLesson.lesson.sourceType}</p>
+            </div>
+            <div>
+              <p className="text-slate-500 font-semibold">Trạng thái</p>
+              <p className="font-bold text-slate-800">{selectedLesson.lesson.isFree ? 'Miễn phí' : 'Trả phí'}</p>
+            </div>
+            <div className="md:col-span-2">
+              <p className="text-slate-500 font-semibold">Video</p>
+              {selectedLesson.lesson.videoUrl ? (
+                <div className="space-y-2">
+                  {selectedLesson.lesson.sourceType === 'YOUTUBE' ? (
+                    getYoutubeEmbedUrl(selectedLesson.lesson.videoUrl) ? (
+                      <iframe
+                        title={`youtube-${selectedLesson.lesson.id}`}
+                        src={getYoutubeEmbedUrl(selectedLesson.lesson.videoUrl) || undefined}
+                        className={`w-full rounded-xl border border-slate-200 ${isPreviewExpanded ? 'h-[520px]' : 'h-[300px]'}`}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    ) : (
+                      <p className="text-slate-400">URL YouTube chưa đúng định dạng để nhúng video.</p>
+                    )
+                  ) : (
+                    <video
+                      controls
+                      preload="metadata"
+                      className={`w-full rounded-xl border border-slate-200 bg-black ${isPreviewExpanded ? 'h-[520px]' : 'h-[300px]'}`}
+                      src={selectedLesson.lesson.videoUrl}
+                    >
+                      Trình duyệt không hỗ trợ phát video.
+                    </video>
+                  )}
+
+                  <div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsPreviewExpanded((prev) => !prev)}
+                    >
+                      {isPreviewExpanded ? 'Thu nhỏ' : 'Phóng to'}
+                    </Button>
+                  </div>
+
+                </div>
+              ) : (
+                <p className="text-slate-400">Chưa có URL video.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="max-w-4xl">
         <DragDropContext onDragEnd={onDragEnd}>
           <Droppable droppableId="chapters" type="chapter">
@@ -609,7 +823,15 @@ export default function CurriculumEditorPage() {
                              <p className="text-sm font-medium text-slate-400 text-center py-4">Chưa có bài học nào trong phần này.</p>
                            ) : (
                              chapter.lessons.map((lesson) => (
-                               <div key={lesson.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-white shadow-sm hover:border-primary/40 transition-colors group">
+                               <div
+                                 key={lesson.id}
+                                 className={`flex items-center justify-between p-3 rounded-xl border bg-white shadow-sm transition-colors group cursor-pointer ${
+                                   selectedLessonKey === `${chapter.id}::${lesson.id}`
+                                     ? 'border-primary ring-2 ring-primary/30'
+                                     : 'border-slate-200 hover:border-primary/40'
+                                 }`}
+                                 onClick={() => setSelectedLessonKey(`${chapter.id}::${lesson.id}`)}
+                               >
                                   <div className="flex items-center gap-3">
                                      <GripVertical className="size-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
                                      <div className="p-1.5 rounded-md bg-slate-100 text-slate-500">
@@ -622,14 +844,29 @@ export default function CurriculumEditorPage() {
                                      <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 ${lesson.isFree ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                                        {lesson.isFree ? 'FREE' : 'PAID'}
                                      </span>
+                                     <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 ${lesson.isPublished ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
+                                       {lesson.isPublished ? 'PUBLISHED' : 'DRAFT'}
+                                     </span>
                                   </div>
                                   <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className={`h-8 px-2 text-[11px] font-semibold ${lesson.isPublished ? 'text-amber-700 hover:text-amber-800' : 'text-emerald-700 hover:text-emerald-800'}`}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        toggleLessonPublished(chapter.id, lesson);
+                                      }}
+                                    >
+                                      {lesson.isPublished ? 'Unpublish' : 'Publish'}
+                                    </Button>
                                     <label className="inline-flex">
                                       <input
                                         type="file"
                                         accept="video/mp4,video/webm,video/quicktime,video/x-msvideo"
                                         className="hidden"
                                         onChange={(event) => {
+                                          event.stopPropagation();
                                           const file = event.target.files?.[0];
                                           setSelectedLessonKey(`${chapter.id}::${lesson.id}`);
                                           uploadLessonVideo(chapter.id, lesson.id, file);
@@ -644,7 +881,10 @@ export default function CurriculumEditorPage() {
                                       variant="ghost"
                                       size="icon"
                                       className="h-8 w-8 text-slate-400 hover:text-primary"
-                                      onClick={() => editLesson(chapter.id, lesson.id, lesson.title, lesson.videoUrl, lesson.isFree, lesson.sourceType)}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        editLesson(chapter.id, lesson.id, lesson.title, lesson.videoUrl, lesson.isFree, lesson.sourceType);
+                                      }}
                                     >
                                       <Edit3 className="size-4" />
                                     </Button>
@@ -652,7 +892,10 @@ export default function CurriculumEditorPage() {
                                       variant="ghost"
                                       size="icon"
                                       className="h-8 w-8 text-slate-400 hover:text-destructive"
-                                      onClick={() => removeLesson(chapter.id, lesson.id)}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        removeLesson(chapter.id, lesson.id);
+                                      }}
                                     >
                                       <Trash2 className="size-4" />
                                     </Button>

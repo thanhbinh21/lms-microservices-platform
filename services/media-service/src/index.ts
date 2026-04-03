@@ -21,7 +21,12 @@ const app = express();
 const PORT = process.env.PORT || 3004;
 
 // Middleware bao mat
-app.use(helmet());
+app.use(
+  helmet({
+    // Cho phep web-client (khac origin khi dev) render anh/video tra ve tu media-service.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000', credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 

@@ -88,12 +88,7 @@ services:
           - /media
         strip_path: true
     plugins:
-      - name: jwt
-        config:
-          secret_is_base64: false
-          key_claim_name: kid
-          claims_to_verify:
-            - exp
+      # JWT do media-service trust header tu Gateway (giong course-service) de dong bo local-dev flow.
       - name: rate-limiting
         config:
           minute: 100
