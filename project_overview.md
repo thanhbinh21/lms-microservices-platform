@@ -112,11 +112,11 @@ Dự án được chia thành 20 giai đoạn (Phases) theo chuẩn "Vertical Sl
 - [x] **Phase 9.1:** Backend Cleanup — Gỡ Node Gateway (chỉ dùng Kong), Prisma migrations (sourceType, category, lastLoginAt), fix N+1, graceful shutdown. ✅ Completed: Mar 31, 2026
 - [x] **Phase 9.2:** Frontend Cleanup — SharedNavbar/Footer, `/courses/[slug]` route, Phase 7.5 (edit/delete chapter/lesson), ErrorBoundary, loading.tsx, mobile menu, active sidebar. ✅ Completed: Mar 31, 2026 (Updated hotfix: thumbnail upload + curriculum UX/status messaging + sample data seed)
 - [ ] **Phase 9.3:** DX Improvements — `pnpm run setup` bootstrap, turbo pipeline cho Prisma, `.nvmrc`, cleanup test files.
-- [ ] **Phase 9.4:** Auth Role Policy Refactor — Register luon tao role STUDENT, bo role input tu client, cap nhat validation + response contract.
-- [ ] **Phase 9.5:** Become Educator Backend Flow — Them endpoint `/auth/become-educator`, audit nang cap role, xu ly refresh/session de dong bo role moi.
-- [ ] **Phase 9.6:** Become Educator Frontend UX — Bo role selector o Register, them CTA Become Educator (Profile/Dashboard), cap nhat role state va instructor redirect.
-- [ ] **Phase 9.7:** System Seed Content — Admin he thong tao/quan ly bo khoa hoc mau (co bai free) de hoc vien trai nghiem truoc khi giang vien upload khoa hoc that.
-- [ ] **Phase 9.8:** Media Provider Unification — Chuyen media upload/delivery sang Cloudinary Free, giu local storage fallback cho dev/test, ngung dung S3/VideoCipher trong flow chinh.
+- [x] **Phase 9.4:** Auth Role Policy Refactor — Register luon tao role STUDENT, bo role input tu client, cap nhat validation + response contract.
+- [x] **Phase 9.5:** Become Educator Backend Flow — Them endpoint `/auth/become-educator`, audit nang cap role, xu ly refresh/session de dong bo role moi.
+- [x] **Phase 9.6:** Become Educator Frontend UX — Bo role selector o Register, them CTA Become Educator (Profile/Dashboard), cap nhat role state va instructor redirect.
+- [x] **Phase 9.7:** System Seed Content — Admin he thong tao/quan ly bo khoa hoc mau (co bai free) de hoc vien trai nghiem truoc khi giang vien upload khoa hoc that.
+- [x] **Phase 9.8:** Media Provider Unification — Chuyen media upload/delivery sang Cloudinary Free, giu local storage fallback cho dev/test, ngung dung S3/VideoCipher trong flow chinh.
 
 ### Phase 14-16: Learning Experience
 - [ ] **Phase 14:** Student Learning UI — `/learn/[courseId]` layout, LessonProgress model, video player, progress tracking, Review UI. (Uu tien trien khai truoc block Commerce & Payments de hoc vien xem video free som)
