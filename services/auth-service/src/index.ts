@@ -16,7 +16,7 @@ import { updateUserRole } from './controllers/update-role.controller.js';
 const env = initEnv();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3101;
 let server: ReturnType<typeof app.listen> | null = null;
 let shuttingDown = false;
 
