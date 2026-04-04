@@ -31,9 +31,10 @@ export function SharedNavbar() {
   const [mounted, setMounted] = useState(false);
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  const showAuth = mounted && isAuthenticated && !!user;
   const normalizedRole = (user?.role || '').toUpperCase();
   const canBecomeInstructor = showAuth && normalizedRole === 'STUDENT';
   const canAccessInstructorStudio = showAuth && normalizedRole === 'INSTRUCTOR';
@@ -44,6 +45,10 @@ export function SharedNavbar() {
     router.push('/login');
     router.refresh();
   };
+
+  if (!mounted) {
+    return <header className="glass-navbar sticky top-0 z-40 shadow-sm h-16"></header>;
+  }
 
   return (
     <header className="glass-navbar sticky top-0 z-40 shadow-sm">

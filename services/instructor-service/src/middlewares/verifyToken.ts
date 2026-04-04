@@ -10,32 +10,19 @@ interface JwtUserPayload extends jwt.JwtPayload {
 
 export function verifyToken(req: Request, res: Response, next: NextFunction): void {
   const traceId = (req.headers['x-trace-id'] as string | undefined) || null;
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    errorResponse(res, 'Missing or invalid authorization token', 401, traceId);
+  const userId = req.headers['x-user-id'] as string | undefined;
+  const userRole = req.headers['x-user-role'] as string | undefined;
+
+  if (!userId) {
+    errorResponse(res, 'Unauthorized — missing authentication', 401, traceId);
     return;
   }
 
-  const token = authHeader.split(' ')[1];
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    errorResponse(res, 'Server misconfiguration', 500, traceId);
-    return;
-  }
-
-  try {
-    const decoded = jwt.verify(token, secret) as JwtUserPayload;
-    if (!decoded.userId || !decoded.role) {
-      errorResponse(res, 'Invalid or expired token', 401, traceId);
-      return;
-    }
-    req.user = {
-      userId: decoded.userId,
-      role: decoded.role,
-      email: decoded.email,
-    };
-    next();
-  } catch {
-    errorResponse(res, 'Invalid or expired token', 401, traceId);
-  }
+  req.user = {
+    userId: userId,
+    role: userRole || '',
+    // Kong mặc định không truyền email via headers, nên ta bỏ qua hoặc map từ decode middleware nếu có
+  };
+  
+  next();
 }

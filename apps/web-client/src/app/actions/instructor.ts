@@ -210,7 +210,7 @@ async function refreshAccessToken(): Promise<string | undefined> {
   return nextAccessToken;
 }
 
-async function callApi<T>(
+export async function callApi<T>(
   path: string,
   init?: RequestInit,
   requireAuth = false,

@@ -13,6 +13,7 @@
 ├── services
 │   ├── auth-service
 │   ├── course-service
+│   ├── instructor-service
 │   ├── payment-service
 │   ├── media-service
 │   ├── notification-service

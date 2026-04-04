@@ -2,12 +2,16 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Clock3, PlayCircle, Lock } from 'lucide-react';
 import { getPublicCourseDetailAction } from '@/app/actions/instructor';
-import { getEnrollmentStatusAction } from '@/app/actions/learning';
+import { getCourseProgressAction } from '@/app/actions/student';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
-import { cookies } from 'next/headers';
+
+import { EnrollButton } from './enroll-button';
+import { PreviewButton } from './preview-button';
+
 
 interface CourseDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -37,46 +41,11 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
     ? new Date(course.updatedAt || course.createdAt || Date.now()).toLocaleDateString('vi-VN')
     : '-';
 
-  const isFree = Number(course.price || 0) === 0;
+  const isFree = Number(course.price) === 0;
 
-  const cookieStore = await cookies();
-  const hasAuth = !!cookieStore.get('accessToken')?.value;
-  let isEnrolled = false;
-
-  if (hasAuth && course.id) {
-    const enrollRes = await getEnrollmentStatusAction(course.id);
-    isEnrolled = !!(enrollRes.success && enrollRes.data?.enrolled);
-  }
-
-  function renderCTA() {
-    if (isEnrolled) {
-      return (
-        <Button asChild className="gap-2 shadow-lg shadow-primary/20">
-          <Link href={`/learn/${course.id}`}>
-            <PlayCircle className="size-4" />
-            Tiếp tục học
-          </Link>
-        </Button>
-      );
-    }
-    if (isFree && hasAuth) {
-      return (
-        <Button asChild className="gap-2 bg-emerald-600 shadow-lg shadow-emerald-600/20 hover:bg-emerald-500">
-          <Link href={`/learn/${course.id}`}>
-            <PlayCircle className="size-4" />
-            Bắt đầu học miễn phí
-          </Link>
-        </Button>
-      );
-    }
-    return (
-      <Button asChild>
-        <Link href={hasAuth ? '#' : '/register'}>
-          {hasAuth ? 'Đăng ký khóa học' : 'Đăng ký học ngay'}
-        </Link>
-      </Button>
-    );
-  }
+  // Kiem tra enrollment bang cach get progress
+  const progressRes = await getCourseProgressAction(course.id);
+  const isEnrolled = progressRes.success && progressRes.code === 200;
 
   return (
     <div className="glass-page min-h-screen text-foreground relative overflow-hidden">
@@ -90,7 +59,7 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
           <Link href="/courses" className="text-sm font-semibold text-muted-foreground hover:text-foreground">
             ← Quay lại danh sách khóa học
           </Link>
-          {renderCTA()}
+          <EnrollButton courseId={course.id} isEnrolled={isEnrolled} isFree={isFree} />
         </div>
 
         <Card className="rounded-3xl border-white/60 bg-white/70 backdrop-blur-xl shadow-sm">
@@ -161,10 +130,13 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
                         <p className="text-xs text-muted-foreground">{formatDuration(lesson.duration)}</p>
                       </div>
                       <div className="inline-flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${lesson.isFree ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {lesson.isFree ? <PlayCircle className="size-3" /> : <Lock className="size-3" />}
-                          {lesson.isFree ? 'Xem thử' : 'Trả phí'}
-                        </span>
+                        <PreviewButton 
+                           courseId={course.id} 
+                           courseSlug={course.slug || slug} 
+                           lessonId={lesson.id} 
+                           isFree={lesson.isFree} 
+                           isEnrolled={isEnrolled} 
+                        />
                       </div>
                     </div>
                   ))}
