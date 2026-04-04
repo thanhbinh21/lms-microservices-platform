@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Clapperboard, LogOut, Menu, X } from 'lucide-react';
@@ -28,7 +28,13 @@ export function SharedNavbar() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const normalizedRole = (user?.role || '').toUpperCase();
   const canBecomeInstructor = isAuthenticated && !!user && normalizedRole === 'STUDENT';
   const canAccessInstructorStudio = isAuthenticated && !!user && normalizedRole === 'INSTRUCTOR';
@@ -39,6 +45,10 @@ export function SharedNavbar() {
     router.push('/login');
     router.refresh();
   };
+
+  if (!mounted) {
+    return <header className="glass-navbar sticky top-0 z-40 shadow-sm h-16"></header>;
+  }
 
   return (
     <header className="glass-navbar sticky top-0 z-40 shadow-sm">

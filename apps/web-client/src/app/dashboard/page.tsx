@@ -77,13 +77,15 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 <h1 className="text-3xl md:text-4xl font-bold">Chào buổi sáng, {user.name}! 👋</h1>
                 <p className="text-white/80 max-w-xl text-sm md:text-base leading-relaxed">
-                  Bạn đang làm rất tốt! Tiếp tục chuỗi ngày học tập để hoàn thành khóa "Fullstack Next.js" nhé. 
+                  Bạn đang làm rất tốt! Tiếp tục chuỗi ngày học tập để hoàn thành khóa {data?.activeCourses?.[0] ? `"${data.activeCourses[0].title}"` : "học của bạn"} nhé. 
                   Hãy nhớ rằng đích đến của bạn là trở thành kỹ sư phần mềm xuất sắc.
                 </p>
               </div>
-              <Button className="w-fit bg-white text-primary hover:bg-white/90 shadow-xl rounded-xl px-6 h-12 font-bold whitespace-nowrap">
-                Tiếp tục học <PlayCircle className="ml-2 size-5" />
-              </Button>
+              <Link href={data?.activeCourses?.[0] ? `/learn/${data.activeCourses[0].slug}` : "/courses"}>
+                <Button className="w-fit bg-white text-primary hover:bg-white/90 shadow-xl rounded-xl px-6 h-12 font-bold whitespace-nowrap">
+                  Tiếp tục học <PlayCircle className="ml-2 size-5" />
+                </Button>
+              </Link>
             </div>
           </div>
         </ScrollReveal>
@@ -154,7 +156,9 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <div className="w-full md:w-auto shrink-0 flex items-center md:items-end md:h-full">
-                           <Button className="w-full md:w-auto rounded-xl shadow-md">Học tiếp tục</Button>
+                           <Link href={`/learn/${course.slug}`} className="w-full md:w-auto">
+                             <Button className="w-full rounded-xl shadow-md">Học tiếp tục</Button>
+                           </Link>
                         </div>
                       </Card>
                     </ScrollReveal>

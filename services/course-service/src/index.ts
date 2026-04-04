@@ -27,6 +27,8 @@ import {
   deleteLesson,
   getLessonPlayback,
 } from './controllers/lesson.controller';
+import { enrollFreeCourse } from './controllers/enrollment.controller';
+import { getCourseProgress, updateLessonProgress } from './controllers/progress.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import prisma from './lib/prisma';
 
@@ -84,6 +86,11 @@ app.post('/api/courses/:courseId/chapters/:chapterId/lessons', ...requireRole('i
 app.put('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), updateLesson);
 app.delete('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), deleteLesson);
 app.get('/api/lessons/:lessonId/playback', getLessonPlayback);
+
+// ─── Student Learning Routes (Enrollment & Progress) ──────────────────────────
+app.post('/api/enrollments/free', requireAuth, enrollFreeCourse);
+app.get('/api/courses/:courseId/progress', requireAuth, getCourseProgress);
+app.put('/api/lessons/:lessonId/progress', requireAuth, updateLessonProgress);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {

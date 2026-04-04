@@ -115,8 +115,11 @@ Dự án được chia thành 20 giai đoạn (Phases) theo chuẩn "Vertical Sl
 - [ ] **Phase 9.4:** Auth Role Policy Refactor — Register luon tao role STUDENT, bo role input tu client, cap nhat validation + response contract.
 - [ ] **Phase 9.5:** Become Educator Backend Flow — Them endpoint `/auth/become-educator`, audit nang cap role, xu ly refresh/session de dong bo role moi.
 - [ ] **Phase 9.6:** Become Educator Frontend UX — Bo role selector o Register, them CTA Become Educator (Profile/Dashboard), cap nhat role state va instructor redirect.
-- [ ] **Phase 9.7:** System Seed Content — Admin he thong tao/quan ly bo khoa hoc mau (co bai free) de hoc vien trai nghiem truoc khi giang vien upload khoa hoc that.
+- [x] **Phase 9.7:** System Seed Content — Admin he thong tao/quan ly bo khoa hoc mau (co bai free) de hoc vien trai nghiem truoc khi giang vien upload khoa hoc that. ✅ Completed: Apr 04, 2026
 - [ ] **Phase 9.8:** Media Provider Unification — Chuyen media upload/delivery sang Cloudinary Free, giu local storage fallback cho dev/test, ngung dung S3/VideoCipher trong flow chinh.
+- [x] **Phase 9.9:** Authentication Standardization - Removed duplicated JWT decodings in `course-service` and `instructor-service`. Both now correctly rely on Kong API Gateway for `x-user-id` and `x-user-role`. ✅ Completed: Apr 04, 2026
+- [x] **Phase 9.10:** Resolving Race Conditions - Fixed auth token `restoreSessionAction` race condition that was triggering endless refreshes when switching tabs. ✅ Completed: Apr 04, 2026
+- [x] **Phase 9.11:** Sync Application Defaults - Resolved mismatch validations for user registrations and centralized password policies. Upsert logic for seed commands to safely mutate data without blowing up primary keys. ✅ Completed: Apr 04, 2026
 
 ### Phase 14-16: Learning Experience
 - [ ] **Phase 14:** Student Learning UI — `/learn/[courseId]` layout, LessonProgress model, video player, progress tracking, Review UI. (Uu tien trien khai truoc block Commerce & Payments de hoc vien xem video free som)
@@ -138,6 +141,8 @@ Dự án được chia thành 20 giai đoạn (Phases) theo chuẩn "Vertical Sl
 - [ ] **Phase 20:** Dockerize all services, docker-compose.prod.yml, CI/CD (GitHub Actions), Nginx + SSL, monitoring, backup strategy.
 
 ---
+
+
 
 ## 6. Ghi Chú Quan Trọng (Decisions & Assumptions)
 

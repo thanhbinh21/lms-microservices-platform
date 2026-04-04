@@ -39,10 +39,11 @@ export async function getDashboardData(): Promise<{ success: boolean; data?: Das
     },
     activeCourses: sourceCourses.slice(0, 3).map((item, index) => ({
       id: item.id,
+      slug: item.slug || item.id,
       title: item.title,
       progress: Math.max(10, 70 - index * 18),
       thumbnail: (item.title.match(/[A-Za-z]/g)?.slice(0, 2).join('') || 'CRS').toUpperCase(),
-      instructor: item.instructorId,
+      instructor: item.instructorId?.slice(0, 8).toUpperCase() || 'HỆ THỐNG',
       lastAccessed: index === 0 ? 'Gần đây' : 'Trong tuần này',
     })),
     recommendedCourses: publicCourses.slice(0, 3).map((item) => ({

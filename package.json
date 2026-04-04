@@ -17,7 +17,10 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
-    "docker:health": "docker-compose ps"
+    "docker:health": "docker-compose ps",
+    "seed": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-all.ts",
+    "seed:accounts": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-accounts.ts",
+    "seed:courses": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-courses.ts"
   },
   "devDependencies": {
     "@types/supertest": "^7.2.0",

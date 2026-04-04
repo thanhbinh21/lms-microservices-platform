@@ -27,7 +27,7 @@ import { StatusMessage } from '@/components/ui/status-message';
 // Override schema inline if needed, but assuming standard loginSchema format exists
 const loginSchema = z.object({
   email: z.string().email('Email không đúng định dạng'),
-  password: z.string().min(6, 'Mật khẩu phải từ 6 ký tự'),
+  password: z.string().min(8, 'Mật khẩu phải từ 8 ký tự'),
 });
 type LoginInput = z.infer<typeof loginSchema>;
 

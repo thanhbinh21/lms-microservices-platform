@@ -82,6 +82,7 @@ model Lesson {
   order       Int      @default(0)
   videoUrl    String?  @map("video_url")   // VideoCipher/S3 (Phase 6)
   sourceType  LessonSourceType @default(UPLOAD) @map("source_type")
+  content     String?  // Noi dung/mo ta bai hoc (text)
   duration    Int      @default(0)          // seconds
   isPublished Boolean  @default(false) @map("is_published")
   isFree      Boolean  @default(false) @map("is_free") // preview lesson
@@ -91,18 +92,37 @@ model Lesson {
 
   // Relations
   chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  progress LessonProgress[] // 1 Lesson co nhieu tien do cua hoc vien
 
   @@index([chapterId])
   @@map("lessons")
 }
 
+// Luu vet tien do hoc tap cua hoc vien tren tung bai hoc
+model LessonProgress {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")      // User dang ky
+  lessonId    String   @map("lesson_id")
+  isCompleted Boolean  @default(false) @map("is_completed")
+  lastWatched Int      @default(0) @map("last_watched") // so giay (thoi luong da xem)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId]) // 1 user chi co 1 progress / lesson
+  @@index([userId])
+  @@map("lesson_progress")
+}
+
 // Enrollment — owned by Course Service (source of truth for access control)
-// Populated by Kafka consumer in Phase 12
+// Populated by Kafka consumer in Phase 12 or by direct Free Enroll
 model Enrollment {
   id         String   @id @default(uuid())
   userId     String   @map("user_id")      // from Kafka event
   courseId   String   @map("course_id")
-  orderId    String   @unique @map("order_id") // idempotency key
+  orderId    String   @unique @map("order_id") // idempotency key hoac dummy_order
   enrolledAt DateTime @default(now()) @map("enrolled_at")
 
   // Relations

@@ -306,7 +306,7 @@ export async function getCourseCurriculum(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
 
-    if (course.instructorId !== instructorId && userRole !== 'admin') {
+    if (course.instructorId !== instructorId && userRole?.toLowerCase() !== 'admin') {
       const forbidden: ApiResponse<null> = {
         success: false,
         code: 403,
@@ -392,7 +392,7 @@ export async function updateCourse(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
     // Admin duoc phep cap nhat bat ky khoa hoc nao
-    if (course.instructorId !== instructorId && userRole !== 'admin') {
+    if (course.instructorId !== instructorId && userRole?.toLowerCase() !== 'admin') {
       const forbidden: ApiResponse<null> = {
         success: false, code: 403, message: 'Khong co quyen - khong phai khoa hoc cua ban', data: null, trace_id: traceId,
       };
@@ -453,7 +453,7 @@ export async function publishCourse(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
 
-    if (course.instructorId !== instructorId && userRole !== 'admin') {
+    if (course.instructorId !== instructorId && userRole?.toLowerCase() !== 'admin') {
       const forbidden: ApiResponse<null> = {
         success: false,
         code: 403,
@@ -522,7 +522,7 @@ export async function deleteCourse(req: Request, res: Response) {
       };
       return res.status(404).json(notFound);
     }
-    if (course.instructorId !== instructorId && userRole !== 'admin') {
+    if (course.instructorId !== instructorId && userRole?.toLowerCase() !== 'admin') {
       const forbidden: ApiResponse<null> = {
         success: false, code: 403, message: 'Khong co quyen - khong phai khoa hoc cua ban', data: null, trace_id: traceId,
       };
