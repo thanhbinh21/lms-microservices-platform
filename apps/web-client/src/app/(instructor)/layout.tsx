@@ -21,8 +21,19 @@ const navLinks: NavLink[] = [
   { label: 'Thiết lập Kênh', href: '/instructor/settings', icon: Settings },
 ];
 
+function normalizePath(p: string) {
+  if (p.length > 1 && p.endsWith('/')) return p.slice(0, -1);
+  return p;
+}
+
 function isLinkActive(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(`${href}/`);
+  const path = normalizePath(pathname);
+  const h = normalizePath(href);
+  // Trang gốc /instructor: chỉ active đúng khi đang ở đúng URL đó (không gồm /instructor/courses, ...)
+  if (h === '/instructor') {
+    return path === '/instructor';
+  }
+  return path === h || path.startsWith(`${h}/`);
 }
 
 export default function InstructorLayout({ children }: { children: React.ReactNode }) {

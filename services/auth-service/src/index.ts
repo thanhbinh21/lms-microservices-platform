@@ -10,6 +10,7 @@ import { register } from './controllers/register.controller.js';
 import { login } from './controllers/login.controller.js';
 import { refresh } from './controllers/refresh.controller.js';
 import { logout } from './controllers/logout.controller.js';
+import { updateUserRole } from './controllers/update-role.controller.js';
 
 // Validate bien moi truong khi khoi dong
 const env = initEnv();
@@ -58,6 +59,7 @@ app.post('/register', register);
 app.post('/login', login);
 app.post('/refresh', refresh);
 app.post('/logout', logout);
+app.patch('/users/role', updateUserRole);
 
 // Xu ly 404
 app.use((req: Request, res: Response) => {

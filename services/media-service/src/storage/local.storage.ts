@@ -19,8 +19,8 @@ export class LocalStorageProvider implements StorageProvider {
 
   constructor() {
     this.uploadDir = process.env.LOCAL_UPLOAD_DIR || DEFAULT_UPLOAD_DIR;
-    const port = process.env.PORT || 3004;
-    this.baseUrl = `http://localhost:${port}`;
+    // Tra URL qua Kong de frontend khong bi van de same-origin voi port service.
+    this.baseUrl = (process.env.MEDIA_PUBLIC_BASE_URL || 'http://localhost:8000/media').replace(/\/$/, '');
   }
 
   async generateUploadUrl(params: {

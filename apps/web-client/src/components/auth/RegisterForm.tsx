@@ -31,7 +31,6 @@ export default function RegisterForm() {
       email: '',
       password: '',
       confirmPassword: '',
-      role: 'STUDENT',
     },
   });
 
@@ -50,7 +49,7 @@ export default function RegisterForm() {
         }));
 
         setSuccess(mapUiSuccessMessage(result.message, 'Đăng ký thành công! Đang chuyển hướng...'));
-        const redirectPath = result.user.role === 'INSTRUCTOR' ? '/instructor/courses' : '/dashboard';
+        const redirectPath = '/';
         
         setTimeout(() => {
           router.push(redirectPath);
@@ -161,43 +160,6 @@ export default function RegisterForm() {
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-semibold text-foreground">Loại tài khoản</FormLabel>
-                  <FormControl>
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className={`cursor-pointer rounded-xl border p-3 text-sm font-semibold transition-colors ${field.value === 'STUDENT' ? 'border-primary bg-primary/10 text-primary' : 'border-white/80 bg-white/60 text-muted-foreground'}`}>
-                        <input
-                          type="radio"
-                          className="sr-only"
-                          value="STUDENT"
-                          checked={field.value === 'STUDENT'}
-                          onChange={() => field.onChange('STUDENT')}
-                          disabled={isLoading}
-                        />
-                        Học viên
-                      </label>
-                      <label className={`cursor-pointer rounded-xl border p-3 text-sm font-semibold transition-colors ${field.value === 'INSTRUCTOR' ? 'border-primary bg-primary/10 text-primary' : 'border-white/80 bg-white/60 text-muted-foreground'}`}>
-                        <input
-                          type="radio"
-                          className="sr-only"
-                          value="INSTRUCTOR"
-                          checked={field.value === 'INSTRUCTOR'}
-                          onChange={() => field.onChange('INSTRUCTOR')}
-                          disabled={isLoading}
-                        />
-                        Giảng viên
-                      </label>
-                    </div>
-                  </FormControl>
-                  <FormMessage className="text-xs text-destructive font-medium" />
-                </FormItem>
-              )}
-            />
 
             {error && <StatusMessage type="error" message={error} />}
             {success && <StatusMessage type="success" message={success} />}

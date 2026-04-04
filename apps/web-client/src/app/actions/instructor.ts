@@ -5,6 +5,55 @@ import { cookies } from 'next/headers';
 
 const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:8000';
 const AUTH_PREFIX = process.env.NEXT_PUBLIC_AUTH_PREFIX || '/auth';
+/** Goi thang instructor-service (vd: http://localhost:3006) de tranh Kong khi dev / Kong chua co route. */
+const INSTRUCTOR_SERVICE_URL = process.env.INSTRUCTOR_SERVICE_URL?.trim() || '';
+
+export interface BecomeInstructorInput {
+  fullName: string;
+  phone: string;
+  expertise: string;
+  experienceYears: number;
+  bio: string;
+  courseTitle: string;
+  courseCategory: string;
+  courseDescription: string;
+}
+
+export interface InstructorRequestDto {
+  id: string;
+  userId: string;
+  fullName: string;
+  phone: string;
+  email: string;
+  dateOfBirth?: string | null;
+  address?: string | null;
+  expertise: string;
+  specialization: string;
+  experienceYears: number;
+  currentJob?: string | null;
+  bio: string;
+  github?: string | null;
+  linkedin?: string | null;
+  website?: string | null;
+  youtube?: string | null;
+  cvFile?: string | null;
+  certificateFile?: string | null;
+  identityCard?: string | null;
+  avatar?: string | null;
+  courseTitle: string;
+  courseCategory: string;
+  courseDescription: string;
+  targetStudents?: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export interface InstructorRequestStatsDto {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+}
 
 interface ApiResponse<T> {
   success: boolean;
@@ -83,6 +132,8 @@ export interface CourseCurriculumDto {
   price?: number;
   level?: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
   instructorId?: string;
+  createdAt?: string;
+  updatedAt?: string;
   chapters: ChapterDto[];
 }
 
@@ -159,7 +210,13 @@ async function refreshAccessToken(): Promise<string | undefined> {
   return nextAccessToken;
 }
 
-async function callApi<T>(path: string, init?: RequestInit, requireAuth = false): Promise<ApiResponse<T>> {
+async function callApi<T>(
+  path: string,
+  init?: RequestInit,
+  requireAuth = false,
+  baseUrlOverride?: string,
+): Promise<ApiResponse<T>> {
+  const baseUrl = (baseUrlOverride ?? GATEWAY_URL).replace(/\/$/, '');
   const headers = new Headers(init?.headers || {});
   headers.set('Content-Type', 'application/json');
 
@@ -196,7 +253,7 @@ async function callApi<T>(path: string, init?: RequestInit, requireAuth = false)
     headers.set('x-user-role', (decoded.role || '').toLowerCase());
   }
 
-  let response = await fetch(`${GATEWAY_URL}${path}`, {
+  let response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers,
     cache: 'no-store',
@@ -212,7 +269,7 @@ async function callApi<T>(path: string, init?: RequestInit, requireAuth = false)
         headers.set('x-user-id', decoded.userId);
         headers.set('x-user-role', (decoded.role || '').toLowerCase());
       }
-      response = await fetch(`${GATEWAY_URL}${path}`, {
+      response = await fetch(`${baseUrl}${path}`, {
         ...init,
         headers,
         cache: 'no-store',
@@ -220,8 +277,134 @@ async function callApi<T>(path: string, init?: RequestInit, requireAuth = false)
     }
   }
 
-  const result = await response.json();
-  return result as ApiResponse<T>;
+  const text = await response.text();
+  let result: ApiResponse<T>;
+  try {
+    result = JSON.parse(text) as ApiResponse<T>;
+  } catch {
+    return {
+      success: false,
+      code: response.status,
+      message: text.slice(0, 200) || 'Invalid response from server',
+      data: null,
+      trace_id: '',
+    };
+  }
+  return result;
+}
+
+function instructorBaseUrl() {
+  return INSTRUCTOR_SERVICE_URL || GATEWAY_URL;
+}
+
+export async function createInstructorRequestAction(data: BecomeInstructorInput): Promise<{ success: boolean; message: string }> {
+  const result = await callApi<unknown>(
+    '/instructor/request',
+    {
+      method: 'POST',
+      body: JSON.stringify(data),
+    },
+    true,
+    instructorBaseUrl(),
+  );
+
+  return {
+    success: result.success,
+    message:
+      result.message ||
+      (result.success ? 'Đã gửi yêu cầu thành công.' : 'Không thể gửi yêu cầu đăng ký giảng viên.'),
+  };
+}
+
+export async function getMyPendingInstructorRequestAction(): Promise<{
+  success: boolean;
+  message: string;
+  request: InstructorRequestDto | null;
+}> {
+  const result = await callApi<{ request: InstructorRequestDto | null }>(
+    '/instructor/my-request',
+    { method: 'GET' },
+    true,
+    instructorBaseUrl(),
+  );
+
+  return {
+    success: result.success,
+    message: result.message,
+    request: result.success && result.data ? result.data.request : null,
+  };
+}
+
+export async function getInstructorRequestStatsAction(): Promise<{
+  success: boolean;
+  message: string;
+  stats: InstructorRequestStatsDto | null;
+}> {
+  const result = await callApi<InstructorRequestStatsDto>(
+    '/instructor/requests/stats',
+    { method: 'GET' },
+    true,
+    instructorBaseUrl(),
+  );
+
+  return {
+    success: result.success,
+    message: result.message,
+    stats: result.success && result.data ? result.data : null,
+  };
+}
+
+export async function listInstructorRequestsAdminAction(): Promise<{
+  success: boolean;
+  message: string;
+  requests: InstructorRequestDto[];
+}> {
+  const result = await callApi<InstructorRequestDto[]>(
+    '/instructor/requests',
+    { method: 'GET' },
+    true,
+    instructorBaseUrl(),
+  );
+
+  return {
+    success: result.success,
+    message: result.message,
+    requests: result.success && Array.isArray(result.data) ? result.data : [],
+  };
+}
+
+export async function getInstructorRequestByIdAdminAction(id: string): Promise<{
+  success: boolean;
+  message: string;
+  request: InstructorRequestDto | null;
+}> {
+  const result = await callApi<InstructorRequestDto>(`/instructor/requests/${id}`, { method: 'GET' }, true, instructorBaseUrl());
+
+  return {
+    success: result.success,
+    message: result.message,
+    request: result.success && result.data ? result.data : null,
+  };
+}
+
+export async function approveInstructorRequestAction(id: string): Promise<{ success: boolean; message: string }> {
+  const result = await callApi<unknown>(`/instructor/approve/${id}`, { method: 'PUT' }, true, instructorBaseUrl());
+  if (result.success) {
+    revalidatePath('/profile');
+    revalidatePath('/admin/instructor-requests');
+    revalidatePath(`/admin/instructor-requests/${id}`);
+  }
+  return { success: result.success, message: result.message };
+}
+
+export async function rejectInstructorRequestAction(id: string): Promise<{ success: boolean; message: string }> {
+  const result = await callApi<unknown>(`/instructor/reject/${id}`, { method: 'PUT' }, true, instructorBaseUrl());
+  if (result.success) {
+    revalidatePath('/profile');
+    revalidatePath('/admin/instructor-requests');
+    revalidatePath(`/admin/instructor-requests/${id}`);
+  }
+  return { success: result.success, message: result.message };
 }
 
 export async function getPublicCoursesAction(page = 1, limit = 20) {
@@ -275,7 +458,22 @@ export async function updateCourseAction(courseId: string, data: Partial<CourseD
   );
 
   revalidatePath(`/instructor/courses/${courseId}`);
-  return { success: result.success, message: result.message };
+  return { success: result.success, message: result.message, data: result.data };
+}
+
+export async function publishCourseAction(courseId: string, thumbnail?: string) {
+  const result = await callApi<CourseDto>(
+    `/course/api/courses/${courseId}/publish`,
+    {
+      method: 'POST',
+      body: JSON.stringify(thumbnail ? { thumbnail } : {}),
+    },
+    true,
+  );
+
+  revalidatePath(`/instructor/courses/${courseId}`);
+  revalidatePath('/courses');
+  return { success: result.success, message: result.message, data: result.data };
 }
 
 export async function updateCurriculumOrderAction(courseId: string, orderedChapterIds: string[]) {

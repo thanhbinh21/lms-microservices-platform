@@ -88,12 +88,7 @@ services:
           - /media
         strip_path: true
     plugins:
-      - name: jwt
-        config:
-          secret_is_base64: false
-          key_claim_name: kid
-          claims_to_verify:
-            - exp
+      # JWT do media-service trust header tu Gateway (giong course-service) de dong bo local-dev flow.
       - name: rate-limiting
         config:
           minute: 100
@@ -124,6 +119,38 @@ services:
           key_claim_name: kid
           claims_to_verify:
             - exp
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - "x-user-id:$(headers['x-user-id'])"
+              - "x-user-role:$(headers['x-user-role'])"
+      - name: correlation-id
+        config:
+          header_name: x-trace-id
+          generator: uuid
+          echo_downstream: true
+
+  - name: instructor-service
+    url: http://host.docker.internal:3006
+    routes:
+      - name: instructor-route
+        paths:
+          - /instructor
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+    plugins:
+      # JWT do instructor-service tu verify (giong course-service). Tranh loi Kong JWT/kid khi dev.
       - name: rate-limiting
         config:
           minute: 100

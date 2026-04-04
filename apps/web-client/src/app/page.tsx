@@ -1,40 +1,14 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { ArrowRight, PlayCircle, ShieldCheck, Users, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
-
-const featuredCourses = [
-  {
-    id: 'course-nextjs',
-    title: 'Lộ Trình Fullstack Next.js Và Tailwind CSS',
-    category: 'Web Development',
-    lessons: 45,
-    students: 1200,
-    price: '1.299.000đ',
-    rating: '4.8',
-  },
-  {
-    id: 'course-python-data',
-    title: 'Phân Tích Dữ Liệu Với Python Nâng Cao',
-    category: 'Data Science',
-    lessons: 60,
-    students: 950,
-    price: '1.550.000đ',
-    rating: '4.9',
-  },
-  {
-    id: 'course-digital-marketing',
-    title: 'Digital Marketing: Từ Tư Duy Đến Thực Chiến',
-    category: 'Marketing',
-    lessons: 32,
-    students: 2100,
-    price: '990.000đ',
-    rating: '4.7',
-  },
-];
+import { InstructorRequestFlash } from '@/components/home/InstructorRequestFlash';
+import { HomeAuthActions } from '@/components/home/home-auth-actions';
+import { getPublicCoursesAction } from '@/app/actions/instructor';
 
 const highlights = [
   {
@@ -60,7 +34,26 @@ const highlights = [
   },
 ];
 
-export default function Home() {
+function formatPriceVND(price: number) {
+  return `${Number(price || 0).toLocaleString('vi-VN')}đ`;
+}
+
+function formatDuration(totalSeconds: number) {
+  if (!totalSeconds) return '0 phút';
+  const totalMinutes = Math.max(1, Math.floor(totalSeconds / 60));
+  if (totalMinutes < 60) return `${totalMinutes} phút`;
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes > 0 ? `${hours}h ${minutes}p` : `${hours}h`;
+}
+
+export default async function Home() {
+  const publicCoursesResult = await getPublicCoursesAction(1, 6);
+  const featuredCourses = publicCoursesResult.success && publicCoursesResult.data
+    ? publicCoursesResult.data.courses
+    : [];
+
   return (
     <div className="glass-page min-h-screen text-foreground font-sans relative overflow-hidden">
       {/* Decorative background orbs for glass refraction */}
@@ -69,6 +62,10 @@ export default function Home() {
       <div className="absolute bottom-[-10%] left-[20%] w-[50%] h-[30%] rounded-full bg-indigo-300/15 blur-[120px] pointer-events-none" />
       
       <SharedNavbar />
+
+      <Suspense fallback={null}>
+        <InstructorRequestFlash />
+      </Suspense>
 
       <main>
         <section id="kham-pha" className="relative overflow-hidden px-4 py-16 md:px-6 md:py-20">
@@ -92,18 +89,7 @@ export default function Home() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <Button asChild size="lg" className="gap-2 shadow-lg shadow-primary/20">
-                  <Link href="/register">
-                    Bắt đầu ngay
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-                <Button asChild size="lg" variant="outline" className="gap-2 bg-white/60">
-                  <Link href="/login">
-                    <PlayCircle className="size-4" />
-                    Xem demo
-                  </Link>
-                </Button>
+                <HomeAuthActions context="hero" />
               </div>
 
               <div className="flex items-center gap-4 text-xs text-muted-foreground md:text-sm">
@@ -171,38 +157,46 @@ export default function Home() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {featuredCourses.map((course, index) => (
               <ScrollReveal key={course.id} delay={index * 150} className="h-full">
-                <Card className="glass-panel group rounded-3xl transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/20 border-white/60 h-full flex flex-col">
-                  <CardHeader className="p-2">
-                    <div className="relative aspect-video overflow-hidden rounded-2xl bg-[linear-gradient(120deg,hsl(var(--primary)/0.08),hsl(var(--primary)/0.02))] border border-white/50">
-                      <span className="absolute right-3 top-3 rounded-full bg-white/90 backdrop-blur-sm px-3 py-1 text-xs font-bold text-primary shadow-sm border border-primary/10">
-                        {course.category}
-                      </span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4 px-6 pt-4 pb-0 flex-1">
-                    <p className="line-clamp-2 text-lg font-bold leading-tight">{course.title}</p>
-                    <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                      <span>{course.lessons} bài học</span>
-                      <span>{course.students} học viên</span>
-                    </div>
-                    <div className="flex items-center justify-between pt-2">
-                      <p className="text-2xl font-bold text-primary">{course.price}</p>
-                      <p className="text-sm font-bold text-muted-foreground">{course.rating} / 5</p>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="pt-6 mt-auto pb-6 px-6">
-                    <Button asChild variant={index === 0 ? 'default' : 'outline'} className="w-full shadow-sm rounded-xl">
-                      <Link href="/register">Xem chi tiết</Link>
-                    </Button>
-                  </CardFooter>
-                </Card>
+                <Link href={`/courses/${course.slug}`} className="block h-full">
+                  <Card className="glass-panel group rounded-3xl transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/20 border-white/60 h-full flex flex-col cursor-pointer">
+                    <CardHeader className="p-2">
+                      <div className="relative aspect-video overflow-hidden rounded-2xl bg-[linear-gradient(120deg,hsl(var(--primary)/0.08),hsl(var(--primary)/0.02))] border border-white/50">
+                        {course.thumbnail ? (
+                          <img src={course.thumbnail} alt={course.title} className="h-full w-full object-cover" />
+                        ) : null}
+                        <span className="absolute right-3 top-3 rounded-full bg-white/90 backdrop-blur-sm px-3 py-1 text-xs font-bold text-primary shadow-sm border border-primary/10">
+                          {course.level || 'BEGINNER'}
+                        </span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4 px-6 pt-4 pb-6 flex-1">
+                      <p className="line-clamp-2 text-lg font-bold leading-tight">{course.title}</p>
+                      <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                        <span>{course.totalLessons || 0} bài học</span>
+                        <span>{formatDuration(course.totalDuration || 0)}</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-2">
+                        <p className="text-2xl font-bold text-primary">{formatPriceVND(Number(course.price || 0))}</p>
+                        <p className="text-sm font-bold text-muted-foreground">{course.status || 'PUBLISHED'}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
               </ScrollReveal>
             ))}
           </div>
 
+          {featuredCourses.length === 0 && (
+            <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
+              <CardContent className="py-10 text-center text-sm font-medium text-muted-foreground">
+                Hiện chưa có khóa học nào được xuất bản.
+              </CardContent>
+            </Card>
+          )}
+
           <div className="flex justify-center pt-4">
             <Button asChild variant="outline" size="lg" className="rounded-full px-8 bg-white/50 backdrop-blur-sm border-primary/20 hover:bg-white">
-              <Link href="/register">Xem tất cả khóa học</Link>
+              <Link href="/courses">Xem tất cả khóa học</Link>
             </Button>
           </div>
         </section>
@@ -252,12 +246,7 @@ export default function Home() {
                   Tham gia cộng đồng hơn 150.000 học viên đang phát triển kỹ năng mỗi ngày tại NexEdu.
                 </p>
                 <div className="flex flex-wrap gap-4 pt-6">
-                  <Button asChild variant="secondary" size="lg" className="bg-white text-primary hover:bg-white/90 rounded-full px-8 shadow-xl">
-                    <Link href="/register">Đăng ký miễn phí</Link>
-                  </Button>
-                  <Button asChild variant="outline" size="lg" className="rounded-full px-8 border-white/40 bg-white/10 backdrop-blur-md text-white hover:bg-white/20 hover:text-white">
-                    <Link href="/login">Liên hệ tư vấn</Link>
-                  </Button>
+                  <HomeAuthActions context="cta" />
                 </div>
               </div>
 

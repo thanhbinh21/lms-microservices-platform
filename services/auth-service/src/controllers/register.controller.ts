@@ -14,7 +14,6 @@ const registerSchema = z.object({
   email: z.string().email('Email khong hop le'),
   password: z.string().min(8, 'Mat khau toi thieu 8 ky tu'),
   name: z.string().min(2, 'Ten toi thieu 2 ky tu'),
-  role: z.enum(['STUDENT', 'INSTRUCTOR']).default('STUDENT'),
 });
 
 // Hang so cau hinh
@@ -54,7 +53,7 @@ export async function register(req: Request, res: Response) {
         email: validatedData.email,
         password: hashedPassword,
         name: validatedData.name,
-        role: validatedData.role,
+        role: 'STUDENT',
         sourceType: 'CREDENTIALS',
       },
       select: {
