@@ -2,10 +2,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package.json package-lock.json* pnpm-lock.yaml* ./
-RUN npm install
+COPY package.json ./
+RUN npm install --ignore-scripts
 
-COPY . .
+COPY prisma ./prisma
+COPY scripts ./scripts
+COPY src ./src
+COPY tsconfig.json ./tsconfig.json
 
 RUN npx prisma generate
 RUN npm run build
