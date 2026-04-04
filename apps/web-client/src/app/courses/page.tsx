@@ -26,7 +26,10 @@ interface CourseCardView {
   reviews: number;
   duration: string;
   students: string;
-  thumbnail: string;
+  /** Ảnh đại diện từ API (thumbnail URL) */
+  thumbnailUrl: string | null;
+  /** Chữ viết tắt khi không có ảnh */
+  initials: string;
   badge: string;
 }
 
@@ -77,7 +80,8 @@ export default function CoursesPage() {
         reviews: 0,
         duration: `${Math.max(1, Math.floor(course.totalDuration / 3600))} giờ`,
         students: `${course._count?.enrollments ?? 0}`,
-        thumbnail: (course.title.match(/[A-Za-z]/g)?.slice(0, 3).join('') || 'CRS').toUpperCase(),
+        thumbnailUrl: course.thumbnail?.trim() || null,
+        initials: (course.title.match(/[A-Za-z]/g)?.slice(0, 3).join('') || 'CRS').toUpperCase(),
         badge: course.status === 'PUBLISHED' ? 'Published' : '',
       }));
 
@@ -103,29 +107,34 @@ export default function CoursesPage() {
 
     setSelectedCourse(result.data);
 
-    // Tu dong chon bai free dau tien co video de test luong hoc vien xem noi dung mien phi
-    const firstFreeWithVideo = result.data.chapters
-      .flatMap((chapter) => chapter.lessons)
-      .find((lesson) => lesson.isFree && lesson.videoUrl);
+    const allLessons = result.data.chapters.flatMap((chapter) => chapter.lessons);
+    // API catalog có thể ẩn videoUrl; luôn gọi playback cho bài free đầu tiên (theo id)
+    const firstFree = allLessons.find((lesson) => lesson.isFree);
 
-    if (firstFreeWithVideo) {
-      const playback = await getLessonPlaybackAction(firstFreeWithVideo.id, false);
+    if (firstFree) {
+      const playback = await getLessonPlaybackAction(firstFree.id, false);
       if (playback.success && playback.data?.videoUrl) {
-        setSelectedLessonTitle(firstFreeWithVideo.title);
+        setSelectedLessonTitle(firstFree.title);
         setSelectedVideoUrl(playback.data.videoUrl);
-        setPlayingLessonId(firstFreeWithVideo.id);
+        setPlayingLessonId(firstFree.id);
         setPlaybackError('');
       } else {
-        setSelectedLessonTitle('');
+        setSelectedLessonTitle(firstFree.title);
         setSelectedVideoUrl('');
-        setPlayingLessonId('');
-        setPlaybackError('Khóa học chưa có bài miễn phí sẵn sàng phát.');
+        setPlayingLessonId(firstFree.id);
+        setPlaybackError(
+          playback.message || 'Bài học miễn phí chưa có video hoặc chưa sẵn sàng phát.',
+        );
       }
     } else {
       setSelectedLessonTitle('');
       setSelectedVideoUrl('');
       setPlayingLessonId('');
-      setPlaybackError('Khóa học chưa có bài miễn phí để học thử.');
+      setPlaybackError(
+        allLessons.length > 0
+          ? 'Khóa học chưa có bài học miễn phí. Chọn bài trả phí sau khi đăng ký khóa học.'
+          : 'Khóa học chưa có bài học được xuất bản hoặc chưa có chương công khai.',
+      );
     }
     setDetailLoading(false);
   };
@@ -199,11 +208,24 @@ export default function CoursesPage() {
               >
               <div className="glass-panel group rounded-4xl border-white/60 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-2 transition-all duration-300 flex flex-col overflow-hidden relative cursor-pointer h-full">
                 
-                {/* Thumbnail */}
+                {/* Thumbnail — ưu tiên ảnh từ API */}
                 <div className="relative aspect-video bg-[linear-gradient(135deg,hsl(var(--primary)/0.1),hsl(var(--primary)/0.02))] border-b border-white/50 flex items-center justify-center overflow-hidden">
-                  <span className="text-6xl font-black text-primary/20 tracking-tighter group-hover:scale-110 transition-transform duration-500">
-                    {course.thumbnail}
-                  </span>
+                  {course.thumbnailUrl ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={course.thumbnailUrl}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent" />
+                    </>
+                  ) : (
+                    <span className="text-6xl font-black text-primary/20 tracking-tighter group-hover:scale-110 transition-transform duration-500">
+                      {course.initials}
+                    </span>
+                  )}
                   
                   {/* Badge */}
                   {course.badge && (
@@ -319,9 +341,17 @@ export default function CoursesPage() {
 
                 <div className="space-y-3">
                   <h4 className="text-sm font-bold text-slate-700">Danh sách bài học</h4>
+                  {(!selectedCourse.chapters || selectedCourse.chapters.length === 0) && (
+                    <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-muted-foreground">
+                      Khóa học chưa có chương/bài học được xuất bản. Giảng viên cần xuất bản chương và bài học trong Studio.
+                    </p>
+                  )}
                   {selectedCourse.chapters.map((chapter) => (
                     <div key={chapter.id} className="rounded-xl border border-slate-200 bg-white p-3">
                       <p className="text-sm font-bold mb-2">{chapter.title}</p>
+                      {chapter.lessons.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">Chưa có bài học trong chương này.</p>
+                      ) : null}
                       <div className="space-y-2">
                         {chapter.lessons.map((lesson) => (
                           <button

@@ -172,11 +172,13 @@ export async function listCourses(req: Request, res: Response) {
 export async function getCourseBySlug(req: Request, res: Response) {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
   try {
+    // Chi lay chuong co it nhat 1 bai da publish (khong yeu cau chapter.isPublished —
+    // nhieu khoa chi bat publish bai ma quen publish chuong)
     const course = await prisma.course.findFirst({
       where: { slug: req.params.slug, status: 'PUBLISHED' },
       include: {
         chapters: {
-          where: { isPublished: true },
+          where: { lessons: { some: { isPublished: true } } },
           orderBy: { order: 'asc' },
           include: {
             lessons: {
@@ -481,9 +483,17 @@ export async function publishCourse(req: Request, res: Response) {
       return res.status(publishValidationError.code).json(publishValidationError);
     }
 
-    const publishedCourse = await prisma.course.update({
-      where: { id: course.id },
-      data: { status: 'PUBLISHED', thumbnail: nextThumbnail },
+    const publishedCourse = await prisma.$transaction(async (tx) => {
+      const updated = await tx.course.update({
+        where: { id: course.id },
+        data: { status: 'PUBLISHED', thumbnail: nextThumbnail },
+      });
+      // Dong bo: khi khoa da publish, tat ca chuong hien thi cong khai (tranh catalog trong khi bai da publish)
+      await tx.chapter.updateMany({
+        where: { courseId: course.id },
+        data: { isPublished: true },
+      });
+      return updated;
     });
 
     const response: ApiResponse<unknown> = {

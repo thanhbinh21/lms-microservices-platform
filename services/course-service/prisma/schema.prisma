@@ -96,19 +96,43 @@ model Lesson {
   @@map("lessons")
 }
 
-// Enrollment — owned by Course Service (source of truth for access control)
-// Populated by Kafka consumer in Phase 12
-model Enrollment {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")      // from Kafka event
-  courseId   String   @map("course_id")
-  orderId    String   @unique @map("order_id") // idempotency key
-  enrolledAt DateTime @default(now()) @map("enrolled_at")
+// ─── Enrollment Enums ─────────────────────────────────────────────────────────
 
-  // Relations
+enum EnrollmentType {
+  FREE
+  PAID
+}
+
+// Enrollment — owned by Course Service (source of truth for access control)
+model Enrollment {
+  id             String         @id @default(uuid())
+  userId         String         @map("user_id")
+  courseId        String         @map("course_id")
+  orderId        String         @unique @map("order_id") // idempotency key
+  enrollmentType EnrollmentType @default(FREE) @map("enrollment_type")
+  enrolledAt     DateTime       @default(now()) @map("enrolled_at")
+
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, courseId]) // prevent duplicate enrollments
+  @@unique([userId, courseId])
   @@index([userId])
   @@map("enrollments")
+}
+
+// LessonProgress — theo dõi tiến trình học từng bài
+model LessonProgress {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  lessonId        String    @map("lesson_id")
+  courseId         String    @map("course_id")
+  isCompleted     Boolean   @default(false) @map("is_completed")
+  watchedDuration Int       @default(0) @map("watched_duration")
+  lastPosition    Int       @default(0) @map("last_position")
+  completedAt     DateTime? @map("completed_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@unique([userId, lessonId])
+  @@index([userId, courseId])
+  @@map("lesson_progress")
 }
