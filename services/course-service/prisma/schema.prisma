@@ -125,10 +125,27 @@ model Enrollment {
   orderId    String   @unique @map("order_id") // idempotency key hoac dummy_order
   enrolledAt DateTime @default(now()) @map("enrolled_at")
 
-  // Relations
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, courseId]) // prevent duplicate enrollments
+  @@unique([userId, courseId])
   @@index([userId])
   @@map("enrollments")
+}
+
+// LessonProgress — theo dõi tiến trình học từng bài
+model LessonProgress {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  lessonId        String    @map("lesson_id")
+  courseId         String    @map("course_id")
+  isCompleted     Boolean   @default(false) @map("is_completed")
+  watchedDuration Int       @default(0) @map("watched_duration")
+  lastPosition    Int       @default(0) @map("last_position")
+  completedAt     DateTime? @map("completed_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@unique([userId, lessonId])
+  @@index([userId, courseId])
+  @@map("lesson_progress")
 }

@@ -256,7 +256,9 @@ export async function getLessonPlayback(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
 
-    if (!lesson.isPublished || !lesson.chapter.isPublished || lesson.chapter.course.status !== 'PUBLISHED') {
+    // Chi yeu cau bai publish + khoa PUBLISHED (khong bat buoc chapter.isPublished —
+    // dong bo voi API catalog / learn-data)
+    if (!lesson.isPublished || lesson.chapter.course.status !== 'PUBLISHED') {
       const forbidden: ApiResponse<null> = {
         success: false, code: 403, message: 'Lesson is not available for playback', data: null, trace_id: traceId,
       };

@@ -31,6 +31,7 @@ import { enrollFreeCourse } from './controllers/enrollment.controller';
 import { getCourseProgress, updateLessonProgress } from './controllers/progress.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import prisma from './lib/prisma';
+import { disconnectProducer } from './lib/kafka-producer';
 
 // Validate bien moi truong khi khoi dong
 validateCourseServiceEnv();
@@ -60,6 +61,15 @@ app.get('/health', (_req: Request, res: Response) => {
   };
   res.status(200).json(response);
 });
+
+// ─── Student Learning Routes (prefix /api/student/ to avoid /:slug conflict) ─
+app.post('/api/student/courses/:courseId/enroll-free', requireAuth, enrollFree);
+app.get('/api/student/courses/:courseId/learn-data', requireAuth, getLearnData);
+app.get('/api/student/courses/:courseId/progress', requireAuth, getCourseProgress);
+app.get('/api/student/courses/:courseId/enrollment-status', requireAuth, getEnrollmentStatus);
+app.post('/api/student/lessons/:lessonId/progress', requireAuth, updateLessonProgress);
+app.post('/api/student/lessons/:lessonId/complete', requireAuth, completeLesson);
+app.get('/api/student/my-courses', requireAuth, getMyCourses);
 
 // ─── Public Routes ────────────────────────────────────────────────────────────
 app.get('/api/courses', listCourses);
@@ -130,7 +140,7 @@ const shutdown = async (signal: string) => {
 
   server.close(async () => {
     try {
-      // Dong Prisma de tra ket noi ve pool khi service bi restart/stop
+      await disconnectProducer();
       await prisma.$disconnect();
       clearTimeout(forceExitTimer);
       logger.info('Server closed');
