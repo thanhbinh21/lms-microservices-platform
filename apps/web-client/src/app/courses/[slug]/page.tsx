@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
 import { EnrollButton } from './enroll-button';
-import { PreviewButton } from './preview-button';
 
 interface CourseDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -56,7 +55,7 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
           <Link href="/courses" className="text-sm font-semibold text-muted-foreground hover:text-foreground">
             ← Quay lại danh sách khóa học
           </Link>
-          <EnrollButton courseId={course.id} isEnrolled={isEnrolled} isFree={isFree} />
+          <EnrollButton courseId={course.id} courseSlug={course.slug || slug} isEnrolled={isEnrolled} isFree={isFree} />
         </div>
 
         <Card className="rounded-3xl border-white/60 bg-white/70 backdrop-blur-xl shadow-sm">
@@ -127,13 +126,11 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
                         <p className="text-xs text-muted-foreground">{formatDuration(lesson.duration)}</p>
                       </div>
                       <div className="inline-flex items-center gap-2">
-                        <PreviewButton 
-                           courseId={course.id} 
-                           courseSlug={course.slug || slug} 
-                           lessonId={lesson.id} 
-                           isFree={lesson.isFree} 
-                           isEnrolled={isEnrolled} 
-                        />
+                        {!isEnrolled && (
+                          <span className="text-[10px] font-bold rounded-full px-2 py-0.5 inline-flex items-center gap-1 bg-slate-100 text-slate-500">
+                            <Lock className="size-3" /> Yêu cầu đăng ký
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}

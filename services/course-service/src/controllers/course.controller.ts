@@ -203,14 +203,14 @@ export async function getCourseBySlug(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
 
-    // Chi tra ve videoUrl cho bai hoc free de dam bao luong xem thu khong lam ro noi dung tra phi
+    // Chi tra ve URL bai hoc trong /playback API khi da enroll. Tra ve null de an video tren trang course detail (review mode).
     const sanitizedCourse = {
       ...serializeCourse(course),
       chapters: course.chapters.map((chapter) => ({
         ...chapter,
         lessons: chapter.lessons.map((lesson) => ({
           ...lesson,
-          videoUrl: lesson.isFree ? lesson.videoUrl : null,
+          videoUrl: null, // LUON an video
           sourceType: inferSourceType(lesson.videoUrl),
         })),
       })),

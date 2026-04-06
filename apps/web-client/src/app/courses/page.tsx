@@ -9,10 +9,7 @@ import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
 import {
   getPublicCoursesAction,
-  getPublicCourseDetailAction,
-  getLessonPlaybackAction,
   type CourseDto,
-  type CourseCurriculumDto,
 } from '@/app/actions/instructor';
 
 interface CourseCardView {
@@ -49,13 +46,7 @@ function getYoutubeEmbedUrl(url: string): string | null {
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState<CourseCardView[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<CourseCurriculumDto | null>(null);
-  const [selectedLessonTitle, setSelectedLessonTitle] = useState<string>('');
-  const [selectedVideoUrl, setSelectedVideoUrl] = useState<string>('');
-  const [playbackError, setPlaybackError] = useState<string>('');
-  const [playingLessonId, setPlayingLessonId] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -87,48 +78,6 @@ export default function CoursesPage() {
 
     fetchCourses();
   }, []);
-
-  const openCourseDetail = async (slug: string) => {
-    setDetailLoading(true);
-    const result = await getPublicCourseDetailAction(slug);
-    if (!result.success || !result.data) {
-      setSelectedCourse(null);
-      setSelectedLessonTitle('');
-      setSelectedVideoUrl('');
-      setPlayingLessonId('');
-      setPlaybackError('Không tải được chi tiết khóa học. Vui lòng thử lại.');
-      setDetailLoading(false);
-      return;
-    }
-
-    setSelectedCourse(result.data);
-
-    // Tu dong chon bai free dau tien co video de test luong hoc vien xem noi dung mien phi
-    const firstFreeWithVideo = result.data.chapters
-      .flatMap((chapter) => chapter.lessons)
-      .find((lesson) => lesson.isFree && lesson.videoUrl);
-
-    if (firstFreeWithVideo) {
-      const playback = await getLessonPlaybackAction(firstFreeWithVideo.id, false);
-      if (playback.success && playback.data?.videoUrl) {
-        setSelectedLessonTitle(firstFreeWithVideo.title);
-        setSelectedVideoUrl(playback.data.videoUrl);
-        setPlayingLessonId(firstFreeWithVideo.id);
-        setPlaybackError('');
-      } else {
-        setSelectedLessonTitle('');
-        setSelectedVideoUrl('');
-        setPlayingLessonId('');
-        setPlaybackError('Khóa học chưa có bài miễn phí sẵn sàng phát.');
-      }
-    } else {
-      setSelectedLessonTitle('');
-      setSelectedVideoUrl('');
-      setPlayingLessonId('');
-      setPlaybackError('Khóa học chưa có bài miễn phí để học thử.');
-    }
-    setDetailLoading(false);
-  };
 
   return (
     <div className="glass-page min-h-screen text-foreground pb-24 relative overflow-hidden">
@@ -191,11 +140,10 @@ export default function CoursesPage() {
           )}
 
           {!loading && courses.map((course, idx) => (
-            <ScrollReveal key={course.id} delay={idx * 100}>
-              <button
-                type="button"
+            <ScrollReveal key={course.id} className="h-full block" delay={idx * 100}>
+              <Link
+                href={`/courses/${course.slug}`}
                 className="block h-full w-full text-left"
-                onClick={() => openCourseDetail(course.slug)}
               >
               <div className="glass-panel group rounded-4xl border-white/60 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-2 transition-all duration-300 flex flex-col overflow-hidden relative cursor-pointer h-full">
                 
@@ -263,104 +211,12 @@ export default function CoursesPage() {
                 </div>
 
               </div>
-              </button>
+              </Link>
             </ScrollReveal>
           ))}
         </div>
 
-        <ScrollReveal delay={250}>
-          <section className="mt-10 rounded-3xl border border-white/60 bg-white/60 backdrop-blur-xl p-6 md:p-8 shadow-lg">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight">Chi tiết khóa học và bài học miễn phí</h2>
-                <p className="text-sm text-muted-foreground font-medium mt-1">
-                  Chọn một khóa học để kiểm tra đầy đủ luồng học viên xem video trước khi mở thanh toán.
-                </p>
-              </div>
-            </div>
 
-            {detailLoading && <p className="mt-6 text-sm text-muted-foreground">Đang tải chi tiết khóa học...</p>}
-
-            {!detailLoading && !selectedCourse && (
-              <p className="mt-6 text-sm text-muted-foreground">Chưa chọn khóa học. Bấm vào một card ở trên để xem nội dung.</p>
-            )}
-
-            {!detailLoading && selectedCourse && (
-              <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-4">
-                  <h3 className="text-xl font-bold">{selectedCourse.title}</h3>
-                  <p className="text-sm text-muted-foreground">{selectedCourse.description || 'Không có mô tả'}</p>
-
-                  <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                    {selectedVideoUrl ? (
-                      getYoutubeEmbedUrl(selectedVideoUrl) ? (
-                        <iframe
-                          className="w-full aspect-video rounded-xl"
-                          src={getYoutubeEmbedUrl(selectedVideoUrl) || ''}
-                          title={selectedLessonTitle || 'Free preview'}
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                      ) : (
-                        <video className="w-full aspect-video rounded-xl bg-black" controls src={selectedVideoUrl} />
-                      )
-                    ) : (
-                      <div className="aspect-video rounded-xl bg-slate-100 border border-dashed border-slate-300 flex flex-col gap-2 items-center justify-center text-sm text-slate-500">
-                        <PlayCircle className="size-7" />
-                        <span>{playbackError || 'Khóa học này chưa có video để phát.'}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {selectedLessonTitle && (
-                    <p className="text-sm font-semibold text-primary">Đang xem: {selectedLessonTitle}</p>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="text-sm font-bold text-slate-700">Danh sách bài học</h4>
-                  {selectedCourse.chapters.map((chapter) => (
-                    <div key={chapter.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                      <p className="text-sm font-bold mb-2">{chapter.title}</p>
-                      <div className="space-y-2">
-                        {chapter.lessons.map((lesson) => (
-                          <button
-                            key={lesson.id}
-                            type="button"
-                            className="w-full text-left rounded-lg border border-slate-200 px-3 py-2 hover:border-primary/50 hover:bg-primary/5 transition-colors"
-                            onClick={async () => {
-                              if (!lesson.isFree) {
-                                setPlaybackError('Bài học trả phí. Bạn cần đăng ký khóa học để xem.');
-                                return;
-                              }
-                              const playback = await getLessonPlaybackAction(lesson.id, false);
-                              if (!playback.success || !playback.data?.videoUrl) {
-                                setPlaybackError(playback.message || 'Không phát được video bài học này.');
-                                return;
-                              }
-                              setSelectedLessonTitle(lesson.title);
-                              setSelectedVideoUrl(playback.data.videoUrl);
-                              setPlayingLessonId(lesson.id);
-                              setPlaybackError('');
-                            }}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <span className={`text-sm font-semibold line-clamp-1 ${playingLessonId === lesson.id ? 'text-primary' : ''}`}>{lesson.title}</span>
-                              <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 inline-flex items-center gap-1 ${lesson.isFree ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                {!lesson.isFree && <Lock className="size-3" />}
-                                {lesson.isFree ? 'FREE' : 'PAID'}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-        </ScrollReveal>
 
         {/* Load More */}
         <ScrollReveal delay={200} className="flex justify-center pt-8">

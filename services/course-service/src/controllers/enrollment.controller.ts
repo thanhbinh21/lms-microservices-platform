@@ -3,7 +3,7 @@ import prisma from '../lib/prisma';
 import { randomUUID } from 'crypto';
 import type { ApiResponse } from '@lms/types';
 
-export const enrollFreeCourse = async (req: Request, res: Response): Promise<Response | void> => {
+export const enrollCourse = async (req: Request, res: Response): Promise<Response | void> => {
   const traceId = (req.headers['x-trace-id'] as string) || '';
   const userId = res.locals.userId as string;
   const { courseId } = req.body;
@@ -35,13 +35,6 @@ export const enrollFreeCourse = async (req: Request, res: Response): Promise<Res
       return res.status(400).json(response);
     }
 
-    if (course.price && course.price.toNumber() > 0) {
-      const response: ApiResponse<null> = {
-        success: false, code: 403, message: 'Course is not free, payment required', data: null, trace_id: traceId,
-      };
-      return res.status(403).json(response);
-    }
-
     // Check if already enrolled
     const existing = await prisma.enrollment.findUnique({
       where: {
@@ -54,6 +47,14 @@ export const enrollFreeCourse = async (req: Request, res: Response): Promise<Res
         success: true, code: 200, message: 'Already enrolled', data: null, trace_id: traceId,
       };
       return res.status(200).json(response);
+    }
+
+    if (course.price && course.price.toNumber() > 0) {
+      // Placeholder for PAID courses.
+      const response: ApiResponse<null> = {
+        success: false, code: 402, message: 'Tính năng thanh toán đang cập nhật', data: null, trace_id: traceId,
+      };
+      return res.status(402).json(response);
     }
 
     // Create free enrollment
@@ -74,5 +75,89 @@ export const enrollFreeCourse = async (req: Request, res: Response): Promise<Res
       success: false, code: 500, message: 'Internal Server Error', data: null, trace_id: traceId,
     };
     return res.status(500).json(response);
+  }
+};
+
+export const getMyEnrollments = async (req: Request, res: Response): Promise<Response | void> => {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const userId = res.locals.userId as string;
+
+  try {
+    const enrollments = await prisma.enrollment.findMany({
+      where: { userId },
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            thumbnail: true,
+            instructorId: true,
+            totalLessons: true,
+            totalDuration: true,
+            level: true,
+            price: true,
+            status: true
+          }
+        }
+      },
+      orderBy: { enrolledAt: 'desc' }
+    });
+
+    const courseIds = enrollments.map(e => e.courseId);
+    
+    // Get all lesson progress for these courses
+    const userProgress = await prisma.lessonProgress.findMany({
+      where: {
+        userId: userId,
+        lesson: {
+          chapter: {
+            courseId: { in: courseIds }
+          }
+        }
+      },
+      include: {
+        lesson: {
+          include: {
+            chapter: true
+          }
+        }
+      }
+    });
+
+    // Map completed lessons count per course
+    const completedMap: Record<string, number> = {};
+    const lastWatchedMap: Record<string, Date> = {};
+
+    userProgress.forEach(up => {
+      const courseId = up.lesson.chapter.courseId;
+      if (up.isCompleted) {
+        completedMap[courseId] = (completedMap[courseId] || 0) + 1;
+      }
+      
+      const currentLatest = lastWatchedMap[courseId];
+      if (!currentLatest || up.updatedAt > currentLatest) {
+        lastWatchedMap[courseId] = up.updatedAt;
+      }
+    });
+
+    const formattedData = enrollments.map(e => {
+      const compCount = completedMap[e.courseId] || 0;
+      const tLessons = e.course.totalLessons || 0;
+      const progressPercent = tLessons > 0 ? Math.round((compCount / tLessons) * 100) : 0;
+      
+      return {
+        ...e,
+        progress: Math.min(progressPercent, 100),
+        lastAccessedAt: lastWatchedMap[e.courseId] || e.enrolledAt
+      };
+    });
+
+    const response: ApiResponse<any> = {
+      success: true, code: 200, message: 'My enrollments retrieved', data: formattedData, trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (error: any) {
+    return res.status(500).json({ success: false, code: 500, message: 'Server Error' });
   }
 };

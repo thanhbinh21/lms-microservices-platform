@@ -6,6 +6,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { CheckCircle2, Circle, ChevronLeft, Menu, PlayCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { updateLessonProgressAction } from '@/app/actions/student';
+import { getLessonPlaybackAction } from '@/app/actions/instructor';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function LearnClientUI({ course, initialProgress }: { course: any, initialProgress: any[] }) {
@@ -31,6 +32,29 @@ export function LearnClientUI({ course, initialProgress }: { course: any, initia
     if (urlLessonId) return allLessons.find((l) => l.id === urlLessonId) || allLessons[0];
     return allLessons[0];
   }, [urlLessonId, allLessons]);
+
+  const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
+
+  useEffect(() => {
+    if (!currentLesson) return;
+    
+    let isMounted = true;
+    const fetchVideoUrl = async () => {
+      setVideoLoading(true);
+      setActiveVideoUrl(null);
+      const res = await getLessonPlaybackAction(currentLesson.id, false);
+      if (isMounted) {
+        if (res.success && res.data?.videoUrl) {
+           setActiveVideoUrl(res.data.videoUrl);
+        }
+        setVideoLoading(false);
+      }
+    };
+
+    fetchVideoUrl();
+    return () => { isMounted = false; };
+  }, [currentLesson?.id]);
 
   // Compute metrics
   const completedCount = progresses.filter((p) => p.isCompleted).length;
@@ -163,17 +187,22 @@ export function LearnClientUI({ course, initialProgress }: { course: any, initia
               <div className="space-y-6">
                 {/* Video Player Area */}
                 <div className="w-full aspect-video bg-black rounded-xl overflow-hidden shadow-lg border border-slate-800 relative group">
-                  {currentLesson.videoUrl ? (
-                    currentLesson.videoUrl.includes('youtube') || currentLesson.videoUrl.includes('youtu.be') ? (
+                  {videoLoading ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 gap-3">
+                      <Loader2 className="w-12 h-12 opacity-50 animate-spin" />
+                      <p className="text-sm font-semibold uppercase tracking-widest opacity-50">Đang tải video...</p>
+                    </div>
+                  ) : activeVideoUrl ? (
+                    activeVideoUrl.includes('youtube') || activeVideoUrl.includes('youtu.be') ? (
                        <iframe 
-                        src={getYoutubeEmbedUrl(currentLesson.videoUrl)} 
+                        src={getYoutubeEmbedUrl(activeVideoUrl)} 
                         className="w-full h-full" 
                         allowFullScreen 
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       />
                     ) : (
                       <video 
-                        src={currentLesson.videoUrl} 
+                        src={activeVideoUrl} 
                         className="w-full h-full object-contain" 
                         controls 
                         controlsList="nodownload"
