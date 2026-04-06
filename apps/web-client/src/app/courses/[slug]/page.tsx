@@ -3,11 +3,14 @@ import { notFound } from 'next/navigation';
 import { Clock3, PlayCircle, Lock } from 'lucide-react';
 import { getPublicCourseDetailAction } from '@/app/actions/instructor';
 import { getCourseProgressAction } from '@/app/actions/student';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
+
 import { EnrollButton } from './enroll-button';
+
 
 interface CourseDetailPageProps {
   params: Promise<{ slug: string }>;
