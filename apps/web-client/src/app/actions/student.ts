@@ -13,10 +13,10 @@ interface ApiResponse<T> {
   trace_id?: string;
 }
 
-export async function enrollFreeCourseAction(courseId: string): Promise<ApiResponse<null>> {
+export async function enrollCourseAction(courseId: string): Promise<ApiResponse<null>> {
   try {
     const res = await callApi<null>(
-      `${COURSE_PREFIX}/api/enrollments/free`,
+      `${COURSE_PREFIX}/api/enrollments`,
       {
         method: 'POST',
         body: JSON.stringify({ courseId }),
@@ -27,10 +27,24 @@ export async function enrollFreeCourseAction(courseId: string): Promise<ApiRespo
     if (res.success) {
       revalidatePath(`/courses/${courseId}`);
       revalidatePath(`/learn/${courseId}`);
+      revalidatePath(`/dashboard`);
     }
     return res;
   } catch (error) {
     return { success: false, code: 500, message: 'Lỗi hệ thống khi ghi danh' };
+  }
+}
+
+export async function getMyEnrollmentsAction(): Promise<ApiResponse<any>> {
+  try {
+    const res = await callApi<any[]>(
+      `${COURSE_PREFIX}/api/enrollments/my`,
+      { method: 'GET' },
+      true
+    );
+    return res;
+  } catch (error) {
+    return { success: false, code: 500, message: 'Lỗi khi lấy danh sách khóa học của tôi' };
   }
 }
 

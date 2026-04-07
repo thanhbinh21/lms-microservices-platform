@@ -9,10 +9,7 @@ import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
 import {
   getPublicCoursesAction,
-  getPublicCourseDetailAction,
-  getLessonPlaybackAction,
   type CourseDto,
-  type CourseCurriculumDto,
 } from '@/app/actions/instructor';
 
 interface CourseCardView {
@@ -52,13 +49,7 @@ function getYoutubeEmbedUrl(url: string): string | null {
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState<CourseCardView[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<CourseCurriculumDto | null>(null);
-  const [selectedLessonTitle, setSelectedLessonTitle] = useState<string>('');
-  const [selectedVideoUrl, setSelectedVideoUrl] = useState<string>('');
-  const [playbackError, setPlaybackError] = useState<string>('');
-  const [playingLessonId, setPlayingLessonId] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -107,34 +98,29 @@ export default function CoursesPage() {
 
     setSelectedCourse(result.data);
 
-    const allLessons = result.data.chapters.flatMap((chapter) => chapter.lessons);
-    // API catalog có thể ẩn videoUrl; luôn gọi playback cho bài free đầu tiên (theo id)
-    const firstFree = allLessons.find((lesson) => lesson.isFree);
+    // Tu dong chon bai free dau tien co video de test luong hoc vien xem noi dung mien phi
+    const firstFreeWithVideo = result.data.chapters
+      .flatMap((chapter) => chapter.lessons)
+      .find((lesson) => lesson.isFree && lesson.videoUrl);
 
-    if (firstFree) {
-      const playback = await getLessonPlaybackAction(firstFree.id, false);
+    if (firstFreeWithVideo) {
+      const playback = await getLessonPlaybackAction(firstFreeWithVideo.id, false);
       if (playback.success && playback.data?.videoUrl) {
-        setSelectedLessonTitle(firstFree.title);
+        setSelectedLessonTitle(firstFreeWithVideo.title);
         setSelectedVideoUrl(playback.data.videoUrl);
-        setPlayingLessonId(firstFree.id);
+        setPlayingLessonId(firstFreeWithVideo.id);
         setPlaybackError('');
       } else {
-        setSelectedLessonTitle(firstFree.title);
+        setSelectedLessonTitle('');
         setSelectedVideoUrl('');
-        setPlayingLessonId(firstFree.id);
-        setPlaybackError(
-          playback.message || 'Bài học miễn phí chưa có video hoặc chưa sẵn sàng phát.',
-        );
+        setPlayingLessonId('');
+        setPlaybackError('Khóa học chưa có bài miễn phí sẵn sàng phát.');
       }
     } else {
       setSelectedLessonTitle('');
       setSelectedVideoUrl('');
       setPlayingLessonId('');
-      setPlaybackError(
-        allLessons.length > 0
-          ? 'Khóa học chưa có bài học miễn phí. Chọn bài trả phí sau khi đăng ký khóa học.'
-          : 'Khóa học chưa có bài học được xuất bản hoặc chưa có chương công khai.',
-      );
+      setPlaybackError('Khóa học chưa có bài miễn phí để học thử.');
     }
     setDetailLoading(false);
   };
@@ -200,11 +186,10 @@ export default function CoursesPage() {
           )}
 
           {!loading && courses.map((course, idx) => (
-            <ScrollReveal key={course.id} delay={idx * 100}>
-              <button
-                type="button"
+            <ScrollReveal key={course.id} className="h-full block" delay={idx * 100}>
+              <Link
+                href={`/courses/${course.slug}`}
                 className="block h-full w-full text-left"
-                onClick={() => openCourseDetail(course.slug)}
               >
               <div className="glass-panel group rounded-4xl border-white/60 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-2 transition-all duration-300 flex flex-col overflow-hidden relative cursor-pointer h-full">
                 
@@ -285,7 +270,7 @@ export default function CoursesPage() {
                 </div>
 
               </div>
-              </button>
+              </Link>
             </ScrollReveal>
           ))}
         </div>
@@ -341,17 +326,9 @@ export default function CoursesPage() {
 
                 <div className="space-y-3">
                   <h4 className="text-sm font-bold text-slate-700">Danh sách bài học</h4>
-                  {(!selectedCourse.chapters || selectedCourse.chapters.length === 0) && (
-                    <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-muted-foreground">
-                      Khóa học chưa có chương/bài học được xuất bản. Giảng viên cần xuất bản chương và bài học trong Studio.
-                    </p>
-                  )}
                   {selectedCourse.chapters.map((chapter) => (
                     <div key={chapter.id} className="rounded-xl border border-slate-200 bg-white p-3">
                       <p className="text-sm font-bold mb-2">{chapter.title}</p>
-                      {chapter.lessons.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">Chưa có bài học trong chương này.</p>
-                      ) : null}
                       <div className="space-y-2">
                         {chapter.lessons.map((lesson) => (
                           <button
