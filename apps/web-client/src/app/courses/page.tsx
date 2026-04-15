@@ -9,10 +9,7 @@ import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
 import {
   getPublicCoursesAction,
-  getPublicCourseDetailAction,
-  getLessonPlaybackAction,
   type CourseDto,
-  type CourseCurriculumDto,
 } from '@/app/actions/instructor';
 
 interface CourseCardView {
@@ -26,7 +23,10 @@ interface CourseCardView {
   reviews: number;
   duration: string;
   students: string;
-  thumbnail: string;
+  /** Ảnh đại diện từ API (thumbnail URL) */
+  thumbnailUrl: string | null;
+  /** Chữ viết tắt khi không có ảnh */
+  initials: string;
   badge: string;
 }
 
@@ -49,13 +49,7 @@ function getYoutubeEmbedUrl(url: string): string | null {
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState<CourseCardView[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<CourseCurriculumDto | null>(null);
-  const [selectedLessonTitle, setSelectedLessonTitle] = useState<string>('');
-  const [selectedVideoUrl, setSelectedVideoUrl] = useState<string>('');
-  const [playbackError, setPlaybackError] = useState<string>('');
-  const [playingLessonId, setPlayingLessonId] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -77,7 +71,8 @@ export default function CoursesPage() {
         reviews: 0,
         duration: `${Math.max(1, Math.floor(course.totalDuration / 3600))} giờ`,
         students: `${course._count?.enrollments ?? 0}`,
-        thumbnail: (course.title.match(/[A-Za-z]/g)?.slice(0, 3).join('') || 'CRS').toUpperCase(),
+        thumbnailUrl: course.thumbnail?.trim() || null,
+        initials: (course.title.match(/[A-Za-z]/g)?.slice(0, 3).join('') || 'CRS').toUpperCase(),
         badge: course.status === 'PUBLISHED' ? 'Published' : '',
       }));
 
@@ -191,19 +186,31 @@ export default function CoursesPage() {
           )}
 
           {!loading && courses.map((course, idx) => (
-            <ScrollReveal key={course.id} delay={idx * 100}>
-              <button
-                type="button"
+            <ScrollReveal key={course.id} className="h-full block" delay={idx * 100}>
+              <Link
+                href={`/courses/${course.slug}`}
                 className="block h-full w-full text-left"
-                onClick={() => openCourseDetail(course.slug)}
               >
               <div className="glass-panel group rounded-4xl border-white/60 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-2 transition-all duration-300 flex flex-col overflow-hidden relative cursor-pointer h-full">
                 
-                {/* Thumbnail */}
+                {/* Thumbnail — ưu tiên ảnh từ API */}
                 <div className="relative aspect-video bg-[linear-gradient(135deg,hsl(var(--primary)/0.1),hsl(var(--primary)/0.02))] border-b border-white/50 flex items-center justify-center overflow-hidden">
-                  <span className="text-6xl font-black text-primary/20 tracking-tighter group-hover:scale-110 transition-transform duration-500">
-                    {course.thumbnail}
-                  </span>
+                  {course.thumbnailUrl ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={course.thumbnailUrl}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent" />
+                    </>
+                  ) : (
+                    <span className="text-6xl font-black text-primary/20 tracking-tighter group-hover:scale-110 transition-transform duration-500">
+                      {course.initials}
+                    </span>
+                  )}
                   
                   {/* Badge */}
                   {course.badge && (
@@ -263,7 +270,7 @@ export default function CoursesPage() {
                 </div>
 
               </div>
-              </button>
+              </Link>
             </ScrollReveal>
           ))}
         </div>

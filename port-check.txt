@@ -1,5 +1,0 @@
-PORT=3000 PID=none NAME=none
-PORT=3001 PID=none NAME=none
-PORT=3002 PID=none NAME=none
-PORT=3003 PID=none NAME=none
-PORT=3004 PID=none NAME=none

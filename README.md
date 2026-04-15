@@ -440,14 +440,16 @@ olms-microservices/
 
 ## Quick Start (Verified)
 
-This is the shortest verified flow for this workspace state.
+Use this flow on a fresh clone to avoid setup mismatch.
 
-1. Install dependencies
+1. Clone and install dependencies
 ```bash
+git clone <repository-url>
+cd olms-microservices
 pnpm install
 ```
 
-2. Prepare env files
+2. Create env files
 ```bash
 cp .env.example .env
 cp services/auth-service/.env.example services/auth-service/.env
@@ -455,27 +457,59 @@ cp services/course-service/.env.example services/course-service/.env
 cp services/media-service/.env.example services/media-service/.env
 ```
 
-3. Create web client env file manually at `apps/web-client/.env.local`
+PowerShell equivalent:
+```powershell
+Copy-Item .env.example .env
+Copy-Item services/auth-service/.env.example services/auth-service/.env
+Copy-Item services/course-service/.env.example services/course-service/.env
+Copy-Item services/media-service/.env.example services/media-service/.env
+```
+
+3. Configure required values
+- `services/auth-service/.env`
+  - `PORT=3101` (must match Kong route)
+  - `DATABASE_URL` = Neon pooled URL (`-pooler`)
+  - `DIRECT_URL` = Neon direct URL (without `-pooler`)
+  - `REDIS_URL`, `JWT_SECRET`
+- `services/course-service/.env`
+  - `PORT=3002`
+  - `DATABASE_URL` + `DIRECT_URL`
+- `services/media-service/.env`
+  - `PORT=3004`
+  - `DATABASE_URL` + `DIRECT_URL`
+
+4. Create `apps/web-client/.env.local`
 ```env
 GATEWAY_URL=http://localhost:8000
 NEXT_PUBLIC_AUTH_PREFIX=/auth
 ```
 
-4. Align auth service port with Kong route
-```env
-# services/auth-service/.env
-PORT=3101
-```
-
-5. Start infra, migrate DB, run dev
+5. Start infrastructure
 ```bash
 pnpm run docker:up
-cd services/auth-service && pnpm prisma:migrate && pnpm prisma:generate
-cd ../course-service && pnpm prisma:migrate && pnpm prisma:generate
-cd ../media-service && pnpm prisma:migrate && pnpm prisma:generate
-cd ../../
+pnpm run docker:health
+```
+
+6. Run Prisma generate + migrate
+```bash
+pnpm --filter @lms/auth-service prisma:generate
+pnpm --filter @lms/auth-service prisma:migrate
+pnpm --filter @lms/course-service prisma:generate
+pnpm --filter @lms/course-service prisma:migrate
+pnpm --filter @lms/media-service prisma:generate
+pnpm --filter @lms/media-service prisma:migrate
+```
+
+7. Start all services
+```bash
 pnpm dev
 ```
+
+8. Verify health checks
+- Kong: `http://localhost:8000/auth/health`
+- Auth Service: `http://localhost:3101/health`
+- Course Service: `http://localhost:3002/health`
+- Media Service: `http://localhost:3004/health`
 
 ### Installation Steps
 
@@ -505,15 +539,15 @@ cp .env.example .env
 
 # Auth Service
 cp services/auth-service/.env.example services/auth-service/.env
-# Edit: DATABASE_URL, JWT_SECRET, JWT_REFRESH_SECRET, REDIS_URL, PORT=3101
+# Edit: DATABASE_URL, DIRECT_URL, JWT_SECRET, REDIS_URL, PORT=3101
 
 # Course Service
 cp services/course-service/.env.example services/course-service/.env
-# Edit: DATABASE_URL, PORT=3002
+# Edit: DATABASE_URL, DIRECT_URL, PORT=3002
 
 # Media Service
 cp services/media-service/.env.example services/media-service/.env
-# Edit: DATABASE_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, PORT=3004
+# Edit: DATABASE_URL, DIRECT_URL, PORT=3004 (AWS vars chi can khi dung S3)
 
 # Web Client (create manually)
 # apps/web-client/.env.local
@@ -968,7 +1002,6 @@ docker exec -it kafka kafka-console-consumer --bootstrap-server localhost:9092 -
 **Production checklist:**
 
 - [ ] Change `JWT_SECRET` to cryptographically random string (min 32 chars)
-- [ ] Change `JWT_REFRESH_SECRET` to different random string
 - [ ] Update `DATABASE_URL` to production Neon instances
 - [ ] Set `NODE_ENV=production`
 - [ ] Configure `CORS_ORIGIN` to frontend domain
@@ -1002,7 +1035,7 @@ docker build -t lms-web-client:latest -f apps/web-client/Dockerfile .
 Every service exposes `/health` endpoint:
 
 ```bash
-curl http://localhost:3001/health
+curl http://localhost:3101/health
 # Response: {"status":"ok","timestamp":"2026-03-08T10:30:00.000Z"}
 ```
 

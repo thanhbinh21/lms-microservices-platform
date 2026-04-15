@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Clapperboard, LogOut, Menu, X } from 'lucide-react';
@@ -28,10 +28,16 @@ export function SharedNavbar() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const normalizedRole = (user?.role || '').toUpperCase();
-  const canBecomeInstructor = isAuthenticated && !!user && normalizedRole === 'STUDENT';
-  const canAccessInstructorStudio = isAuthenticated && !!user && normalizedRole === 'INSTRUCTOR';
+  const canBecomeInstructor = showAuth && normalizedRole === 'STUDENT';
+  const canAccessInstructorStudio = showAuth && normalizedRole === 'INSTRUCTOR';
 
   const handleLogout = async () => {
     await logoutAction();
@@ -39,6 +45,10 @@ export function SharedNavbar() {
     router.push('/login');
     router.refresh();
   };
+
+  if (!mounted) {
+    return <header className="glass-navbar sticky top-0 z-40 shadow-sm h-16"></header>;
+  }
 
   return (
     <header className="glass-navbar sticky top-0 z-40 shadow-sm">
@@ -61,15 +71,15 @@ export function SharedNavbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-4">
-          {isAuthenticated && user ? (
+          {showAuth ? (
             <>
               <Link
                 href="/profile"
                 className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white/50"
               >
-                <span className="text-sm font-semibold text-foreground">Xin chào, {user.name}</span>
+                <span className="text-sm font-semibold text-foreground">Xin chào, {user!.name}</span>
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/80 bg-primary/10 text-sm font-bold text-primary shadow-sm">
-                  {user.name?.charAt(0) || 'U'}
+                  {user!.name?.charAt(0) || 'U'}
                 </span>
               </Link>
               {canAccessInstructorStudio && (
@@ -135,7 +145,7 @@ export function SharedNavbar() {
             ))}
           </div>
           <div className="mt-4 grid grid-cols-1 gap-2">
-            {isAuthenticated && user ? (
+            {showAuth ? (
               <>
                 <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
                   <Button variant="outline" className="w-full">Dashboard</Button>

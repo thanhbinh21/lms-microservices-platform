@@ -19,5 +19,11 @@ export const createConsumer = async (groupId: string): Promise<Consumer> => {
   return consumer;
 };
 
+export const TOPICS = {
+  ENROLLMENT_CREATED: 'learning.enrollment.created',
+  LESSON_COMPLETED: 'learning.lesson.completed',
+  COURSE_COMPLETED: 'learning.course.completed',
+} as const;
+
 export { kafka };
 export default kafka;

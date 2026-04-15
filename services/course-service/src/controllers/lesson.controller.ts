@@ -54,7 +54,7 @@ function validateLessonVideoSource(sourceType: 'UPLOAD' | 'YOUTUBE', videoUrl?: 
 async function verifyChapterOwnership(courseId: string, chapterId: string, instructorId: string, userRole?: string) {
   const course = await prisma.course.findUnique({ where: { id: courseId } });
   if (!course) return { error: 'Course not found', status: 404 };
-  if (course.instructorId !== instructorId && userRole !== 'admin') return { error: 'Forbidden — not your course', status: 403 };
+  if (course.instructorId !== instructorId && userRole?.toLowerCase() !== 'admin') return { error: 'Forbidden — not your course', status: 403 };
 
   const chapter = await prisma.chapter.findUnique({ where: { id: chapterId, courseId } });
   if (!chapter) return { error: 'Chapter not found', status: 404 };
@@ -256,7 +256,9 @@ export async function getLessonPlayback(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
 
-    if (!lesson.isPublished || !lesson.chapter.isPublished || lesson.chapter.course.status !== 'PUBLISHED') {
+    // Chi yeu cau bai publish + khoa PUBLISHED (khong bat buoc chapter.isPublished —
+    // dong bo voi API catalog / learn-data)
+    if (!lesson.isPublished || lesson.chapter.course.status !== 'PUBLISHED') {
       const forbidden: ApiResponse<null> = {
         success: false, code: 403, message: 'Lesson is not available for playback', data: null, trace_id: traceId,
       };

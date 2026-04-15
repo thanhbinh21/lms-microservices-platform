@@ -26,7 +26,7 @@ const reorderSchema = z.object({
 async function verifyCourseOwnership(courseId: string, instructorId: string, userRole?: string) {
   const course = await prisma.course.findUnique({ where: { id: courseId } });
   if (!course) return { error: 'Course not found', status: 404 };
-  if (course.instructorId !== instructorId && userRole !== 'admin') return { error: 'Forbidden — not your course', status: 403 };
+  if (course.instructorId !== instructorId && userRole?.toLowerCase() !== 'admin') return { error: 'Forbidden — not your course', status: 403 };
   return { course };
 }
 

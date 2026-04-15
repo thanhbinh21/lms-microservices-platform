@@ -21,7 +21,6 @@ out
 
 # Sensitive files 
 .github/
-.plan/
 
 # Logs
 logs
@@ -73,3 +72,4 @@ docker-compose.override.yml
 *.tsbuildinfo
 temp/
 tmp/
+plan/

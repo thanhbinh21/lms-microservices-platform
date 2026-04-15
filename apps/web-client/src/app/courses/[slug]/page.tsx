@@ -2,10 +2,15 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Clock3, PlayCircle, Lock } from 'lucide-react';
 import { getPublicCourseDetailAction } from '@/app/actions/instructor';
+import { getCourseProgressAction } from '@/app/actions/student';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
+
+import { EnrollButton } from './enroll-button';
+
 
 interface CourseDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -35,6 +40,12 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
     ? new Date(course.updatedAt || course.createdAt || Date.now()).toLocaleDateString('vi-VN')
     : '-';
 
+  const isFree = Number(course.price) === 0;
+
+  // Kiem tra enrollment bang cach get progress
+  const progressRes = await getCourseProgressAction(course.id);
+  const isEnrolled = progressRes.success && progressRes.code === 200;
+
   return (
     <div className="glass-page min-h-screen text-foreground relative overflow-hidden">
       <div className="absolute top-[-10%] right-[-5%] w-[35%] h-[40%] rounded-full bg-primary/10 blur-[140px] pointer-events-none" />
@@ -47,9 +58,7 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
           <Link href="/courses" className="text-sm font-semibold text-muted-foreground hover:text-foreground">
             ← Quay lại danh sách khóa học
           </Link>
-          <Button asChild>
-            <Link href="/register">Đăng ký học ngay</Link>
-          </Button>
+          <EnrollButton courseId={course.id} courseSlug={course.slug || slug} isEnrolled={isEnrolled} isFree={isFree} />
         </div>
 
         <Card className="rounded-3xl border-white/60 bg-white/70 backdrop-blur-xl shadow-sm">
@@ -120,10 +129,11 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
                         <p className="text-xs text-muted-foreground">{formatDuration(lesson.duration)}</p>
                       </div>
                       <div className="inline-flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${lesson.isFree ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {lesson.isFree ? <PlayCircle className="size-3" /> : <Lock className="size-3" />}
-                          {lesson.isFree ? 'Xem thử' : 'Trả phí'}
-                        </span>
+                        {!isEnrolled && (
+                          <span className="text-[10px] font-bold rounded-full px-2 py-0.5 inline-flex items-center gap-1 bg-slate-100 text-slate-500">
+                            <Lock className="size-3" /> Yêu cầu đăng ký
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}

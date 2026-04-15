@@ -223,15 +223,30 @@ export async function restoreSessionAction(): Promise<AuthResponse> {
     }
 
     let accessToken = currentAccessToken;
-    let refreshToken = currentRefreshToken;
 
-    // Co refresh token thi lam moi truoc: JWT moi lay role tu DB (sau admin duyet giang vien / doi vai tro).
-    if (refreshToken) {
-      const refreshed = await refreshWithToken(refreshToken);
+    // Kiem tra access token con hop le khong truoc khi quyet dinh refresh.
+    // Chi goi refresh khi access token thuc su het han hoac khong co,
+    // tranh race condition khi nhieu tab/request dong thoi lam mat refresh token.
+    let needsRefresh = false;
+
+    if (accessToken) {
+      const payload = decodeTokenPayload(accessToken);
+      if (!payload || (payload.exp && payload.exp * 1000 <= Date.now())) {
+        needsRefresh = true;
+      }
+    } else {
+      needsRefresh = true;
+    }
+
+    if (needsRefresh && currentRefreshToken) {
+      const refreshed = await refreshWithToken(currentRefreshToken);
       if (refreshed) {
         accessToken = refreshed.accessToken;
-        refreshToken = refreshed.refreshToken;
-        await writeAuthCookies({ accessToken, refreshToken });
+        await writeAuthCookies({ accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken });
+      } else {
+        // Refresh that bai — token cu da bi thu hoi hoac het han
+        await clearAuthCookies();
+        return { success: false, code: 401, message: 'Phien dang nhap da het han. Vui long dang nhap lai.' };
       }
     }
 

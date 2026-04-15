@@ -172,11 +172,13 @@ export async function listCourses(req: Request, res: Response) {
 export async function getCourseBySlug(req: Request, res: Response) {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
   try {
+    // Chi lay chuong co it nhat 1 bai da publish (khong yeu cau chapter.isPublished —
+    // nhieu khoa chi bat publish bai ma quen publish chuong)
     const course = await prisma.course.findFirst({
       where: { slug: req.params.slug, status: 'PUBLISHED' },
       include: {
         chapters: {
-          where: { isPublished: true },
+          where: { lessons: { some: { isPublished: true } } },
           orderBy: { order: 'asc' },
           include: {
             lessons: {
@@ -203,14 +205,14 @@ export async function getCourseBySlug(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
 
-    // Chi tra ve videoUrl cho bai hoc free de dam bao luong xem thu khong lam ro noi dung tra phi
+    // Chi tra ve URL bai hoc trong /playback API khi da enroll. Tra ve null de an video tren trang course detail (review mode).
     const sanitizedCourse = {
       ...serializeCourse(course),
       chapters: course.chapters.map((chapter) => ({
         ...chapter,
         lessons: chapter.lessons.map((lesson) => ({
           ...lesson,
-          videoUrl: lesson.isFree ? lesson.videoUrl : null,
+          videoUrl: null, // LUON an video
           sourceType: inferSourceType(lesson.videoUrl),
         })),
       })),
@@ -306,7 +308,7 @@ export async function getCourseCurriculum(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
 
-    if (course.instructorId !== instructorId && userRole !== 'admin') {
+    if (course.instructorId !== instructorId && userRole?.toLowerCase() !== 'admin') {
       const forbidden: ApiResponse<null> = {
         success: false,
         code: 403,
@@ -392,7 +394,7 @@ export async function updateCourse(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
     // Admin duoc phep cap nhat bat ky khoa hoc nao
-    if (course.instructorId !== instructorId && userRole !== 'admin') {
+    if (course.instructorId !== instructorId && userRole?.toLowerCase() !== 'admin') {
       const forbidden: ApiResponse<null> = {
         success: false, code: 403, message: 'Khong co quyen - khong phai khoa hoc cua ban', data: null, trace_id: traceId,
       };
@@ -453,7 +455,7 @@ export async function publishCourse(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
 
-    if (course.instructorId !== instructorId && userRole !== 'admin') {
+    if (course.instructorId !== instructorId && userRole?.toLowerCase() !== 'admin') {
       const forbidden: ApiResponse<null> = {
         success: false,
         code: 403,
@@ -481,9 +483,17 @@ export async function publishCourse(req: Request, res: Response) {
       return res.status(publishValidationError.code).json(publishValidationError);
     }
 
-    const publishedCourse = await prisma.course.update({
-      where: { id: course.id },
-      data: { status: 'PUBLISHED', thumbnail: nextThumbnail },
+    const publishedCourse = await prisma.$transaction(async (tx) => {
+      const updated = await tx.course.update({
+        where: { id: course.id },
+        data: { status: 'PUBLISHED', thumbnail: nextThumbnail },
+      });
+      // Dong bo: khi khoa da publish, tat ca chuong hien thi cong khai (tranh catalog trong khi bai da publish)
+      await tx.chapter.updateMany({
+        where: { courseId: course.id },
+        data: { isPublished: true },
+      });
+      return updated;
     });
 
     const response: ApiResponse<unknown> = {
@@ -522,7 +532,7 @@ export async function deleteCourse(req: Request, res: Response) {
       };
       return res.status(404).json(notFound);
     }
-    if (course.instructorId !== instructorId && userRole !== 'admin') {
+    if (course.instructorId !== instructorId && userRole?.toLowerCase() !== 'admin') {
       const forbidden: ApiResponse<null> = {
         success: false, code: 403, message: 'Khong co quyen - khong phai khoa hoc cua ban', data: null, trace_id: traceId,
       };

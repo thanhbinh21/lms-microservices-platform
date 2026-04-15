@@ -77,13 +77,15 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 <h1 className="text-3xl md:text-4xl font-bold">Chào buổi sáng, {user.name}! 👋</h1>
                 <p className="text-white/80 max-w-xl text-sm md:text-base leading-relaxed">
-                  Bạn đang làm rất tốt! Tiếp tục chuỗi ngày học tập để hoàn thành khóa "Fullstack Next.js" nhé. 
+                  Bạn đang làm rất tốt! Tiếp tục chuỗi ngày học tập để hoàn thành khóa {data?.activeCourses?.[0] ? `"${data.activeCourses[0].title}"` : "học của bạn"} nhé. 
                   Hãy nhớ rằng đích đến của bạn là trở thành kỹ sư phần mềm xuất sắc.
                 </p>
               </div>
-              <Button className="w-fit bg-white text-primary hover:bg-white/90 shadow-xl rounded-xl px-6 h-12 font-bold whitespace-nowrap">
-                Tiếp tục học <PlayCircle className="ml-2 size-5" />
-              </Button>
+              <Link href={data?.activeCourses?.[0] ? `/learn/${data.activeCourses[0].slug}` : "/courses"}>
+                <Button className="w-fit bg-white text-primary hover:bg-white/90 shadow-xl rounded-xl px-6 h-12 font-bold whitespace-nowrap">
+                  Tiếp tục học <PlayCircle className="ml-2 size-5" />
+                </Button>
+              </Link>
             </div>
           </div>
         </ScrollReveal>
@@ -132,33 +134,46 @@ export default function DashboardPage() {
                 </ScrollReveal>
 
                 <div className="space-y-4">
-                  {data.activeCourses.map((course: any, idx: number) => (
-                    <ScrollReveal key={idx} delay={idx * 100}>
-                      <Card className="glass-panel rounded-2xl border-white/60 hover:shadow-lg transition-all p-4 md:p-6 flex flex-col md:flex-row gap-6 items-center">
-                        <div className="w-full md:w-48 aspect-video bg-[linear-gradient(135deg,hsl(var(--primary)/0.08),hsl(var(--primary)/0.02))] rounded-xl border border-white/50 flex items-center justify-center shadow-inner shrink-0">
-                          <span className="text-3xl font-bold text-primary/30 uppercase tracking-widest">{course.thumbnail}</span>
-                        </div>
-                        <div className="flex-1 w-full space-y-4">
-                          <div>
-                            <p className="text-xs font-semibold text-primary mb-1">Giảng viên: {course.instructor}</p>
-                            <h3 className="text-lg font-bold leading-tight">{course.title}</h3>
+                  {data.activeCourses.length === 0 ? (
+                    <Card className="glass-panel border-dashed border-2 py-12 flex flex-col items-center justify-center text-center">
+                      <BookOpen className="size-16 text-muted-foreground/30 mb-4" />
+                      <h3 className="text-xl font-bold mb-2">Bạn chưa có khóa học nào</h3>
+                      <p className="text-muted-foreground text-sm font-medium max-w-sm mb-6">Bạn cần đăng ký khóa học để bắt đầu theo dõi lộ trình của mình. Hãy khám phá ngay!</p>
+                      <Link href="/courses">
+                        <Button className="px-8 font-bold shadow-md rounded-full">Khám phá khóa học</Button>
+                      </Link>
+                    </Card>
+                  ) : (
+                    data.activeCourses.map((course: any, idx: number) => (
+                      <ScrollReveal key={idx} delay={idx * 100}>
+                        <Card className="glass-panel rounded-2xl border-white/60 hover:shadow-lg transition-all p-4 md:p-6 flex flex-col md:flex-row gap-6 items-center">
+                          <div className="w-full md:w-48 aspect-video bg-[linear-gradient(135deg,hsl(var(--primary)/0.08),hsl(var(--primary)/0.02))] rounded-xl border border-white/50 flex items-center justify-center shadow-inner shrink-0">
+                            <span className="text-3xl font-bold text-primary/30 uppercase tracking-widest">{course.thumbnail}</span>
                           </div>
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-xs font-semibold text-muted-foreground">
-                              <span>Hoàn thành {course.progress}%</span>
-                              <span>Truy cập: {course.lastAccessed}</span>
+                          <div className="flex-1 w-full space-y-4">
+                            <div>
+                              <p className="text-xs font-semibold text-primary mb-1">Giảng viên: {course.instructor}</p>
+                              <h3 className="text-lg font-bold leading-tight">{course.title}</h3>
                             </div>
-                            <div className="h-2 w-full bg-secondary/50 rounded-full overflow-hidden shadow-inner">
-                              <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${course.progress}%` }} />
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-xs font-semibold text-muted-foreground">
+                                <span>Hoàn thành {course.progress}%</span>
+                                <span>Truy cập: {course.lastAccessed}</span>
+                              </div>
+                              <div className="h-2 w-full bg-secondary/50 rounded-full overflow-hidden shadow-inner">
+                                <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${course.progress}%` }} />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="w-full md:w-auto shrink-0 flex items-center md:items-end md:h-full">
-                           <Button className="w-full md:w-auto rounded-xl shadow-md">Học tiếp tục</Button>
-                        </div>
-                      </Card>
-                    </ScrollReveal>
-                  ))}
+                          <div className="w-full md:w-auto shrink-0 flex items-center md:items-end md:h-full">
+                             <Link href={`/learn/${course.slug}`} className="w-full md:w-auto">
+                               <Button className="w-full rounded-xl shadow-md cursor-pointer pointer-events-auto z-10" onClick={(e) => e.stopPropagation()}>Học tiếp tục</Button>
+                             </Link>
+                          </div>
+                        </Card>
+                      </ScrollReveal>
+                    ))
+                  )}
                 </div>
               </div>
 
