@@ -36,8 +36,8 @@ export function SharedNavbar() {
   }, []);
 
   const normalizedRole = (user?.role || '').toUpperCase();
-  const canBecomeInstructor = showAuth && normalizedRole === 'STUDENT';
-  const canAccessInstructorStudio = showAuth && normalizedRole === 'INSTRUCTOR';
+  const canBecomeInstructor = isAuthenticated && normalizedRole === 'STUDENT';
+  const canAccessInstructorStudio = isAuthenticated && normalizedRole === 'INSTRUCTOR';
 
   const handleLogout = async () => {
     await logoutAction();
@@ -71,7 +71,7 @@ export function SharedNavbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-4">
-          {showAuth ? (
+          {isAuthenticated ? (
             <>
               <Link
                 href="/profile"
@@ -145,7 +145,7 @@ export function SharedNavbar() {
             ))}
           </div>
           <div className="mt-4 grid grid-cols-1 gap-2">
-            {showAuth ? (
+            {isAuthenticated ? (
               <>
                 <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
                   <Button variant="outline" className="w-full">Dashboard</Button>
