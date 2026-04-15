@@ -21,7 +21,10 @@ out
 
 # Sensitive files 
 .github/
-
+.codex/
+.vscode/
+.claude/
+.idea/
 # Logs
 logs
 *.log
@@ -42,7 +45,7 @@ lerna-debug.log*
 *.swo
 *~
 .DS_Store
-
+AGENTS.md
 # Testing
 coverage
 .nyc_output

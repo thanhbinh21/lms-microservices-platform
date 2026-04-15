@@ -9,7 +9,10 @@ import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
 import {
   getPublicCoursesAction,
+  getPublicCourseDetailAction,
+  getLessonPlaybackAction,
   type CourseDto,
+  type CourseCurriculumDto,
 } from '@/app/actions/instructor';
 
 interface CourseCardView {
@@ -50,6 +53,12 @@ function getYoutubeEmbedUrl(url: string): string | null {
 export default function CoursesPage() {
   const [courses, setCourses] = useState<CourseCardView[]>([]);
   const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<CourseCurriculumDto | null>(null);
+  const [selectedLessonTitle, setSelectedLessonTitle] = useState('');
+  const [selectedVideoUrl, setSelectedVideoUrl] = useState('');
+  const [playingLessonId, setPlayingLessonId] = useState('');
+  const [playbackError, setPlaybackError] = useState('');
 
   useEffect(() => {
     const fetchCourses = async () => {
