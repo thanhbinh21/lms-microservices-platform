@@ -23,7 +23,9 @@
     "seed:courses": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-courses.ts"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/supertest": "^7.2.0",
+    "bcryptjs": "^2.4.3",
     "supertest": "^7.2.2",
     "tsx": "^4.21.0",
     "turbo": "^2.0.0",
