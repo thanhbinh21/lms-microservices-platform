@@ -121,16 +121,16 @@ Dự án được chia thành 20 giai đoạn (Phases) theo chuẩn "Vertical Sl
 - [x] **Phase 9.10:** Resolving Race Conditions - Fixed auth token `restoreSessionAction` race condition that was triggering endless refreshes when switching tabs. ✅ Completed: Apr 04, 2026
 - [x] **Phase 9.11:** Sync Application Defaults - Resolved mismatch validations for user registrations and centralized password policies. Upsert logic for seed commands to safely mutate data without blowing up primary keys. ✅ Completed: Apr 04, 2026
 
-### Phase 14-16: Learning Experience
-- [ ] **Phase 14:** Student Learning UI — `/learn/[courseId]` layout, LessonProgress model, video player, progress tracking, Review UI. (Uu tien trien khai truoc block Commerce & Payments de hoc vien xem video free som)
-- [ ] **Phase 15:** **Notification Service** — Kafka consumer, Nodemailer (dev) + Resend (prod), email templates, notification bell UI.
-- [ ] **Phase 16:** Student Dashboard — `/dashboard` real data, "Khoá học của tôi", progress cards, learning streak, va trang thai Become Educator.
+### Phase 10-12: Learning Experience
+- [ ] **Phase 10:** Student Learning UI — `/learn/[courseId]` layout, LessonProgress model, video player, progress tracking, Review UI. (Uu tien trien khai truoc block Commerce & Payments de hoc vien xem video free som)
+- [ ] **Phase 11:** **Notification Service** — Kafka consumer, Nodemailer (dev) + Resend (prod), email templates, notification bell UI.
+- [ ] **Phase 12:** Student Dashboard — `/dashboard` real data, "Khoá học của tôi", progress cards, learning streak, va trang thai Become Educator.
 
-### Phase 10-13: Commerce & Payments (VNPay + Kafka)
-- [ ] **Phase 10:** Build **Payment Service DB** & Order CRUD (Order, Transaction, VNPayAudit models, price verification). (Sau khi hoc vien da co free-learning flow o Phase 14-16)
-- [ ] **Phase 11:** Tích hợp **VNPay** (Create URL, IPN Webhook, Return URL, checksum, JSONB audit).
-- [ ] **Phase 12:** Kafka Producer — Upgrade `@lms/kafka-client` (typed events, retry, DLQ), Payment publish `payment.order.completed`.
-- [ ] **Phase 13:** Kafka Consumer — Enrollment idempotent + Retry mechanism + DLQ admin + **Rating/Review model & API**.
+### Phase 13-16: Commerce & Payments (VNPay + Kafka)
+- [ ] **Phase 13:** Build **Payment Service DB** & Order CRUD (Order, Transaction, VNPayAudit models, price verification). (Sau khi hoc vien da co free-learning flow o Phase 10-12)
+- [ ] **Phase 14:** Tích hợp **VNPay** (Create URL, IPN Webhook, Return URL, checksum, JSONB audit).
+- [ ] **Phase 15:** Kafka Producer — Upgrade `@lms/kafka-client` (typed events, retry, DLQ), Payment publish `payment.order.completed`.
+- [ ] **Phase 16:** Kafka Consumer — Enrollment idempotent + Retry mechanism + DLQ admin + **Rating/Review model & API**.
 
 ### Phase 17-19: Advanced Features
 - [ ] **Phase 17:** Search, Filter & Category System — Full-text search, category model, filter sidebar, sort options.

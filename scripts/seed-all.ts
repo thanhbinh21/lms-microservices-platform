@@ -19,8 +19,7 @@ const BCRYPT_SALT_ROUNDS = 10;
 const authPrisma = new AuthPrisma({
   datasources: {
     db: {
-      url: process.env.DATABASE_URL_AUTH ||
-        'postgresql://neondb_owner:npg_n4ym7HYRqAVD@ep-odd-dew-a1dd5hjf-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
+      url: process.env.DATABASE_URL_AUTH
     },
   },
 });
@@ -28,8 +27,7 @@ const authPrisma = new AuthPrisma({
 const coursePrisma = new CoursePrisma({
   datasources: {
     db: {
-      url: process.env.DATABASE_URL_COURSE ||
-        'postgresql://neondb_owner:npg_fCcLVwM3USQ0@ep-nameless-star-a1z0mm2l-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
+      url: process.env.DATABASE_URL_COURSE
     },
   },
 });

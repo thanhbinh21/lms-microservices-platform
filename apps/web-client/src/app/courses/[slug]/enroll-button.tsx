@@ -9,12 +9,11 @@ import { useAppSelector } from '@/lib/redux/hooks';
 
 interface EnrollButtonProps {
   courseId: string;
-  courseSlug: string;
   isEnrolled: boolean;
   isFree?: boolean;
 }
 
-export function EnrollButton({ courseId, courseSlug, isEnrolled, isFree = true }: EnrollButtonProps) {
+export function EnrollButton({ courseId, isEnrolled, isFree = true }: EnrollButtonProps) {
   const router = useRouter();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,7 +21,7 @@ export function EnrollButton({ courseId, courseSlug, isEnrolled, isFree = true }
 
   const handleEnroll = async () => {
     if (isEnrolled) {
-      router.push(`/learn/${courseSlug}`);
+      router.push(`/learn/${courseId}`);
       return;
     }
 
@@ -39,7 +38,7 @@ export function EnrollButton({ courseId, courseSlug, isEnrolled, isFree = true }
     setIsLoading(false);
 
     if (result.success) {
-      router.push(`/learn/${courseSlug}`);
+      router.push(`/learn/${courseId}`);
     } else {
       if (result.code === 401) {
         setErrorStr('Vui lòng đăng nhập để ghi danh!');
@@ -52,7 +51,7 @@ export function EnrollButton({ courseId, courseSlug, isEnrolled, isFree = true }
 
   if (isEnrolled) {
     return (
-      <Button onClick={() => router.push(`/learn/${courseSlug}`)}>
+      <Button onClick={() => router.push(`/learn/${courseId}`)}>
         Vào học ngay
       </Button>
     );

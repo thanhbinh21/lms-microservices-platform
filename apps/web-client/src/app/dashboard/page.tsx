@@ -81,7 +81,7 @@ export default function DashboardPage() {
                   Hãy nhớ rằng đích đến của bạn là trở thành kỹ sư phần mềm xuất sắc.
                 </p>
               </div>
-              <Link href={data?.activeCourses?.[0] ? `/learn/${data.activeCourses[0].slug}` : "/courses"}>
+              <Link href={data?.activeCourses?.[0] ? `/learn/${data.activeCourses[0].id}` : "/courses"}>
                 <Button className="w-fit bg-white text-primary hover:bg-white/90 shadow-xl rounded-xl px-6 h-12 font-bold whitespace-nowrap">
                   Tiếp tục học <PlayCircle className="ml-2 size-5" />
                 </Button>
@@ -166,7 +166,7 @@ export default function DashboardPage() {
                             </div>
                           </div>
                           <div className="w-full md:w-auto shrink-0 flex items-center md:items-end md:h-full">
-                             <Link href={`/learn/${course.slug}`} className="w-full md:w-auto">
+                             <Link href={`/learn/${course.id}`} className="w-full md:w-auto">
                                <Button className="w-full rounded-xl shadow-md cursor-pointer pointer-events-auto z-10" onClick={(e) => e.stopPropagation()}>Học tiếp tục</Button>
                              </Link>
                           </div>

@@ -29,6 +29,7 @@ import {
 } from './controllers/lesson.controller';
 import { enrollCourse, getMyEnrollments } from './controllers/enrollment.controller';
 import { getCourseProgress, updateLessonProgress } from './controllers/progress.controller';
+import { enrollFree, getLearnData, getEnrollmentStatus, completeLesson, getMyCourses } from './controllers/learning.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import prisma from './lib/prisma';
 import { disconnectProducer } from './lib/kafka-producer';

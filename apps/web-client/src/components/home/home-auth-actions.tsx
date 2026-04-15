@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowRight, Clapperboard, LayoutDashboard, PlayCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppSelector } from '@/lib/redux/hooks';
+import { useEffect, useState } from 'react';
 
 interface HomeAuthActionsProps {
   context: 'hero' | 'cta';
@@ -11,12 +12,19 @@ interface HomeAuthActionsProps {
 
 export function HomeAuthActions({ context }: HomeAuthActionsProps) {
   const { isAuthenticated, isLoading, user } = useAppSelector((state) => state.auth);
-  const normalizedRole = (user?.role || '').toUpperCase();
-  const canAccessInstructorStudio = normalizedRole === 'INSTRUCTOR' || normalizedRole === 'ADMIN';
+  const [mounted, setMounted] = useState(false);
 
-  if (isLoading) {
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Tranh hydration mismatch: server va client render giong nhau (null) cho den khi mount
+  if (!mounted || isLoading) {
     return null;
   }
+
+  const normalizedRole = (user?.role || '').toUpperCase();
+  const canAccessInstructorStudio = normalizedRole === 'INSTRUCTOR' || normalizedRole === 'ADMIN';
 
   if (!isAuthenticated || !user) {
     if (context === 'hero') {
