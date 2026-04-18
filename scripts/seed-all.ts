@@ -11,15 +11,91 @@
 import { PrismaClient as CoursePrisma } from '../services/course-service/src/generated/prisma/index.js';
 import { PrismaClient as AuthPrisma } from '../services/auth-service/src/generated/prisma/index.js';
 import bcrypt from 'bcryptjs';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const BCRYPT_SALT_ROUNDS = 10;
+
+function readEnvVarFromFile(filePath: string, variableName: string): string | undefined {
+  if (!fs.existsSync(filePath)) {
+    return undefined;
+  }
+
+  const content = fs.readFileSync(filePath, 'utf8');
+  const lines = content.split(/\r?\n/);
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    const normalized = trimmed.startsWith('export ')
+      ? trimmed.slice('export '.length).trim()
+      : trimmed;
+    const equalIndex = normalized.indexOf('=');
+
+    if (equalIndex === -1) {
+      continue;
+    }
+
+    const key = normalized.slice(0, equalIndex).trim();
+    if (key !== variableName) {
+      continue;
+    }
+
+    let value = normalized.slice(equalIndex + 1).trim();
+    const hasDoubleQuotes = value.startsWith('"') && value.endsWith('"');
+    const hasSingleQuotes = value.startsWith("'") && value.endsWith("'");
+    if (hasDoubleQuotes || hasSingleQuotes) {
+      value = value.slice(1, -1);
+    }
+
+    return value;
+  }
+
+  return undefined;
+  
+}
+
+const projectRoot = path.resolve(__dirname, '..');
+
+const authDbUrl =
+  process.env.DATABASE_URL_AUTH ||
+  process.env.AUTH_DATABASE_URL ||
+  readEnvVarFromFile(
+    path.join(projectRoot, 'services', 'auth-service', '.env'),
+    'DATABASE_URL',
+  );
+
+const courseDbUrl =
+  process.env.DATABASE_URL_COURSE ||
+  process.env.COURSE_DATABASE_URL ||
+  readEnvVarFromFile(
+    path.join(projectRoot, 'services', 'course-service', '.env'),
+    'DATABASE_URL',
+  );
+
+if (!authDbUrl || !courseDbUrl) {
+  const missing = [
+    !authDbUrl ? 'auth-service DATABASE_URL' : null,
+    !courseDbUrl ? 'course-service DATABASE_URL' : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+  throw new Error(
+    `Missing database URL for seed script (${missing}). Set DATABASE_URL_AUTH/DATABASE_URL_COURSE or configure services/*/.env.`,
+  );
+}
 
 // ─── Database Connections ─────────────────────────────────────────────────────
 
 const authPrisma = new AuthPrisma({
   datasources: {
     db: {
-      url: process.env.DATABASE_URL_AUTH
+      url: authDbUrl,
     },
   },
 });
@@ -27,7 +103,7 @@ const authPrisma = new AuthPrisma({
 const coursePrisma = new CoursePrisma({
   datasources: {
     db: {
-      url: process.env.DATABASE_URL_COURSE
+      url: courseDbUrl,
     },
   },
 });

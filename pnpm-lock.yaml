@@ -20,6 +20,9 @@ importers:
       supertest:
         specifier: ^7.2.2
         version: 7.2.2
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       turbo:
         specifier: ^2.0.0
         version: 2.9.3
@@ -4166,7 +4169,11 @@ packages:
       '@vitest/spy': 4.1.2
       estree-walker: 3.0.3
       magic-string: 0.30.21
+<<<<<<< HEAD
+      vite: 8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(tsx@4.21.0)
+=======
       vite: 6.4.2
+>>>>>>> bb57cc15e6ae53a4b5a1854abbd2eb58891eba28
     dev: true
 
   /@vitest/pretty-format@4.1.2:
@@ -7939,9 +7946,15 @@ packages:
     engines: {node: '>= 0.8'}
     dev: false
 
+<<<<<<< HEAD
+  /vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(tsx@4.21.0):
+    resolution: {integrity: sha512-B9ifbFudT1TFhfltfaIPgjo9Z3mDynBTJSUYxTjOQruf/zHH+ezCQKcoqO+h7a9Pw9Nm/OtlXAiGT1axBgwqrQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+=======
   /vite@6.4.2:
     resolution: {integrity: sha512-2N/55r4JDJ4gdrCvGgINMy+HH3iRpNIz8K6SFwVsA+JbQScLiC+clmAxBgwiSPgcG9U15QmvqCGWzMbqda5zGQ==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
+>>>>>>> bb57cc15e6ae53a4b5a1854abbd2eb58891eba28
     hasBin: true
     peerDependencies:
       '@types/node': ^18.0.0 || ^20.0.0 || >=22.0.0
@@ -7985,6 +7998,7 @@ packages:
       postcss: 8.5.8
       rollup: 4.60.1
       tinyglobby: 0.2.15
+      tsx: 4.21.0
     optionalDependencies:
       fsevents: 2.3.3
     dev: true
@@ -8042,6 +8056,7 @@ packages:
       tinyexec: 1.0.4
       tinyglobby: 0.2.15
       tinyrainbow: 3.1.0
+      vite: 8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(tsx@4.21.0)
       vite: 6.4.2
       why-is-node-running: 2.3.0
     transitivePeerDependencies:
