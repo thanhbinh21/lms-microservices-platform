@@ -23,6 +23,8 @@ export const TOPICS = {
   ENROLLMENT_CREATED: 'learning.enrollment.created',
   LESSON_COMPLETED: 'learning.lesson.completed',
   COURSE_COMPLETED: 'learning.course.completed',
+  /** Admin / catalog: course lifecycle (publish, archive, reopen). */
+  COURSE_CATALOG_STATUS_CHANGED: 'course.catalog.status-changed',
 } as const;
 
 export { kafka };

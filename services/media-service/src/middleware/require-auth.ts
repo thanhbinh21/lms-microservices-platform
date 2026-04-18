@@ -34,7 +34,8 @@ export function requireRole(...roles: string[]): Array<(req: Request, res: Respo
     requireAuth,
     (req: Request, res: Response, next: NextFunction): void => {
       const traceId = (req.headers['x-trace-id'] as string) || '';
-      if (!roles.includes(res.locals.userRole as string)) {
+      const userRole = ((res.locals.userRole as string) || '').toLowerCase();
+      if (!roles.some((r) => r.toLowerCase() === userRole)) {
         const response: ApiResponse<null> = {
           success: false, code: 403,
           message: `Forbidden — required role: ${roles.join(' or ')}`,
