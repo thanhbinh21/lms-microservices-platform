@@ -71,11 +71,30 @@ export async function updateAdminUserPassword(
 }
 
 export async function getAdminUserStats(): Promise<ApiResponse<any>> {
-  return callApi<any>(
-    `/auth/admin/users/stats`,
+  const res = await callApi<any>(
+    `/auth/admin/stats`,
     { method: 'GET' },
     true,
   );
+
+  if (!res.success || !res.data) return res;
+
+  const usersByRole = (res.data.usersByRole ?? {}) as Record<string, number>;
+  const usersByStatus = (res.data.usersByStatus ?? {}) as Record<string, number>;
+
+  return {
+    ...res,
+    data: {
+      totalUsers: res.data.totalUsers ?? 0,
+      activeUsers: usersByStatus.ACTIVE ?? 0,
+      studentCount: usersByRole.STUDENT ?? 0,
+      instructorCount: usersByRole.INSTRUCTOR ?? 0,
+      adminCount: usersByRole.ADMIN ?? 0,
+      usersByRole,
+      usersByStatus,
+      newUsersThisMonth: res.data.newUsersThisMonth ?? 0,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -113,11 +132,29 @@ export async function updateAdminCourseStatus(
 }
 
 export async function getAdminCourseStats(): Promise<ApiResponse<any>> {
-  return callApi<any>(
-    `/course/api/admin/courses/stats`,
+  const res = await callApi<any>(
+    `/course/api/admin/stats`,
     { method: 'GET' },
     true,
   );
+
+  if (!res.success || !res.data) return res;
+
+  const coursesByStatus = (res.data.coursesByStatus ?? {}) as Record<string, number>;
+
+  return {
+    ...res,
+    data: {
+      totalCourses: res.data.totalCourses ?? 0,
+      publishedCourses: coursesByStatus.PUBLISHED ?? 0,
+      draftCourses: coursesByStatus.DRAFT ?? 0,
+      archivedCourses: coursesByStatus.ARCHIVED ?? 0,
+      coursesByStatus,
+      totalEnrollments: res.data.totalEnrollments ?? 0,
+      totalReviews: res.data.totalReviews ?? 0,
+      flaggedReviews: res.data.flaggedReviews ?? 0,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
