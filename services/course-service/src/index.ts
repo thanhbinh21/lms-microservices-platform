@@ -33,6 +33,7 @@ import { getCourseProgress, updateLessonProgress } from './controllers/progress.
 import { enrollFree, getLearnData, getEnrollmentStatus, completeLesson, getMyCourses } from './controllers/learning.controller';
 import { getCourseByIdInternal } from './controllers/internal.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
+import adminRouter from './routes/admin.routes';
 import prisma from './lib/prisma';
 import { disconnectProducer } from './lib/kafka-producer';
 import { startKafkaConsumers } from './lib/kafka-consumer';
@@ -86,6 +87,7 @@ app.get('/api/courses/:slug', getCourseBySlug);
 
 // ─── Admin Routes ─────────────────────────────────────────────────────────────
 app.post('/api/admin/categories', ...requireRole('admin'), createCategory);
+app.use('/api/admin', ...requireRole('admin'), adminRouter);
 
 // ─── Instructor Routes (Kong injects x-user-id, x-user-role) ─────────────────
 // requireRole middleware: validates header exists + role check, sets res.locals.userId

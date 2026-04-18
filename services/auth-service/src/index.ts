@@ -11,6 +11,8 @@ import { login } from './controllers/login.controller.js';
 import { refresh } from './controllers/refresh.controller.js';
 import { logout } from './controllers/logout.controller.js';
 import { updateUserRole } from './controllers/update-role.controller.js';
+import { requireAdmin } from './middleware/require-admin.js';
+import adminRouter from './routes/admin.routes.js';
 
 // Validate bien moi truong khi khoi dong
 const env = initEnv();
@@ -60,6 +62,9 @@ app.post('/login', login);
 app.post('/refresh', refresh);
 app.post('/logout', logout);
 app.patch('/users/role', updateUserRole);
+
+// Admin routes
+app.use('/admin', requireAdmin, adminRouter);
 
 // Xu ly 404
 app.use((req: Request, res: Response) => {

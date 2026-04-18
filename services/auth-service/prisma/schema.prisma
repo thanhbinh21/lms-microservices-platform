@@ -19,6 +19,7 @@ model User {
   password  String   // Bcrypt hashed
   name      String
   role      UserRole @default(STUDENT)
+  status    UserStatus @default(ACTIVE)
   sourceType String   @default("CREDENTIALS") @map("source_type")
   lastLoginAt DateTime? @map("last_login_at")
   createdAt DateTime @default(now()) @map("created_at")
@@ -50,4 +51,10 @@ enum UserRole {
   STUDENT
   INSTRUCTOR
   ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+  SUSPENDED
 }

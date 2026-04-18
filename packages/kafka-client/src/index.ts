@@ -48,6 +48,8 @@ export const TOPICS = {
 
   // Dead letter (Phase 15)
   DEAD_LETTER: 'system.dead-letter',
+  /** Admin / catalog: course lifecycle (publish, archive, reopen). */
+  COURSE_CATALOG_STATUS_CHANGED: 'course.catalog.status-changed',
 } as const;
 
 export type KafkaTopic = (typeof TOPICS)[keyof typeof TOPICS];
