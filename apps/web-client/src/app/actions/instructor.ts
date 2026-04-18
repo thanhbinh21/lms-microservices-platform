@@ -121,6 +121,8 @@ interface PresignedUploadDto {
   presignedUrl: string;
   storageKey: string;
   expiresAt: string;
+  uploadMethod?: 'POST_FORM';
+  uploadFields?: Record<string, string>;
 }
 
 export interface CourseCurriculumDto {
@@ -185,29 +187,34 @@ async function refreshAccessToken(): Promise<string | undefined> {
     return undefined;
   }
 
-  const response = await fetch(`${GATEWAY_URL}${AUTH_PREFIX}/refresh`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refreshToken }),
-    cache: 'no-store',
-  });
+  try {
+    const response = await fetch(`${GATEWAY_URL}${AUTH_PREFIX}/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+      cache: 'no-store',
+    });
 
-  const result = await response.json();
-  if (!response.ok || !result.success) {
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      return undefined;
+    }
+
+    const nextAccessToken = result?.data?.accessToken as string | undefined;
+    const nextRefreshToken = result?.data?.refreshToken as string | undefined;
+
+    if (!nextAccessToken || !nextRefreshToken) {
+      return undefined;
+    }
+
+    await writeAuthCookies({ accessToken: nextAccessToken, refreshToken: nextRefreshToken });
+    return nextAccessToken;
+  } catch {
+    // Tranh throw len Server Action khi Auth/Gateway tam thoi down.
     return undefined;
   }
-
-  const nextAccessToken = result?.data?.accessToken as string | undefined;
-  const nextRefreshToken = result?.data?.refreshToken as string | undefined;
-
-  if (!nextAccessToken || !nextRefreshToken) {
-    return undefined;
-  }
-
-  await writeAuthCookies({ accessToken: nextAccessToken, refreshToken: nextRefreshToken });
-  return nextAccessToken;
 }
 
 export async function callApi<T>(
@@ -253,11 +260,22 @@ export async function callApi<T>(
     headers.set('x-user-role', (decoded.role || '').toLowerCase());
   }
 
-  let response = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    headers,
-    cache: 'no-store',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, {
+      ...init,
+      headers,
+      cache: 'no-store',
+    });
+  } catch {
+    return {
+      success: false,
+      code: 503,
+      message: 'Service temporarily unavailable. Please try again.',
+      data: null,
+      trace_id: '',
+    };
+  }
 
   if (requireAuth && response.status === 401) {
     const refreshedToken = await refreshAccessToken();
@@ -269,11 +287,21 @@ export async function callApi<T>(
         headers.set('x-user-id', decoded.userId);
         headers.set('x-user-role', (decoded.role || '').toLowerCase());
       }
-      response = await fetch(`${baseUrl}${path}`, {
-        ...init,
-        headers,
-        cache: 'no-store',
-      });
+      try {
+        response = await fetch(`${baseUrl}${path}`, {
+          ...init,
+          headers,
+          cache: 'no-store',
+        });
+      } catch {
+        return {
+          success: false,
+          code: 503,
+          message: 'Service temporarily unavailable. Please try again.',
+          data: null,
+          trace_id: '',
+        };
+      }
     }
   }
 

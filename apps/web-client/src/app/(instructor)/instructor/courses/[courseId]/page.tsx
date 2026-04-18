@@ -116,7 +116,22 @@ export default function CourseSettingsPage() {
         return;
       }
 
-      if (presigned.data.presignedUrl.includes('/api/upload/local/')) {
+      if (presigned.data.uploadMethod === 'POST_FORM' && presigned.data.uploadFields) {
+        const formData = new FormData();
+        for (const [key, value] of Object.entries(presigned.data.uploadFields)) {
+          formData.append(key, value);
+        }
+        formData.append('file', file);
+
+        const uploadResponse = await fetch(presigned.data.presignedUrl, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!uploadResponse.ok) {
+          showStatus('error', 'Upload ảnh bìa thất bại.');
+          return;
+        }
+      } else if (presigned.data.presignedUrl.includes('/api/upload/local/')) {
         const formData = new FormData();
         formData.append('file', file);
         const uploadResponse = await fetch(presigned.data.presignedUrl, {

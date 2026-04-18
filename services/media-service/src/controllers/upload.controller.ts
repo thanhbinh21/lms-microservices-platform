@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
-import { getStorageProvider } from '../storage';
+import { forceLocalStorageFallback, getActiveStorageProvider, getStorageProvider } from '../storage';
 
 // Schema yeu cau presigned URL
 const presignedUploadSchema = z.object({
@@ -87,11 +87,35 @@ export async function requestPresignedUpload(req: Request, res: Response) {
 
     // Tao presigned URL tu storage provider
     const storage = getStorageProvider();
-    const { presignedUrl, storageKey, expiresAt } = await storage.generateUploadUrl({
-      filename,
-      mimeType,
-      folder,
-    });
+    let uploadPayload: {
+      presignedUrl: string;
+      storageKey: string;
+      expiresAt: Date;
+      uploadMethod?: 'POST_FORM';
+      uploadFields?: Record<string, string>;
+    };
+
+    try {
+      uploadPayload = await storage.generateUploadUrl({
+        filename,
+        mimeType,
+        folder,
+      });
+    } catch (err) {
+      // Khi Cloudinary gap loi runtime, auto fallback sang local de khong chan luong upload.
+      if (getActiveStorageProvider() === 'cloudinary') {
+        const fallback = forceLocalStorageFallback(err);
+        uploadPayload = await fallback.generateUploadUrl({
+          filename,
+          mimeType,
+          folder,
+        });
+      } else {
+        throw err;
+      }
+    }
+
+    const { presignedUrl, storageKey, expiresAt, uploadMethod, uploadFields } = uploadPayload;
 
     // Tao ban ghi MediaAsset voi trang thai PENDING
     const media = await prisma.mediaAsset.create({
@@ -115,6 +139,8 @@ export async function requestPresignedUpload(req: Request, res: Response) {
       presignedUrl: string;
       storageKey: string;
       expiresAt: string;
+      uploadMethod?: 'POST_FORM';
+      uploadFields?: Record<string, string>;
     }> = {
       success: true, code: 201,
       message: 'Presigned upload URL generated',
@@ -123,6 +149,8 @@ export async function requestPresignedUpload(req: Request, res: Response) {
         presignedUrl,
         storageKey,
         expiresAt: expiresAt.toISOString(),
+        uploadMethod,
+        uploadFields,
       },
       trace_id: traceId,
     };
@@ -270,8 +298,8 @@ export async function confirmUpload(req: Request, res: Response) {
     // Kiem tra file ton tai trong storage (local: bat buoc, S3: bo qua do eventual consistency)
     const storage = getStorageProvider();
     const exists = await storage.fileExists(media.storageKey);
-    const isLocal = (process.env.STORAGE_PROVIDER || 'local') === 'local';
-    if (isLocal && !exists) {
+    const isLocalUpload = media.presignedUrl?.includes('/api/upload/local/') ?? false;
+    if (isLocalUpload && !exists) {
       const missing: ApiResponse<null> = {
         success: false, code: 400,
         message: 'File not found in storage. Upload may have failed.',

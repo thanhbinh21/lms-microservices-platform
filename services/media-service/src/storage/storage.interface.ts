@@ -9,7 +9,13 @@ export interface StorageProvider {
     filename: string;
     mimeType: string;
     folder: string;
-  }): Promise<{ presignedUrl: string; storageKey: string; expiresAt: Date }>;
+  }): Promise<{
+    presignedUrl: string;
+    storageKey: string;
+    expiresAt: Date;
+    uploadMethod?: 'POST_FORM';
+    uploadFields?: Record<string, string>;
+  }>;
 
   /** Lay URL cong khai de truy cap file */
   getFileUrl(storageKey: string): Promise<string>;

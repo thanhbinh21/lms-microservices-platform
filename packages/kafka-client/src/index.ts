@@ -92,6 +92,7 @@ export interface TopicEventMap {
   [TOPICS.DEAD_LETTER]: unknown;
   [TOPICS.LESSON_COMPLETED]: unknown;
   [TOPICS.COURSE_COMPLETED]: unknown;
+  [TOPICS.COURSE_CATALOG_STATUS_CHANGED]: unknown;
 }
 
 // ─── Publish helper ───────────────────────────────────────────────────────────

@@ -150,7 +150,7 @@ export default function AdminCoursesPage() {
                 <tbody>
                   {courses.map((c) => (
                     <tr key={c.id} className="border-b border-zinc-100 transition-colors hover:bg-zinc-50/50">
-                      <td className="max-w-[200px] truncate py-3 pr-4 font-medium">{c.title}</td>
+                      <td className="max-w-50 truncate py-3 pr-4 font-medium">{c.title}</td>
                       <td className="py-3 pr-4 text-muted-foreground">{c.category || '—'}</td>
                       <td className="py-3 pr-4">
                         <StatusBadge status={c.status || 'DRAFT'} />

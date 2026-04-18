@@ -1,5 +1,5 @@
 # Giai phong cac port dev cua monorepo (Windows). Chay: pnpm dev:kill-ports
-$ports = 3000, 3001, 3002, 3004, 3006, 3101
+$ports = 3000, 3001, 3002, 3003, 3004, 3005, 3006, 3101
 foreach ($port in $ports) {
   Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | ForEach-Object {
     $procId = $_.OwningProcess

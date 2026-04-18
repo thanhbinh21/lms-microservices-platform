@@ -367,7 +367,22 @@ export default function CurriculumEditorPage() {
         return;
       }
 
-      if (presigned.data.presignedUrl.includes('/api/upload/local/')) {
+      if (presigned.data.uploadMethod === 'POST_FORM' && presigned.data.uploadFields) {
+        const formData = new FormData();
+        for (const [key, value] of Object.entries(presigned.data.uploadFields)) {
+          formData.append(key, value);
+        }
+        formData.append('file', file);
+
+        const uploadResponse = await fetch(presigned.data.presignedUrl, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!uploadResponse.ok) {
+          showStatus('error', 'Upload video thất bại.');
+          return;
+        }
+      } else if (presigned.data.presignedUrl.includes('/api/upload/local/')) {
         const formData = new FormData();
         formData.append('file', file);
         const uploadResponse = await fetch(presigned.data.presignedUrl, {
@@ -738,7 +753,7 @@ export default function CurriculumEditorPage() {
                       <iframe
                         title={`youtube-${selectedLesson.lesson.id}`}
                         src={getYoutubeEmbedUrl(selectedLesson.lesson.videoUrl) || undefined}
-                        className={`w-full rounded-xl border border-slate-200 ${isPreviewExpanded ? 'h-[520px]' : 'h-[300px]'}`}
+                        className={`w-full rounded-xl border border-slate-200 ${isPreviewExpanded ? 'h-130' : 'h-75'}`}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                         allowFullScreen
                       />
@@ -749,7 +764,7 @@ export default function CurriculumEditorPage() {
                     <video
                       controls
                       preload="metadata"
-                      className={`w-full rounded-xl border border-slate-200 bg-black ${isPreviewExpanded ? 'h-[520px]' : 'h-[300px]'}`}
+                      className={`w-full rounded-xl border border-slate-200 bg-black ${isPreviewExpanded ? 'h-130' : 'h-75'}`}
                       src={selectedLesson.lesson.videoUrl}
                     >
                       Trình duyệt không hỗ trợ phát video.
