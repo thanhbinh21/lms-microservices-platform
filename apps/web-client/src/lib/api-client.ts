@@ -59,22 +59,27 @@ async function refreshAccessToken(): Promise<string | undefined> {
   const refreshToken = cookieStore.get('refreshToken')?.value;
   if (!refreshToken) return undefined;
 
-  const response = await fetch(`${GATEWAY_URL}${AUTH_PREFIX}/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
-    cache: 'no-store',
-  });
+  try {
+    const response = await fetch(`${GATEWAY_URL}${AUTH_PREFIX}/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+      cache: 'no-store',
+    });
 
-  const result = await response.json();
-  if (!response.ok || !result.success) return undefined;
+    const result = await response.json();
+    if (!response.ok || !result.success) return undefined;
 
-  const nextAccessToken = result?.data?.accessToken as string | undefined;
-  const nextRefreshToken = result?.data?.refreshToken as string | undefined;
-  if (!nextAccessToken || !nextRefreshToken) return undefined;
+    const nextAccessToken = result?.data?.accessToken as string | undefined;
+    const nextRefreshToken = result?.data?.refreshToken as string | undefined;
+    if (!nextAccessToken || !nextRefreshToken) return undefined;
 
-  await writeAuthCookies({ accessToken: nextAccessToken, refreshToken: nextRefreshToken });
-  return nextAccessToken;
+    await writeAuthCookies({ accessToken: nextAccessToken, refreshToken: nextRefreshToken });
+    return nextAccessToken;
+  } catch {
+    // Khi Gateway/Auth tam thoi khong reachable, tra ve undefined de caller xu ly mem.
+    return undefined;
+  }
 }
 
 export async function callApi<T>(
@@ -105,7 +110,18 @@ export async function callApi<T>(
     if (decoded.email) headers.set('x-user-email', decoded.email);
   }
 
-  let response = await fetch(`${baseUrl}${path}`, { ...init, headers, cache: 'no-store' });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, { ...init, headers, cache: 'no-store' });
+  } catch {
+    return {
+      success: false,
+      code: 503,
+      message: 'Service temporarily unavailable. Please try again.',
+      data: null,
+      trace_id: '',
+    };
+  }
 
   if (requireAuth && response.status === 401) {
     const refreshedToken = await refreshAccessToken();
@@ -116,7 +132,17 @@ export async function callApi<T>(
         headers.set('x-user-id', decoded.userId);
         headers.set('x-user-role', (decoded.role || '').toLowerCase());
       }
-      response = await fetch(`${baseUrl}${path}`, { ...init, headers, cache: 'no-store' });
+      try {
+        response = await fetch(`${baseUrl}${path}`, { ...init, headers, cache: 'no-store' });
+      } catch {
+        return {
+          success: false,
+          code: 503,
+          message: 'Service temporarily unavailable. Please try again.',
+          data: null,
+          trace_id: '',
+        };
+      }
     }
   }
 

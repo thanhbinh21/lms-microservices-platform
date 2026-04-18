@@ -206,3 +206,69 @@ Huong dan migrate/deploy (du kien cho Phase 9.8):
 Tac dong den roadmap:
 - Learning Experience (Phase 14-16) tiep tuc duoc uu tien truoc block Commerce & Payments.
 - Co bo sample courses + video free som ket hop voi provider Cloudinary de hoc vien trai nghiem truoc.
+
+## 14. Trien khai thuc te Phase 9.8 - Cloudinary first, fallback local
+Muc tieu thay doi:
+- Uu tien Cloudinary cho upload image/video khi co `CLOUDINARY_URL`.
+- Neu thieu key hoac Cloudinary gap loi khoi tao/runtime o buoc tao upload URL, tu dong fallback sang local provider hien tai.
+- Giu nguyen API contract cu de frontend va instructor flow khong bi vo.
+
+Pham vi file/code bi anh huong:
+- services/media-service/src/storage/index.ts
+- services/media-service/src/storage/storage.interface.ts
+- services/media-service/src/controllers/upload.controller.ts
+- services/media-service/src/index.ts
+- packages/env-validator/src/index.ts
+- apps/web-client/src/app/actions/instructor.ts
+- apps/web-client/src/app/(instructor)/instructor/courses/[courseId]/page.tsx
+- apps/web-client/src/app/(instructor)/instructor/courses/[courseId]/curriculum/page.tsx
+- services/media-service/package.json
+- project_overview.md
+
+Quyet dinh ky thuat quan trong va ly do:
+- `CLOUDINARY_URL` duoc dat lam nguon uu tien cao nhat de bat provider Cloudinary, giup cau hinh nhanh gon (1 bien moi truong).
+- Them provider Cloudinary trong storage factory, nhung van giu LocalStorageProvider de fallback de khong chan luong upload khi Cloudinary khong san sang.
+- Presigned response duoc mo rong them truong tuy chon:
+   - `uploadMethod: 'POST_FORM'`
+   - `uploadFields: Record<string,string>`
+   Muc dich la ho tro Cloudinary upload form-data ma van tuong thich voi local/S3 flow cu.
+- Frontend upload logic duoc cap nhat theo thu tu:
+   1) Neu `uploadMethod=POST_FORM` -> POST form-data (Cloudinary)
+   2) Neu URL local -> PUT form-data vao local upload endpoint
+   3) Nguoc lai -> PUT binary (S3/presigned URL)
+
+Huong dan migrate/deploy:
+1. Cai dependency moi cho media-service:
+    - `pnpm --filter @lms/media-service add cloudinary`
+2. Cau hinh env media-service:
+    - Bat buoc: `DATABASE_URL`, `DIRECT_URL`
+    - Khuyen nghi de dung Cloudinary: `CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>`
+    - Tuong thich fallback local: `STORAGE_PROVIDER=local` hoac `STORAGE_PROVIDER=cloudinary`
+3. Khoi dong lai media-service sau khi cap nhat env.
+4. Verify health:
+    - `GET /health` cua media-service tra ve `storage: cloudinary` neu dung Cloudinary
+    - Neu fallback, health tra ve `storage: local`
+
+Demo luong du lieu end-to-end:
+1. Instructor chon file video/thumbnail trong web-client.
+2. Web-client goi `/media/api/upload/presigned`.
+3. Media-service:
+    - Neu co `CLOUDINARY_URL` hop le: sinh signed upload URL + fields cho Cloudinary.
+    - Neu loi: chuyen sang local provider va tra local upload URL.
+4. Web-client upload file theo `uploadMethod`.
+5. Web-client goi `/media/api/upload/complete` de xac nhan.
+6. Media-service cap nhat `MediaAsset.status=UPLOADED` va tra URL phuc vu playback/thumbnail.
+
+Truoc va sau khi thay doi:
+- Truoc:
+   - Chu yeu dua vao local/S3 branch, chua co flow Cloudinary first thuc te.
+   - Frontend upload chi co 2 kieu PUT (form-data local / binary S3).
+- Sau:
+   - Cloudinary duoc uu tien tu dong khi co `CLOUDINARY_URL`.
+   - Fallback local duoc bat de tranh downtime upload.
+   - Frontend ho tro them Cloudinary POST form upload nhung khong vo backward compatibility.
+
+Ket qua kiem thu ky thuat:
+- `pnpm --filter @lms/env-validator run build` pass.
+- `pnpm --filter @lms/media-service run build` pass.
+- Kiem tra compile tren cac file web-client bi anh huong: khong co loi TypeScript tai file da sua.

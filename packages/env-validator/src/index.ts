@@ -57,6 +57,7 @@ const internalServiceEnvSchema = z.object({
 // Storage (Phase 6 - media-service)
 const storageEnvSchema = z.object({
   STORAGE_PROVIDER: z.enum(['local', 's3', 'cloudinary']).default('local'),
+  CLOUDINARY_URL: z.string().url('CLOUDINARY_URL must be valid URL').optional(),
 });
 
 /**

@@ -10,7 +10,7 @@ import type { ApiResponse } from '@lms/types';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import { requestPresignedUpload, confirmUpload, registerExternalMedia } from './controllers/upload.controller';
 import { getMediaAsset, getMediaByLesson, getMediaByCourse, deleteMediaAsset } from './controllers/media.controller';
-import { getStorageProvider } from './storage';
+import { getActiveStorageProvider, shouldEnableLocalUploadRoutes } from './storage';
 import { LocalStorageProvider } from './storage/local.storage';
 import prisma from './lib/prisma';
 
@@ -38,11 +38,12 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 
 // Kiem tra suc khoe
 app.get('/health', (_req: Request, res: Response) => {
+  const activeStorage = getActiveStorageProvider();
   const response: ApiResponse<{ service: string; storage: string }> = {
     success: true, code: 200, message: 'OK',
     data: {
       service: 'media-service',
-      storage: process.env.STORAGE_PROVIDER || 'local',
+      storage: activeStorage,
     },
     trace_id: '',
   };
@@ -54,8 +55,10 @@ app.post('/api/upload/presigned', ...requireRole('instructor', 'admin'), request
 app.post('/api/upload/complete', ...requireRole('instructor', 'admin'), confirmUpload);
 app.post('/api/upload/external', ...requireRole('instructor', 'admin'), registerExternalMedia);
 
-// Route upload local (chi dung khi STORAGE_PROVIDER=local)
-if ((process.env.STORAGE_PROVIDER || 'local') === 'local') {
+// Route upload local (duoc bat khi local duoc chon hoac la fallback cho Cloudinary)
+if (shouldEnableLocalUploadRoutes()) {
+  const localStorage = new LocalStorageProvider();
+
   const upload = multer({
     limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
     storage: multer.diskStorage({
@@ -90,8 +93,8 @@ if ((process.env.STORAGE_PROVIDER || 'local') === 'local') {
 
         // Move temp file to correct storage path
         const fs = await import('fs/promises');
-        const storage = getStorageProvider() as LocalStorageProvider;
-        const targetPath = storage.getAbsolutePath(storageKey);
+        // Route local phai luon ghi vao filesystem, khong phu thuoc provider dang active.
+        const targetPath = localStorage.getAbsolutePath(storageKey);
         const targetDir = path.dirname(targetPath);
         await fs.mkdir(targetDir, { recursive: true });
         await fs.rename(req.file.path, targetPath);
@@ -128,12 +131,14 @@ app.get('/api/media/lesson/:lessonId', getMediaByLesson);
 app.get('/api/media/course/:courseId', requireAuth, getMediaByCourse);
 app.delete('/api/media/:id', ...requireRole('instructor', 'admin'), deleteMediaAsset);
 
-// Phuc vu file local (chi dung trong dev)
-if ((process.env.STORAGE_PROVIDER || 'local') === 'local') {
+// Phuc vu file local (duoc bat cung dieu kien voi local upload route)
+if (shouldEnableLocalUploadRoutes()) {
+  const localStorage = new LocalStorageProvider();
+
   app.get('/api/media/file/:storageKey(*)', async (req: Request, res: Response) => {
     const storageKey = decodeURIComponent(req.params.storageKey);
-    const storage = getStorageProvider() as LocalStorageProvider;
-    const filePath = storage.getAbsolutePath(storageKey);
+    // Endpoint nay chi phuc vu local file, nen khong dung provider cloudinary/s3.
+    const filePath = localStorage.getAbsolutePath(storageKey);
 
     try {
       const fs = await import('fs/promises');
