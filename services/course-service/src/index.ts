@@ -31,9 +31,11 @@ import { listCategories, createCategory } from './controllers/category.controlle
 import { enrollCourse, getMyEnrollments } from './controllers/enrollment.controller';
 import { getCourseProgress, updateLessonProgress } from './controllers/progress.controller';
 import { enrollFree, getLearnData, getEnrollmentStatus, completeLesson, getMyCourses } from './controllers/learning.controller';
+import { getCourseByIdInternal } from './controllers/internal.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import prisma from './lib/prisma';
 import { disconnectProducer } from './lib/kafka-producer';
+import { startKafkaConsumers } from './lib/kafka-consumer';
 
 // Validate bien moi truong khi khoi dong
 validateCourseServiceEnv();
@@ -63,6 +65,10 @@ app.get('/health', (_req: Request, res: Response) => {
   };
   res.status(200).json(response);
 });
+
+// ─── Internal service-to-service routes (KHONG expose qua Kong) ──────────────
+// Payment-service goi /internal/courses/:id de verify price.
+app.get('/internal/courses/:id', getCourseByIdInternal);
 
 // ─── Student Learning Routes (prefix /api/student/ to avoid /:slug conflict) ─
 app.post('/api/student/courses/:courseId/enroll-free', requireAuth, enrollFree);
@@ -139,6 +145,21 @@ const server = app.listen(PORT, () => {
   logger.info(`[COURSE-SERVICE] Da khoi dong tren port ${PORT}`);
   logger.info(`Moi truong: ${process.env.NODE_ENV}`);
 });
+
+// Khoi dong Kafka consumer (Phase 16: payment.order.completed -> enrollment).
+// Khong block khoi dong HTTP server; neu Kafka chua san, log warning va thu lai.
+if (process.env.KAFKA_BROKER) {
+  startKafkaConsumers().catch((err) => {
+    logger.error({ err }, '[COURSE-SERVICE] Kafka consumer start failed — se thu lai sau 10s');
+    setTimeout(() => {
+      startKafkaConsumers().catch((retryErr) =>
+        logger.error({ err: retryErr }, '[COURSE-SERVICE] Kafka consumer retry failed'),
+      );
+    }, 10_000);
+  });
+} else {
+  logger.warn('KAFKA_BROKER chua set — bo qua consumer (flow mua khoa hoc se khong tao enrollment)');
+}
 
 // Tat server an toan
 const shutdown = async (signal: string) => {

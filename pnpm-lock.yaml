@@ -399,6 +399,101 @@ importers:
         specifier: ^5.3.3
         version: 5.9.3
 
+  services/notification-service:
+    dependencies:
+      '@lms/env-validator':
+        specifier: workspace:*
+        version: link:../../packages/env-validator
+      '@lms/kafka-client':
+        specifier: workspace:*
+        version: link:../../packages/kafka-client
+      '@lms/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@lms/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@prisma/client':
+        specifier: ^5.8.0
+        version: 5.22.0(prisma@5.22.0)
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.6
+      express:
+        specifier: ^4.18.2
+        version: 4.22.1
+      helmet:
+        specifier: ^7.1.0
+        version: 7.2.0
+    devDependencies:
+      '@types/cors':
+        specifier: ^2.8.17
+        version: 2.8.19
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      '@types/node':
+        specifier: ^20.10.6
+        version: 20.19.37
+      prisma:
+        specifier: ^5.8.0
+        version: 5.22.0
+      tsx:
+        specifier: ^4.7.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
+  services/payment-service:
+    dependencies:
+      '@lms/env-validator':
+        specifier: workspace:*
+        version: link:../../packages/env-validator
+      '@lms/kafka-client':
+        specifier: workspace:*
+        version: link:../../packages/kafka-client
+      '@lms/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@lms/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@prisma/client':
+        specifier: ^5.8.0
+        version: 5.22.0(prisma@5.22.0)
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.6
+      express:
+        specifier: ^4.18.2
+        version: 4.22.1
+      helmet:
+        specifier: ^7.1.0
+        version: 7.2.0
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.76
+    devDependencies:
+      '@types/cors':
+        specifier: ^2.8.17
+        version: 2.8.19
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      '@types/node':
+        specifier: ^20.10.6
+        version: 20.19.37
+      prisma:
+        specifier: ^5.8.0
+        version: 5.22.0
+      tsx:
+        specifier: ^4.7.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
 packages:
 
   /@alloc/quick-lru@5.2.0:

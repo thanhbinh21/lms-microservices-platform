@@ -58,7 +58,12 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
           <Link href="/courses" className="text-sm font-semibold text-muted-foreground hover:text-foreground">
             ← Quay lại danh sách khóa học
           </Link>
-          <EnrollButton courseId={course.id} isEnrolled={isEnrolled} isFree={isFree} />
+          <EnrollButton
+            courseId={course.id}
+            isEnrolled={isEnrolled}
+            isFree={isFree}
+            price={Number(course.price || 0)}
+          />
         </div>
 
         <Card className="rounded-3xl border-white/60 bg-white/70 backdrop-blur-xl shadow-sm">
