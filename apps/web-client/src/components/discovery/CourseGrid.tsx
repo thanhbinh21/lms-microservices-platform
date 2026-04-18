@@ -1,8 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { Star, Clock, Users, BookOpen } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState, MouseEvent } from 'react';
+import { Star, Clock, Users, BookOpen, ShoppingCart, Loader2 } from 'lucide-react';
 import type { DiscoveryCourse } from '@/app/actions/discovery';
+import { createOrderAction } from '@/app/actions/payment';
+import { useAppSelector } from '@/lib/redux/hooks';
 
 interface CourseGridProps {
   courses: DiscoveryCourse[];
@@ -21,15 +25,44 @@ const LEVEL_COLORS: Record<string, string> = {
 };
 
 function CourseCard({ course }: { course: DiscoveryCourse }) {
-  const priceLabel =
-    Number(course.price) === 0
-      ? 'Miễn phí'
-      : `${Number(course.price).toLocaleString('vi-VN')}đ`;
+  const router = useRouter();
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const [buying, setBuying] = useState(false);
+  const [buyError, setBuyError] = useState<string>('');
+
+  const priceNumber = Number(course.price);
+  const isFree = priceNumber === 0;
+  const priceLabel = isFree ? 'Miễn phí' : `${priceNumber.toLocaleString('vi-VN')}đ`;
 
   const hours = Math.max(1, Math.floor(course.totalDuration / 3600));
   const initials = (
     course.title.match(/[A-Za-z]/g)?.slice(0, 3).join('') || 'CRS'
   ).toUpperCase();
+
+  const handleBuy = async (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    setBuying(true);
+    setBuyError('');
+    const res = await createOrderAction(course.id);
+    setBuying(false);
+
+    if (!res.success || !res.data?.payUrl) {
+      if (res.code === 409) {
+        router.push(`/learn/${course.id}`);
+        return;
+      }
+      setBuyError(res.message || 'Không tạo được đơn hàng');
+      return;
+    }
+    window.location.href = res.data.payUrl;
+  };
 
   return (
     <Link href={`/courses/${course.slug}`} className="block h-full">
@@ -119,15 +152,33 @@ function CourseCard({ course }: { course: DiscoveryCourse }) {
               </span>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span
                 className={`text-lg font-black ${
-                  Number(course.price) === 0 ? 'text-emerald-600' : 'text-primary'
+                  isFree ? 'text-emerald-600' : 'text-primary'
                 }`}
               >
                 {priceLabel}
               </span>
+              {!isFree && (
+                <button
+                  type="button"
+                  onClick={handleBuy}
+                  disabled={buying}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-60"
+                >
+                  {buying ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ShoppingCart className="w-3.5 h-3.5" />
+                  )}
+                  Mua
+                </button>
+              )}
             </div>
+            {buyError && (
+              <p className="text-[11px] text-rose-500 font-semibold">{buyError}</p>
+            )}
           </div>
         </div>
       </div>

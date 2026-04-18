@@ -47,19 +47,24 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
     setMounted(true);
     if (isLoading) return;
 
-    // Role Guard: Require authentication AND instructor/admin role
+    // Role Guard: chi INSTRUCTOR moi duoc vao Studio.
+    // - Chua dang nhap -> /login
+    // - ADMIN -> trang chu (admin quan ly qua Profile > Quan ly don GV, khong phai Studio)
+    // - STUDENT -> /dashboard
     if (!isAuthenticated) {
-      router.push('/login');
-    } else if (user?.role !== 'INSTRUCTOR' && user?.role !== 'ADMIN') {
-      router.push('/dashboard');
+      router.replace('/login');
+    } else if (user?.role === 'ADMIN') {
+      router.replace('/');
+    } else if (user?.role !== 'INSTRUCTOR') {
+      router.replace('/dashboard');
     }
   }, [user, isAuthenticated, isLoading, router]);
 
   if (!mounted || isLoading || !user) return null; // Wait for client hydration
 
-  // If authenticated but wrong role, prevent rendering kids to avoid flicker before redirect catches
-    if (user.role !== 'INSTRUCTOR' && user.role !== 'ADMIN') {
-     return null;
+  // Chan render con khi sai role de tranh flicker truoc khi redirect xu ly xong
+  if (user.role !== 'INSTRUCTOR') {
+    return null;
   }
 
   return (

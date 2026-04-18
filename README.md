@@ -397,36 +397,38 @@ olms-microservices/
 
 **Port**: 3003  
 **Database**: `payment_db` (Neon PostgreSQL)  
-**Status**: Not Implemented
+**Status**: Implemented (Phase 13-16)
 
-**Planned Features:**
-- VNPay payment gateway integration
-- Order management and tracking
-- Transaction audit logs (JSONB for full VNPay response)
-- Kafka event publishing on payment completion
-- Refund handling
+**Features:**
+- VNPay payment gateway integration (sandbox + prod compatible)
+- Order management with status tracking (`PENDING | COMPLETED | FAILED | EXPIRED | REFUNDED`)
+- Transaction audit logs (full VNPay response stored as JSONB)
+- Kafka event publishing on payment completion with typed events + retry + DLQ
+- Anti-tampering: price is verified against Course Service at order creation time
 
-**Planned Endpoints:**
-- `POST /orders` - Create new order
-- `GET /orders/:id` - Get order details
-- `POST /vnpay/create-payment-url` - Generate VNPay URL
-- `POST /vnpay/ipn` - Handle VNPay callback (webhook)
-- `POST /vnpay/return` - Handle user return from VNPay
+**Endpoints (via Kong `/payment`):**
+- `POST /payment/api/orders` — Create new order + generate VNPay pay URL (auth required)
+- `GET /payment/api/orders/:id` — Get order detail (owner only)
+- `GET /payment/api/orders/my` — List my orders
+- `GET /payment/api/vnpay-return` — User browser callback after VNPay (public)
+- `GET|POST /payment/api/vnpay-ipn` — VNPay server webhook (public, signed)
 
 ---
 
-### Notification Service (PLANNED - Phase 14)
+### Notification Service (STUB - Phase 11 WIP, Phase 16 hookup)
 
 **Port**: 3005  
-**Database**: `notification_db` (Neon PostgreSQL)  
-**Status**: Not Implemented
+**Status**: Stub implemented — consumes Kafka events, logs mock emails.
 
-**Planned Features:**
-- Kafka consumer for enrollment events
-- Email queue processing
-- Notification history and status tracking
+**Subscribes to:**
+- `payment.order.completed` → logs "thank you for purchasing" mock email
+- `learning.enrollment.created` → logs "enrollment confirmed" mock email
+
+**Planned (Phase 11 full):**
+- Nodemailer (dev) + Resend (prod)
 - Template-based email rendering
-- Retry mechanism for failed sends
+- Notification history in `notification_db`
+- Bell UI in web-client
 
 ## Getting Started
 
@@ -498,6 +500,8 @@ pnpm --filter @lms/course-service prisma:generate
 pnpm --filter @lms/course-service prisma:migrate
 pnpm --filter @lms/media-service prisma:generate
 pnpm --filter @lms/media-service prisma:migrate
+pnpm --filter @lms/payment-service prisma:generate
+pnpm --filter @lms/payment-service prisma:migrate
 ```
 
 7. Start all services
@@ -510,6 +514,111 @@ pnpm dev
 - Auth Service: `http://localhost:3101/health`
 - Course Service: `http://localhost:3002/health`
 - Media Service: `http://localhost:3004/health`
+- Payment Service: `http://localhost:3003/health`
+- Notification Service: `http://localhost:3005/health`
+
+---
+
+## Payment Flow (End-to-End) — Phase 13-16
+
+### Event-Driven Architecture
+
+```
+┌────────────┐   1.POST /payment/api/orders   ┌──────────────────┐
+│ web-client │ ─────────────────────────────> │  payment-service │
+│  (Next.js) │ <── 201 {payUrl} ──────────── │   (port 3003)    │
+└─────┬──────┘                                 └───────┬──────────┘
+      │ 2. redirect(payUrl)                             │ verifyPrice
+      ▼                                                 ▼
+┌────────────────┐                              ┌──────────────────┐
+│ VNPay Sandbox  │                              │  course-service  │
+│  (gateway)     │                              │   (internal)     │
+└─────┬──────────┘                              └──────────────────┘
+      │ 3. user pays
+      │
+      ├── 4a. redirect user → /payment/vnpay-return (frontend)
+      │
+      └── 4b. IPN webhook → /payment/api/vnpay-ipn (backend)
+                                        │
+                                        │ verify checksum + UPDATE order
+                                        │
+                                        ▼ publish
+                           ┌─────────────────────────────────┐
+                           │  Kafka: payment.order.completed │
+                           └─────────────────────────────────┘
+                                 │                   │
+                                 ▼                   ▼
+                        ┌──────────────┐    ┌────────────────────┐
+                        │course-service│    │notification-service│
+                        │  (consumer)  │    │   (consumer)       │
+                        └──────┬───────┘    └────────────────────┘
+                               │ create Enrollment (idempotent)
+                               │ publish learning.enrollment.created
+                               ▼
+                      ┌──────────────────┐
+                      │  notification    │ ──► mock email "Enrolled"
+                      │   (consumer #2)  │
+                      └──────────────────┘
+
+Retry chain: main -> retry-5s -> retry-1m -> system.dead-letter
+```
+
+### Prerequisites
+
+1. Create a 5th Neon database: **`payment_db`**. Copy pooler + direct URLs.
+2. Copy `services/payment-service/.env.example` → `services/payment-service/.env` and fill:
+   - `DATABASE_URL`, `DIRECT_URL`
+   - `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` (sandbox creds provided in `.env.example`)
+   - `COURSE_SERVICE_URL=http://localhost:3002` (internal, not through Kong)
+3. Copy `services/notification-service/.env.example` → `services/notification-service/.env`.
+4. Run migrations:
+   ```bash
+   pnpm --filter @lms/payment-service prisma:generate
+   pnpm --filter @lms/payment-service prisma:migrate
+   ```
+5. Start services: `pnpm dev` (turborepo picks up payment + notification automatically).
+
+### Testing the flow
+
+1. Seed a paid course (or edit an existing one to have `price > 0`).
+2. Log in on web-client (`http://localhost:3000`), open the course detail page.
+3. Click **"Mua khóa học"** (button shows price).
+4. You are redirected to VNPay sandbox. Use test card:
+   - Card: `9704198526191432198` (NCB — always succeed)
+   - Name: `NGUYEN VAN A`, Expiry: `07/15`, OTP: `123456`
+5. After payment, VNPay redirects to `/payment/vnpay-return`.
+6. Behavior depends on `NODE_ENV`:
+   - **`development`**: Return URL handler verifies signature, updates order to `COMPLETED`, publishes Kafka event directly (because VNPay sandbox cannot reach `localhost` for IPN). Frontend polls until enrollment appears.
+   - **`production`** (or ngrok setup): Return URL just shows "pending", IPN webhook is the source of truth.
+7. Course-service consumer picks up `payment.order.completed` → creates Enrollment idempotently (by `orderId @unique`) → publishes `learning.enrollment.created`.
+8. Notification-service logs mock emails for both events.
+
+### Testing IPN with real VNPay calls (optional)
+
+VNPay sandbox cannot reach `localhost`. To test real IPN:
+
+```bash
+# 1. Start ngrok
+ngrok http 8000
+
+# 2. Set VNPAY_IPN_URL in services/payment-service/.env
+VNPAY_IPN_URL=https://<ngrok-id>.ngrok.app/payment/api/vnpay-ipn
+
+# 3. Restart payment-service. VNPay will now POST IPN to the public URL.
+# Optionally: set NODE_ENV=production to disable the dev Return URL fallback.
+```
+
+### Kafka topics
+
+| Topic | Producer | Consumer(s) |
+|---|---|---|
+| `payment.order.completed` | payment-service | course-service, notification-service |
+| `payment.order.completed.retry-5s` | (republished on failure) | same |
+| `payment.order.completed.retry-1m` | (republished on failure) | same |
+| `learning.enrollment.created` | course-service | notification-service |
+| `system.dead-letter` | (after retry exhaustion) | — (admin inspects) |
+
+Retry helper lives in `packages/kafka-client/src/index.ts` → `consumeWithRetry()`.
 
 ### Installation Steps
 

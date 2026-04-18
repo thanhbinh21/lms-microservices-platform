@@ -11,7 +11,7 @@ const baseEnvSchema = z.object({
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 });
 
-// Kafka (Phase 11-12)
+// Kafka (Phase 11-16)
 const kafkaEnvSchema = z.object({
   KAFKA_BROKER: z.string().min(1, 'KAFKA_BROKER is required'),
 });
@@ -33,17 +33,30 @@ const jwtEnvSchema = z.object({
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
 });
 
-// VNPay (Phase 10 - payment-service)
+// VNPay (Phase 13-14 - payment-service)
 const vnpayEnvSchema = z.object({
   VNPAY_TMN_CODE: z.string().min(1, 'VNPAY_TMN_CODE is required'),
   VNPAY_HASH_SECRET: z.string().min(1, 'VNPAY_HASH_SECRET is required'),
   VNPAY_URL: z.string().url('VNPAY_URL must be valid URL'),
   VNPAY_RETURN_URL: z.string().url('VNPAY_RETURN_URL must be valid URL'),
+  VNPAY_IPN_URL: z.string().url('VNPAY_IPN_URL must be valid URL').optional(),
+  // Payment metadata
+  PAYMENT_CURRENCY: z.string().default('VND'),
+  PAYMENT_TIMEOUT: z.string().default('15'),
+  PAYMENT_VERSION: z.string().default('2.1.0'),
+  PAYMENT_COMMAND: z.string().default('pay'),
+  PAYMENT_LOCALE: z.string().default('vn'),
+  PAYMENT_ORDER_TYPE: z.string().default('other'),
+});
+
+// Service discovery noi bo (payment -> course de verify price)
+const internalServiceEnvSchema = z.object({
+  COURSE_SERVICE_URL: z.string().url('COURSE_SERVICE_URL must be valid URL').optional(),
 });
 
 // Storage (Phase 6 - media-service)
 const storageEnvSchema = z.object({
-  STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
+  STORAGE_PROVIDER: z.enum(['local', 's3', 'cloudinary']).default('local'),
 });
 
 /**
@@ -75,18 +88,25 @@ export const envSchemas = {
   jwt: jwtEnvSchema,
   vnpay: vnpayEnvSchema,
   storage: storageEnvSchema,
+  internalService: internalServiceEnvSchema,
 };
 
 // Helper functions for common service patterns
 export const validateAuthServiceEnv = () =>
   validateEnv(baseEnvSchema, databaseEnvSchema, redisEnvSchema, jwtEnvSchema);
 
-// Kafka se duoc them lai khi Phase 11-12 tich hop
+// Course-service: Phase 16 them Kafka consumer nen can Kafka env.
 export const validateCourseServiceEnv = () =>
-  validateEnv(baseEnvSchema, databaseEnvSchema);
+  validateEnv(baseEnvSchema, databaseEnvSchema, kafkaEnvSchema.partial());
 
 export const validatePaymentServiceEnv = () =>
-  validateEnv(baseEnvSchema, databaseEnvSchema, kafkaEnvSchema, vnpayEnvSchema);
+  validateEnv(
+    baseEnvSchema,
+    databaseEnvSchema,
+    kafkaEnvSchema,
+    vnpayEnvSchema,
+    internalServiceEnvSchema,
+  );
 
 export const validateMediaServiceEnv = () =>
   validateEnv(baseEnvSchema, databaseEnvSchema, storageEnvSchema);

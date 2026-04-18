@@ -65,16 +65,19 @@ services:
         paths:
           - /payment
         strip_path: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
     plugins:
-      - name: jwt
-        config:
-          secret_is_base64: false
-          key_claim_name: kid
-          claims_to_verify:
-            - exp
+      # JWT do payment-service tu trust header (giong course-service) de dong bo local-dev.
+      # Endpoint callback VNPay (/api/vnpay-return, /api/vnpay-ipn) public — khong auth.
       - name: rate-limiting
         config:
-          minute: 100
+          minute: 200
           policy: local
       - name: request-transformer
         config:
@@ -121,12 +124,7 @@ services:
           - /notification
         strip_path: true
     plugins:
-      - name: jwt
-        config:
-          secret_is_base64: false
-          key_claim_name: kid
-          claims_to_verify:
-            - exp
+      # Stub service (Phase 11 chua hoan chinh) — chi health + consumer, trust header.
       - name: rate-limiting
         config:
           minute: 100

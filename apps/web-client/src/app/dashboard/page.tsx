@@ -9,7 +9,8 @@ import { getDashboardData } from '@/app/actions/dashboard';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
 import Link from 'next/link';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
-import { BookOpen, Clock, Trophy, MessageSquare, PlayCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { DashboardTabs } from '@/components/dashboard/dashboard-tabs';
+import { BookOpen, Clock, Trophy, MessageSquare, PlayCircle, Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -47,23 +48,7 @@ export default function DashboardPage() {
 
       <SharedNavbar />
 
-      {/* Thanh dieu huong noi bo Dashboard — giong trang chu, dung chung header co nut Dang ky lam Giang vien + Dang xuat */}
-      <div className="relative z-30 border-b border-white/40 bg-white/40 backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-center gap-x-8 gap-y-2 px-4 py-2.5 text-sm font-semibold text-muted-foreground md:justify-start md:px-8">
-          <Link href="/dashboard" className="border-b-2 border-primary pb-0.5 text-primary">
-            Tổng quan
-          </Link>
-          <Link href="#" className="pb-0.5 transition-colors hover:text-primary">
-            Khóa học của tôi
-          </Link>
-          <Link href="#" className="pb-0.5 transition-colors hover:text-primary">
-            Chứng chỉ
-          </Link>
-          <Link href="#" className="pb-0.5 transition-colors hover:text-primary">
-            Cộng đồng
-          </Link>
-        </div>
-      </div>
+      <DashboardTabs />
 
       <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 space-y-10 relative z-10">
         

@@ -50,9 +50,14 @@ export const enrollCourse = async (req: Request, res: Response): Promise<Respons
     }
 
     if (course.price && course.price.toNumber() > 0) {
-      // Placeholder for PAID courses.
+      // Khoa hoc tra phi: FE phai di qua flow payment-service (POST /payment/api/orders).
+      // Enrollment se duoc tao async boi Kafka consumer sau khi payment.order.completed.
       const response: ApiResponse<null> = {
-        success: false, code: 402, message: 'Tính năng thanh toán đang cập nhật', data: null, trace_id: traceId,
+        success: false,
+        code: 402,
+        message: 'Khoa hoc co phi — vui long tao don hang qua /payment/api/orders',
+        data: null,
+        trace_id: traceId,
       };
       return res.status(402).json(response);
     }

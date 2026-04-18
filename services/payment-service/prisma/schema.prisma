@@ -1,0 +1,88 @@
+// Prisma Schema for Payment Service
+// Database: payment_db (Neon Serverless PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  VNPAY
+}
+
+enum AuditKind {
+  CREATE_URL
+  RETURN
+  IPN
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+/// Don hang tao boi user khi mua khoa hoc.
+/// vnpTxnRef la idempotency key phia VNPay (dung lam ma giao dich trong URL thanh toan).
+model Order {
+  id            String        @id @default(uuid())
+  userId        String        @map("user_id")
+  courseId      String        @map("course_id")
+  courseTitle   String?       @map("course_title")
+  amount        Decimal       @db.Decimal(12, 2)
+  currency      String        @default("VND")
+  status        OrderStatus   @default(PENDING)
+  paymentMethod PaymentMethod @default(VNPAY) @map("payment_method")
+
+  vnpTxnRef         String  @unique @map("vnp_txn_ref")
+  vnpPayUrl         String? @map("vnp_pay_url") @db.Text
+  vnpTransactionNo  String? @map("vnp_transaction_no")
+  vnpBankCode       String? @map("vnp_bank_code")
+  vnpResponseCode   String? @map("vnp_response_code")
+  failureReason     String? @map("failure_reason")
+
+  paidAt    DateTime? @map("paid_at")
+  expiresAt DateTime? @map("expires_at")
+  traceId   String?   @map("trace_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  audits VNPayAudit[]
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("orders")
+}
+
+/// Luu toan bo payload VNPay duoi dang JSONB phuc vu audit/compliance.
+model VNPayAudit {
+  id        String    @id @default(uuid())
+  orderId   String    @map("order_id")
+  kind      AuditKind
+  payload   Json      @db.JsonB
+  signature String?   @db.Text
+  valid     Boolean   @default(false)
+  note      String?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([kind])
+  @@map("vnpay_audits")
+}

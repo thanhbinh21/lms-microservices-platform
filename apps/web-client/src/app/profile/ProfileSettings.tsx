@@ -25,6 +25,10 @@ import {
 import { logoutAction } from '@/app/actions/auth';
 import { logout } from '@/lib/redux/authSlice';
 import { AdminInstructorRequestsPanel } from '@/components/admin/AdminInstructorRequestsPanel';
+import { SecurityPanel } from './panels/SecurityPanel';
+import { NotificationsPanel } from './panels/NotificationsPanel';
+import { PaymentsPanel } from './panels/PaymentsPanel';
+import { DisplayPanel } from './panels/DisplayPanel';
 
 type TabId = 'personal' | 'security' | 'notifications' | 'payments' | 'display' | 'instructor-requests';
 
@@ -307,6 +311,14 @@ export function ProfileSettings() {
                   </Button>
                 </CardFooter>
               </Card>
+            ) : activeTab === 'security' ? (
+              <SecurityPanel />
+            ) : activeTab === 'notifications' ? (
+              <NotificationsPanel />
+            ) : activeTab === 'payments' ? (
+              <PaymentsPanel />
+            ) : activeTab === 'display' ? (
+              <DisplayPanel />
             ) : (
               <Card className="glass-panel rounded-[2rem] border-white/60 shadow-xl">
                 <CardHeader className="p-8">
@@ -314,7 +326,7 @@ export function ProfileSettings() {
                     {sidebarItems.find((s) => s.id === activeTab)?.label ?? 'Cài đặt'}
                   </CardTitle>
                   <CardDescription className="text-base font-medium">
-                    Thông tin cho mục này đang được hoàn thiện. Vui lòng quay lại sau.
+                    Vui lòng chọn một mục trong thanh điều hướng.
                   </CardDescription>
                 </CardHeader>
               </Card>
