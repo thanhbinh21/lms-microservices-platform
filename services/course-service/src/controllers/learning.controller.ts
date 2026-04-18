@@ -37,9 +37,15 @@ export const enrollFree = async (req: Request, res: Response): Promise<Response 
       return res.status(402).json(response);
     }
 
-    await prisma.enrollment.create({
-      data: { userId, courseId, orderId: `FREE-${randomUUID()}` },
-    });
+    await prisma.$transaction([
+      prisma.enrollment.create({
+        data: { userId, courseId, orderId: `FREE-${randomUUID()}` },
+      }),
+      prisma.course.update({
+        where: { id: courseId },
+        data: { enrollmentCount: { increment: 1 } },
+      }),
+    ]);
 
     const response: ApiResponse<null> = { success: true, code: 201, message: 'Enrolled', data: null, trace_id: traceId };
     return res.status(201).json(response);

@@ -27,6 +27,7 @@ import {
   deleteLesson,
   getLessonPlayback,
 } from './controllers/lesson.controller';
+import { listCategories, createCategory } from './controllers/category.controller';
 import { enrollCourse, getMyEnrollments } from './controllers/enrollment.controller';
 import { getCourseProgress, updateLessonProgress } from './controllers/progress.controller';
 import { enrollFree, getLearnData, getEnrollmentStatus, completeLesson, getMyCourses } from './controllers/learning.controller';
@@ -73,8 +74,12 @@ app.post('/api/student/lessons/:lessonId/complete', requireAuth, completeLesson)
 app.get('/api/student/my-courses', requireAuth, getMyCourses);
 
 // ─── Public Routes ────────────────────────────────────────────────────────────
+app.get('/api/categories', listCategories);
 app.get('/api/courses', listCourses);
 app.get('/api/courses/:slug', getCourseBySlug);
+
+// ─── Admin Routes ─────────────────────────────────────────────────────────────
+app.post('/api/admin/categories', ...requireRole('admin'), createCategory);
 
 // ─── Instructor Routes (Kong injects x-user-id, x-user-role) ─────────────────
 // requireRole middleware: validates header exists + role check, sets res.locals.userId
