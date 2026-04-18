@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import type { Prisma } from '../generated/prisma/index.js';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
@@ -134,32 +135,103 @@ async function validateCourseBeforePublish(courseId: string, thumbnail: string, 
 
 // ─── Controllers ──────────────────────────────────────────────────────────────
 
-/** GET /api/courses - Danh sach khoa hoc da xuat ban (co phan trang) */
+const SORT_MAP: Record<string, Prisma.CourseOrderByWithRelationInput> = {
+  newest: { createdAt: 'desc' },
+  popular: { enrollmentCount: 'desc' },
+  rating: { averageRating: 'desc' },
+  price_asc: { price: 'asc' },
+  price_desc: { price: 'desc' },
+};
+
+/** GET /api/courses - Discovery endpoint with search, filter & sort */
 export async function listCourses(req: Request, res: Response) {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 12));
     const skip = (page - 1) * limit;
 
-    const [courses, total] = await prisma.$transaction([
+    const q = (req.query.q as string)?.trim() || '';
+    const categorySlug = (req.query.category as string)?.trim() || '';
+    const sortBy = (req.query.sortBy as string) || 'newest';
+    const minPrice = req.query.minPrice !== undefined ? Number(req.query.minPrice) : undefined;
+    const maxPrice = req.query.maxPrice !== undefined ? Number(req.query.maxPrice) : undefined;
+    const minRating = req.query.minRating !== undefined ? Number(req.query.minRating) : undefined;
+    const level = (req.query.level as string)?.toUpperCase() || '';
+
+    const where: Prisma.CourseWhereInput = { status: 'PUBLISHED' };
+
+    if (q) {
+      where.OR = [
+        { title: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+    if (categorySlug) {
+      where.category = { slug: categorySlug };
+    }
+    if (minPrice !== undefined && !isNaN(minPrice)) {
+      where.price = { ...(where.price as object), gte: minPrice };
+    }
+    if (maxPrice !== undefined && !isNaN(maxPrice)) {
+      where.price = { ...(where.price as object), lte: maxPrice };
+    }
+    if (minRating !== undefined && !isNaN(minRating)) {
+      where.averageRating = { gte: minRating };
+    }
+    if (level && ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].includes(level)) {
+      where.level = level as any;
+    }
+
+    const orderBy = SORT_MAP[sortBy] || SORT_MAP.newest;
+
+    const [courses, total, categories, priceAgg] = await prisma.$transaction([
       prisma.course.findMany({
-        where: { status: 'PUBLISHED' },
+        where,
         select: {
           id: true, title: true, slug: true, description: true,
           thumbnail: true, price: true, level: true, instructorId: true,
           totalLessons: true, totalDuration: true, createdAt: true,
+          averageRating: true, ratingCount: true, enrollmentCount: true,
+          category: { select: { name: true, slug: true } },
+          _count: { select: { enrollments: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip,
         take: limit,
       }),
-      prisma.course.count({ where: { status: 'PUBLISHED' } }),
+      prisma.course.count({ where }),
+      prisma.category.findMany({
+        include: { _count: { select: { courses: { where: { status: 'PUBLISHED' } } } } },
+        orderBy: { order: 'asc' },
+      }),
+      prisma.course.aggregate({
+        where: { status: 'PUBLISHED' },
+        _min: { price: true },
+        _max: { price: true },
+      }),
     ]);
 
     const response: ApiResponse<unknown> = {
       success: true, code: 200, message: 'Courses fetched successfully',
-      data: { courses: courses.map(serializeCourse), total, page, limit },
+      data: {
+        courses: courses.map(serializeCourse),
+        total,
+        page,
+        limit,
+        filters: {
+          categories: categories.map((c) => ({
+            slug: c.slug,
+            name: c.name,
+            courseCount: c._count.courses,
+          })),
+          priceRange: {
+            min: Number(priceAgg._min.price ?? 0),
+            max: Number(priceAgg._max.price ?? 0),
+          },
+          levels: ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'],
+        },
+      },
       trace_id: traceId,
     };
     return res.status(200).json(response);
@@ -177,6 +249,7 @@ export async function getCourseBySlug(req: Request, res: Response) {
     const course = await prisma.course.findFirst({
       where: { slug: req.params.slug, status: 'PUBLISHED' },
       include: {
+        category: { select: { name: true, slug: true } },
         chapters: {
           where: { lessons: { some: { isPublished: true } } },
           orderBy: { order: 'asc' },
