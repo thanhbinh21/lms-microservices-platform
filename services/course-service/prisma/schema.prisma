@@ -31,6 +31,13 @@ enum LessonSourceType {
   YOUTUBE
 }
 
+enum FailedEventStatus {
+  PENDING
+  RETRIED
+  RESOLVED
+  IGNORED
+}
+
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 
@@ -68,6 +75,7 @@ model Course {
   category    Category?    @relation(fields: [categoryId], references: [id])
   chapters    Chapter[]
   enrollments Enrollment[]
+  reviews     Review[]
 
   @@index([instructorId])
   @@index([status])
@@ -149,5 +157,39 @@ model Enrollment {
   @@unique([userId, courseId])
   @@index([userId])
   @@map("enrollments")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  courseId  String   @map("course_id")
+  rating    Int      // 1-5
+  comment   String?
+  isFlagged Boolean  @default(false) @map("is_flagged")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([courseId])
+  @@index([isFlagged])
+  @@map("reviews")
+}
+
+model FailedEvent {
+  id           String            @id @default(uuid())
+  topic        String
+  originalKey  String?           @map("original_key")
+  payload      Json
+  errorMessage String            @map("error_message")
+  retryCount   Int               @default(0) @map("retry_count")
+  status       FailedEventStatus @default(PENDING)
+  createdAt    DateTime          @default(now()) @map("created_at")
+  retriedAt    DateTime?         @map("retried_at")
+
+  @@index([status])
+  @@index([topic])
+  @@map("failed_events")
 }
 
