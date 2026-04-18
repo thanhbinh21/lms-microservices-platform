@@ -21,7 +21,7 @@ export interface GatewayHeaders {
   'x-trace-id': string;
 }
 
-// Base event cho Kafka
+// Base event cho Kafka (envelope co field chuan)
 export interface KafkaEvent<T = any> {
   event_id: string;
   event_type: string;
@@ -30,17 +30,58 @@ export interface KafkaEvent<T = any> {
   trace_id: string;
 }
 
-// Event thanh toan hoan tat
+// ─── Payment / Order domain ───────────────────────────────────────────────────
+
+export type OrderStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'EXPIRED' | 'REFUNDED';
+
+export interface OrderDto {
+  id: string;
+  userId: string;
+  courseId: string;
+  amount: number;
+  currency: string;
+  status: OrderStatus;
+  paymentMethod: 'vnpay';
+  vnpTxnRef: string;
+  vnpPayUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  paidAt?: string | null;
+}
+
+export interface CreateOrderInput {
+  courseId: string;
+}
+
+export interface CreateOrderResult {
+  orderId: string;
+  payUrl: string;
+  amount: number;
+  currency: string;
+}
+
+// Event thanh toan hoan tat (publish boi payment-service)
 export interface PaymentCompletedEvent {
   order_id: string;
   user_id: string;
   course_id: string;
   amount: number;
+  currency: string;
   payment_method: 'vnpay';
-  vnpay_transaction_id: string;
+  vnp_txn_ref: string;
+  vnp_transaction_no: string;
+  paid_at: string;
 }
 
-// Du lieu ghi danh khoa hoc
+// Event enrollment (publish boi course-service sau khi tao enrollment)
+export interface EnrollmentCreatedEvent {
+  user_id: string;
+  course_id: string;
+  order_id: string;
+  enrolled_at: string;
+}
+
+// Data chung cho enrollment (dung cho API response)
 export interface EnrollmentData {
   user_id: string;
   course_id: string;
@@ -48,13 +89,14 @@ export interface EnrollmentData {
   order_id: string;
 }
 
-// Response tu VNPay callback
+// Response tu VNPay (callback query params)
 export interface VNPayResponse {
   vnp_TxnRef: string;
   vnp_Amount: string;
   vnp_OrderInfo: string;
   vnp_ResponseCode: string;
   vnp_TransactionNo: string;
+  vnp_TransactionStatus: string;
   vnp_BankCode: string;
   vnp_PayDate: string;
   vnp_SecureHash: string;

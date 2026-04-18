@@ -26,7 +26,9 @@ import {
   Sparkles,
   Filter,
   SortAsc,
+  Loader2,
 } from 'lucide-react';
+import { DashboardTabs } from '@/components/dashboard/dashboard-tabs';
 
 type TabId = 'overview' | 'my-courses' | 'certificates' | 'community';
 
@@ -79,6 +81,7 @@ function calcStreak(courses: MyCourseSummary[]): number {
   }
   return streak;
 }
+
 
 export default function DashboardPage() {
   const router = useRouter();

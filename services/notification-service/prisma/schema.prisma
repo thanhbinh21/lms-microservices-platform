@@ -1,0 +1,67 @@
+// Prisma Schema for Notification Service
+// Database: notification_db (Neon Serverless PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum NotificationType {
+  PAYMENT_SUCCESS
+  ENROLLMENT_CREATED
+  COURSE_COMPLETED
+  LESSON_COMPLETED
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  MOCKED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+/// Notification cho hoc vien/giang vien.
+/// Phase 11 stub: chanel=IN_APP, status=MOCKED (log console).
+/// Phase 11 full: channel=EMAIL, status=SENT/FAILED (Nodemailer/Resend).
+model Notification {
+  id        String              @id @default(uuid())
+  userId    String              @map("user_id")
+  type      NotificationType
+  channel   NotificationChannel @default(IN_APP)
+  status    DeliveryStatus      @default(MOCKED)
+
+  title     String
+  body      String              @db.Text
+
+  /// Payload goc tu Kafka event (order_id, course_id, amount, ...)
+  metadata  Json                @default("{}") @db.JsonB
+
+  /// Idempotency key — dung event_id tu Kafka envelope de chong duplicate.
+  eventId   String?             @unique @map("event_id")
+  traceId   String?             @map("trace_id")
+
+  readAt    DateTime?           @map("read_at")
+  sentAt    DateTime?           @map("sent_at")
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@index([type])
+  @@map("notifications")
+}

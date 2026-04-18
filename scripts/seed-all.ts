@@ -56,6 +56,7 @@ function readEnvVarFromFile(filePath: string, variableName: string): string | un
   }
 
   return undefined;
+  
 }
 
 const projectRoot = path.resolve(__dirname, '..');

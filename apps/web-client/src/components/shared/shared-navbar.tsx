@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Clapperboard, LogOut, Menu, X } from 'lucide-react';
+import { Clapperboard, LayoutDashboard, LogOut, Menu, X } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { logoutAction } from '@/app/actions/auth';
@@ -38,6 +38,8 @@ export function SharedNavbar() {
   const normalizedRole = (user?.role || '').toUpperCase();
   const canBecomeInstructor = isAuthenticated && normalizedRole === 'STUDENT';
   const canAccessInstructorStudio = isAuthenticated && normalizedRole === 'INSTRUCTOR';
+  // Chi hoc vien (STUDENT) moi thay Dashboard. INSTRUCTOR dung Studio, ADMIN dung Profile > Quan ly don GV.
+  const canAccessDashboard = isAuthenticated && normalizedRole === 'STUDENT';
 
   const handleLogout = async () => {
     await logoutAction();
@@ -73,6 +75,17 @@ export function SharedNavbar() {
         <div className="hidden md:flex items-center gap-4">
           {isAuthenticated ? (
             <>
+              {canAccessDashboard && (
+                <Link href="/dashboard">
+                  <Button
+                    variant={pathname.startsWith('/dashboard') ? 'default' : 'ghost'}
+                    className="gap-2 font-semibold"
+                  >
+                    <LayoutDashboard className="size-4 shrink-0" />
+                    Dashboard
+                  </Button>
+                </Link>
+              )}
               <Link
                 href="/profile"
                 className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white/50"
@@ -147,9 +160,11 @@ export function SharedNavbar() {
           <div className="mt-4 grid grid-cols-1 gap-2">
             {isAuthenticated ? (
               <>
-                <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
-                  <Button variant="outline" className="w-full">Dashboard</Button>
-                </Link>
+                {canAccessDashboard && (
+                  <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
+                    <Button variant="outline" className="w-full">Dashboard</Button>
+                  </Link>
+                )}
                 <Link href="/profile" onClick={() => setMobileOpen(false)}>
                   <Button variant="outline" className="w-full font-bold">Hồ sơ & tài khoản</Button>
                 </Link>

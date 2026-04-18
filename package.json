@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "dev:kill-ports": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-dev-ports.ps1",
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --concurrency=20",
     "build": "turbo run build",
     "test": "turbo run test",
     "test:integration": "vitest run",
@@ -20,7 +20,8 @@
     "docker:health": "docker-compose ps",
     "seed": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-all.ts",
     "seed:accounts": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-accounts.ts",
-    "seed:courses": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-courses.ts"
+    "seed:courses": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-courses.ts",
+    "seed:categories": "pnpm --filter @lms/course-service exec npx tsx ../../scripts/seed-categories.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

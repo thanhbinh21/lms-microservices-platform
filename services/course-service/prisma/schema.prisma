@@ -31,31 +31,58 @@ enum LessonSourceType {
   YOUTUBE
 }
 
+enum FailedEventStatus {
+  PENDING
+  RETRIED
+  RESOLVED
+  IGNORED
+}
+
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 
-model Course {
-  id           String       @id @default(uuid())
-  title        String
-  slug         String       @unique
-  description  String?
-  thumbnail    String?      // Cloudinary/S3 URL (Phase 6)
-  price        Decimal      @default(0) @db.Decimal(10, 2)
-  level        CourseLevel  @default(BEGINNER)
-  status       CourseStatus @default(DRAFT)
-  category     String?
-  instructorId String       @map("instructor_id")  // from x-user-id (Gateway)
-  totalLessons Int          @default(0) @map("total_lessons")
-  totalDuration Int         @default(0) @map("total_duration") // seconds
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
+model Category {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
 
-  // Relations
-  chapters Chapter[]
+  courses Course[]
+
+  @@map("categories")
+}
+
+model Course {
+  id              String       @id @default(uuid())
+  title           String
+  slug            String       @unique
+  description     String?
+  thumbnail       String?
+  price           Decimal      @default(0) @db.Decimal(10, 2)
+  level           CourseLevel  @default(BEGINNER)
+  status          CourseStatus @default(DRAFT)
+  categoryId      String?      @map("category_id")
+  instructorId    String       @map("instructor_id")
+  totalLessons    Int          @default(0) @map("total_lessons")
+  totalDuration   Int          @default(0) @map("total_duration")
+  averageRating   Float        @default(0) @map("average_rating")
+  ratingCount     Int          @default(0) @map("rating_count")
+  enrollmentCount Int          @default(0) @map("enrollment_count")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  category    Category?    @relation(fields: [categoryId], references: [id])
+  chapters    Chapter[]
   enrollments Enrollment[]
+  reviews     Review[]
 
   @@index([instructorId])
   @@index([status])
+  @@index([categoryId])
+  @@index([averageRating(sort: Desc), enrollmentCount(sort: Desc)])
+  @@index([price])
+  @@index([createdAt(sort: Desc)])
   @@map("courses")
 }
 
@@ -130,5 +157,39 @@ model Enrollment {
   @@unique([userId, courseId])
   @@index([userId])
   @@map("enrollments")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  courseId  String   @map("course_id")
+  rating    Int      // 1-5
+  comment   String?
+  isFlagged Boolean  @default(false) @map("is_flagged")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([courseId])
+  @@index([isFlagged])
+  @@map("reviews")
+}
+
+model FailedEvent {
+  id           String            @id @default(uuid())
+  topic        String
+  originalKey  String?           @map("original_key")
+  payload      Json
+  errorMessage String            @map("error_message")
+  retryCount   Int               @default(0) @map("retry_count")
+  status       FailedEventStatus @default(PENDING)
+  createdAt    DateTime          @default(now()) @map("created_at")
+  retriedAt    DateTime?         @map("retried_at")
+
+  @@index([status])
+  @@index([topic])
+  @@map("failed_events")
 }
 
