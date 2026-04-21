@@ -17,6 +17,18 @@ export function handlePrismaError(
   traceId: string,
   context: string,
 ): Response {
+  if (err instanceof Prisma.PrismaClientInitializationError) {
+    logger.error({ err }, `${context} error`);
+    const unavailable: ApiResponse<null> = {
+      success: false,
+      code: 503,
+      message: 'Database temporarily unavailable',
+      data: null,
+      trace_id: traceId,
+    };
+    return res.status(503).json(unavailable);
+  }
+
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     switch (err.code) {
       case 'P2002': {

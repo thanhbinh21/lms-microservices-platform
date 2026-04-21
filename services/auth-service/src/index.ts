@@ -11,7 +11,8 @@ import { login } from './controllers/login.controller.js';
 import { refresh } from './controllers/refresh.controller.js';
 import { logout } from './controllers/logout.controller.js';
 import { updateUserRole } from './controllers/update-role.controller.js';
-import { requireAdmin } from './middleware/require-admin.js';
+import { becomeEducator } from './controllers/become-educator.controller.js';
+import { requireAdmin } from './middlewares/requireAdmin.js';
 import adminRouter from './routes/admin.routes.js';
 
 // Validate bien moi truong khi khoi dong
@@ -61,7 +62,8 @@ app.post('/register', register);
 app.post('/login', login);
 app.post('/refresh', refresh);
 app.post('/logout', logout);
-app.patch('/users/role', updateUserRole);
+app.post('/become-educator', becomeEducator);
+app.patch('/users/role', requireAdmin, updateUserRole);
 
 // Admin routes
 app.use('/admin', requireAdmin, adminRouter);

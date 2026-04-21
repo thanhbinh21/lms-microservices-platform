@@ -144,10 +144,10 @@ export default function InstructorCourseDetailPage() {
           <p className="text-muted-foreground mt-1 text-sm font-medium">Trang chi tiết đầy đủ dành cho giảng viên.</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => router.push(`/instructor/courses/${courseId}`)}>
+          <Button variant="outline" onClick={() => router.push(`/instructor/courses/${courseId}?step=2`)}>
             <FileEdit className="w-4 h-4 mr-2" /> Cấu hình
           </Button>
-          <Button variant="outline" onClick={() => router.push(`/instructor/courses/${courseId}/curriculum`)}>
+          <Button variant="outline" onClick={() => router.push(`/instructor/courses/${courseId}?step=3`)}>
             <List className="w-4 h-4 mr-2" /> Chương trình
           </Button>
         </div>
@@ -194,7 +194,7 @@ export default function InstructorCourseDetailPage() {
             {course.thumbnail ? (
               <div>
                 <p className="text-slate-500 font-semibold mb-2">Thumbnail</p>
-                <img src={course.thumbnail} alt="thumbnail" className="w-full max-h-[340px] rounded-xl object-cover border border-slate-200" />
+                <img src={course.thumbnail} alt="thumbnail" className="w-full max-h-85 rounded-xl object-cover border border-slate-200" />
               </div>
             ) : null}
           </CardContent>
@@ -204,7 +204,7 @@ export default function InstructorCourseDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Eye className="w-4 h-4" /> Danh sách bài học</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 max-h-[620px] overflow-auto">
+          <CardContent className="space-y-3 max-h-155 overflow-auto">
             {lessons.length === 0 ? (
               <p className="text-sm text-muted-foreground">Chưa có bài học nào.</p>
             ) : (
@@ -238,7 +238,7 @@ export default function InstructorCourseDetailPage() {
               <iframe
                 title={`preview-${selected.lesson.id}`}
                 src={getYoutubeEmbedUrl(selected.lesson.videoUrl) || undefined}
-                className={`w-full rounded-xl border border-slate-200 ${isPreviewExpanded ? 'h-[520px]' : 'h-[300px]'}`}
+                className={`w-full rounded-xl border border-slate-200 ${isPreviewExpanded ? 'h-130' : 'h-75'}`}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
               />
@@ -249,7 +249,7 @@ export default function InstructorCourseDetailPage() {
             <video
               controls
               preload="metadata"
-              className={`w-full rounded-xl border border-slate-200 bg-black ${isPreviewExpanded ? 'h-[520px]' : 'h-[300px]'}`}
+              className={`w-full rounded-xl border border-slate-200 bg-black ${isPreviewExpanded ? 'h-130' : 'h-75'}`}
               src={selected.lesson.videoUrl}
             >
               Trình duyệt không hỗ trợ phát video.

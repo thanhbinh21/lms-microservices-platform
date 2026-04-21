@@ -22,14 +22,12 @@
     "prisma:migrate:status:all": "pnpm -r --workspace-concurrency=1 --filter ./services/* exec prisma migrate status",
     "prisma:push:all": "pnpm -r --workspace-concurrency=1 --filter ./services/* run prisma:push",
     "setup:db": "pnpm prisma:migrate:deploy:all && pnpm prisma:generate:all",
+    "db:sync": "pnpm prisma:push:all && pnpm prisma:generate:all",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
     "docker:health": "docker-compose ps",
-    "seed": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-all.ts",
-    "seed:accounts": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-accounts.ts",
-    "seed:courses": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-courses.ts",
-    "seed:categories": "pnpm --filter @lms/course-service exec npx tsx ../../scripts/seed-categories.ts"
+    "seed": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-all.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

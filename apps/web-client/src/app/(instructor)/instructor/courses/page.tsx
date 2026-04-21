@@ -100,13 +100,13 @@ export default function InstructorCoursesPage() {
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-lg shadow-sm font-semibold" onClick={(event) => {
                   event.stopPropagation();
-                  router.push(`/instructor/courses/${course.id}`);
+                  router.push(`/instructor/courses/${course.id}?step=1`);
                 }}>
                   <FileEdit className="w-4 h-4 mr-2" /> Cấu hình
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-lg shadow-sm font-semibold" onClick={(event) => {
                   event.stopPropagation();
-                  router.push(`/instructor/courses/${course.id}/curriculum`);
+                  router.push(`/instructor/courses/${course.id}?step=3`);
                 }}>
                   <List className="w-4 h-4 mr-2" /> Chương trình
                 </Button>

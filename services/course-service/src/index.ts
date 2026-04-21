@@ -14,6 +14,7 @@ import {
   getInstructorCourses,
   getInstructorCourseById,
   getCourseCurriculum,
+  getCoursePublishGuard,
 } from './controllers/course.controller';
 import {
   createChapter,
@@ -93,6 +94,7 @@ app.use('/api/admin', ...requireRole('admin'), adminRouter);
 // requireRole middleware: validates header exists + role check, sets res.locals.userId
 app.get('/api/instructor/courses', requireAuth, getInstructorCourses);
 app.get('/api/instructor/courses/:id', requireAuth, getInstructorCourseById);
+app.get('/api/instructor/courses/:id/publish-guard', ...requireRole('instructor', 'admin'), getCoursePublishGuard);
 app.get('/api/courses/:id/curriculum', ...requireRole('instructor', 'admin'), getCourseCurriculum);
 app.post('/api/courses', ...requireRole('instructor', 'admin'), createCourse);
 app.put('/api/courses/:id', ...requireRole('instructor', 'admin'), updateCourse);

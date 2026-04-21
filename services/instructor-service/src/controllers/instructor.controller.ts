@@ -108,9 +108,11 @@ export async function getRequest(req: Request, res: Response): Promise<Response 
 export async function approve(req: Request, res: Response): Promise<Response | void> {
   const traceId = (req.headers['x-trace-id'] as string | undefined) || null;
   try {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : '';
-    const data = await approveRequest(req.params.id as string, token);
+    if (!req.user) {
+      return errorResponse(res, 'Unauthorized', 401, traceId);
+    }
+
+    const data = await approveRequest(req.params.id as string, req.user);
     return successResponse(res, 'Instructor request approved', data, 200, traceId);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to approve request';

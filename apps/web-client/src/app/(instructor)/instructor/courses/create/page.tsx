@@ -33,7 +33,7 @@ export default function CreateCoursePage() {
     try {
       const result = await createCourseAction(values.title);
       if (result.success && result.courseId) {
-        router.push(`/instructor/courses/${result.courseId}`);
+        router.push(`/instructor/courses/${result.courseId}?step=1`);
         return;
       }
 

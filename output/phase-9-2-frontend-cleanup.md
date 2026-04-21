@@ -259,6 +259,64 @@ Demo luong du lieu end-to-end:
 5. Web-client goi `/media/api/upload/complete` de xac nhan.
 6. Media-service cap nhat `MediaAsset.status=UPLOADED` va tra URL phuc vu playback/thumbnail.
 
+## 15. Update bo sung - 5-step course wizard + publish guard + auto-save draft
+Muc tieu thay doi:
+- Chuyen tu luong "mo tat ca cung luc" sang wizard 5 buoc ro rang cho instructor.
+- Loai bo nguy co publish nham bang guard checklist bat buoc truoc khi live.
+- Giam mat du lieu nhap dang do dang bang co che auto-save theo buoc va theo thao tac curriculum/media.
+
+Pham vi file/code bi anh huong:
+- services/course-service/src/controllers/course.controller.ts
+- services/course-service/src/index.ts
+- apps/web-client/src/app/actions/instructor.ts
+- apps/web-client/src/app/(instructor)/instructor/courses/create/page.tsx
+- apps/web-client/src/app/(instructor)/instructor/courses/[courseId]/page.tsx
+- apps/web-client/src/app/(instructor)/instructor/courses/page.tsx
+- apps/web-client/src/app/(instructor)/instructor/courses/[courseId]/detail/page.tsx
+- project_overview.md
+
+Quyet dinh ky thuat quan trong va ly do:
+- Dung route wizard duy nhat `/instructor/courses/:courseId?step=1..5`:
+   - Step 1: title + category + level + language.
+   - Step 2: description + thumbnail + pricing.
+   - Step 3: curriculum (chapter/lesson).
+   - Step 4: media tung lesson.
+   - Step 5: publish guard + publish action.
+- Backend them endpoint `GET /api/instructor/courses/:id/publish-guard` de frontend doc trang thai guard theo nguon su that server-side.
+- Publish guard duoc chuan hoa theo yeu cau:
+   - Co thumbnail.
+   - Co it nhat 1 lesson.
+   - Neu ton tai bai tra phi (lesson `isFree=false`) thi gia khoa hoc phai > 0.
+- Loai bo dieu kien cu "phai co lesson da publish + co video" khoi publish guard de dung yeu cau moi.
+- Auto-save draft:
+   - Step 1-2: luu khi bam Next hoac bam nut luu buoc.
+   - Step 3-4: moi thao tac tao/sua/xoa chapter/lesson hoac upload/gan media deu goi API va cap nhat ngay.
+
+Huong dan migrate/deploy:
+1. Deploy `course-service` truoc de co endpoint publish-guard va logic publish moi.
+2. Deploy `web-client` sau de mo wizard UI va route step query.
+3. Verify nhanh:
+    - Tao khoa hoc moi -> redirect vao `?step=1`.
+    - Hoan tat step 1,2,3 -> vao step 5 thay dung trang thai guard.
+    - Publish bi disable khi guard chua dat; enable khi tat ca guard dat.
+
+Demo luong du lieu end-to-end:
+1. Instructor tao course moi -> he thong redirect wizard step 1.
+2. Instructor nhap thong tin step 1/2 -> BFF goi `updateCourseAction` de luu draft.
+3. Instructor tao curriculum va upload/gan media -> BFF goi chapter/lesson/media actions, cap nhat du lieu server ngay.
+4. O step 5, frontend goi `getCoursePublishGuardAction` de render checklist.
+5. Khi checklist dat, frontend goi `publishCourseAction` -> backend set status PUBLISHED va dong bo chapter/lesson phu hop.
+
+Truoc va sau khi thay doi:
+- Truoc:
+   - Settings, curriculum, media tach roi; khong co stepper thong nhat.
+   - Co the thao tac lon xon va kho biet buoc nao bat buoc.
+   - Publish guard khong khop yeu cau nghiep vu moi.
+- Sau:
+   - Luong tao khoa hoc theo 5 buoc co progress bar + lock buoc theo trinh tu.
+   - Publish guard hien thi ro tung dieu kien va khoa nut publish den khi dat.
+   - Draft duoc luu lien tuc theo buoc/thao tac quan trong, giam mat du lieu khi dong tab.
+
 Truoc va sau khi thay doi:
 - Truoc:
    - Chu yeu dua vao local/S3 branch, chua co flow Cloudinary first thuc te.
@@ -272,3 +330,71 @@ Ket qua kiem thu ky thuat:
 - `pnpm --filter @lms/env-validator run build` pass.
 - `pnpm --filter @lms/media-service run build` pass.
 - Kiem tra compile tren cac file web-client bi anh huong: khong co loi TypeScript tai file da sua.
+
+## 16. Update bo sung - chuan hoa UX wizard theo yeu cau nghiep vu instructor (Apr 21, 2026)
+Muc tieu thay doi:
+- Viet hoa toan bo giao dien wizard sang tieng Viet co dau de de su dung.
+- Chuong duoc danh so tu dong khi tao/chinh sua de curriculum ro trinh tu.
+- Lesson co action chinh sua day du; neu lesson khong free thi bat buoc nhap gia ngay tai thao tac lesson.
+- Step 4 bo select lesson don le, hien thi tat ca lesson theo tung chuong de nhap dong thoi.
+- Publish xong dieu huong sang trang public course detail (nhu hoc vien xem).
+- Loai bo `window.confirm` mac dinh, thay bang thong bao/trang thai va xac nhan bang UI he thong.
+
+Pham vi file/code bi anh huong:
+- apps/web-client/src/app/(instructor)/instructor/courses/[courseId]/page.tsx
+- apps/web-client/src/app/actions/instructor.ts
+- services/course-service/src/controllers/lesson.controller.ts
+- project_overview.md
+
+Quyet dinh ky thuat quan trong va ly do:
+- Step 3:
+   - Tu dong format ten chuong: `Chuong N: ...` de giam nhap sai thu tu.
+   - Them luong edit lesson (title + free/paid).
+   - Khi lesson `isFree=false`, bat buoc nhap gia hop le va dong bo vao `course.price` truoc khi luu lesson.
+- Step 4:
+   - Render full tree chuong/bai hoc thay vi combobox chon 1 lesson.
+   - Moi lesson co 3 nhom thao tac:
+      - Upload video
+      - Gan YouTube
+      - Bo media de chi con text
+   - API lesson cho phep `videoUrl` nullable + them field `content` de ho tro bai hoc chi co van ban.
+- Publish:
+   - Sau `publishCourseAction` thanh cong, redirect ngay sang `/courses/{slug}`.
+
+Huong dan migrate/deploy:
+1. Deploy `course-service` truoc (lesson controller da ho tro `content` va clear media).
+2. Deploy `web-client` sau (wizard UI va redirect publish).
+3. Smoke test:
+   - Tao chuong moi -> title co prefix so thu tu.
+   - Tao lesson paid ma khong nhap gia -> bi chan.
+   - Step 4 co the luu text khong media.
+   - Chuyen doi media giua upload va YouTube khong bi song song 2 nguon.
+   - Publish thanh cong -> vao trang `/courses/[slug]`.
+
+Demo luong du lieu end-to-end:
+1. Instructor tao/chinh sua khoa hoc o wizard.
+2. Step 3 tao chapter/lesson, neu lesson paid thi update gia khoa hoc.
+3. Step 4 cap nhat lesson qua `updateLessonAction` (media va content).
+4. Step 5 pass guard -> publish.
+5. Frontend redirect qua route public detail de xem nhu role student.
+
+Truoc va sau khi thay doi:
+- Truoc:
+   - Chuong chua tu dong danh so.
+   - Lesson moi tao khong co edit action day du.
+   - Step 4 chi thao tac 1 lesson/luc, kho quan sat toan bo.
+   - Con dung `window.confirm` native.
+   - Publish xong o lai trang instructor.
+- Sau:
+   - Chuong duoc danh so nhat quan ngay khi tao/chinh sua.
+   - Lesson edit duoc title + free/paid, co gate gia cho lesson paid.
+   - Step 4 xu ly tat ca lesson tren cung man hinh, ho tro text-only.
+   - Xac nhan xoa dung UI noi bo, khong dung alert/confirm mac dinh.
+   - Publish xong dieu huong sang trang public course detail.
+
+Ket qua kiem thu ky thuat:
+- Diagnostic check khong phat hien loi tai cac file da sua.
+- Runtime prerequisites:
+   - `docker-compose ps`: Kafka/Kong/Redis/Zookeeper dang healthy.
+   - `pnpm --filter @lms/types run build`: pass.
+   - `pnpm --filter @lms/course-service exec prisma migrate status`: schema up-to-date.

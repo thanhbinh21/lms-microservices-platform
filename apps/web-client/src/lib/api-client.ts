@@ -54,6 +54,12 @@ async function writeAuthCookies(params: { accessToken?: string; refreshToken?: s
   }
 }
 
+async function clearAuthCookies() {
+  const cookieStore = await cookies();
+  cookieStore.delete('accessToken');
+  cookieStore.delete('refreshToken');
+}
+
 async function refreshAccessToken(): Promise<string | undefined> {
   const cookieStore = await cookies();
   const refreshToken = cookieStore.get('refreshToken')?.value;
@@ -68,11 +74,19 @@ async function refreshAccessToken(): Promise<string | undefined> {
     });
 
     const result = await response.json();
-    if (!response.ok || !result.success) return undefined;
+    if (!response.ok || !result.success) {
+      if (response.status === 401 || response.status === 403) {
+        await clearAuthCookies();
+      }
+      return undefined;
+    }
 
     const nextAccessToken = result?.data?.accessToken as string | undefined;
     const nextRefreshToken = result?.data?.refreshToken as string | undefined;
-    if (!nextAccessToken || !nextRefreshToken) return undefined;
+    if (!nextAccessToken || !nextRefreshToken) {
+      await clearAuthCookies();
+      return undefined;
+    }
 
     await writeAuthCookies({ accessToken: nextAccessToken, refreshToken: nextRefreshToken });
     return nextAccessToken;

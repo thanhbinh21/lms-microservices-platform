@@ -4,8 +4,10 @@
  * Chạy: npx tsx scripts/seed-all.ts
  * 
  * Thực hiện:
- *   1. Tạo 3 tài khoản (Student, Instructor, Admin)
- *   2. Tạo 3 khóa học mẫu với chapters và lessons
+ *   1. Xóa toàn bộ dữ liệu mẫu cũ (Clear Data)
+ *   2. Tạo tài khoản (Student, Instructor, Admin)
+ *   3. Tạo danh mục (Categories)
+ *   4. Tạo khóa học mẫu với chapters và lessons
  */
 
 import { PrismaClient as CoursePrisma } from '../services/course-service/src/generated/prisma/index.js';
@@ -13,6 +15,10 @@ import { PrismaClient as AuthPrisma } from '../services/auth-service/src/generat
 import bcrypt from 'bcryptjs';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const BCRYPT_SALT_ROUNDS = 10;
 
@@ -56,7 +62,6 @@ function readEnvVarFromFile(filePath: string, variableName: string): string | un
   }
 
   return undefined;
-  
 }
 
 const projectRoot = path.resolve(__dirname, '..');
@@ -108,6 +113,38 @@ const coursePrisma = new CoursePrisma({
   },
 });
 
+// ─── Clear Data ───────────────────────────────────────────────────────────────
+
+async function clearOldData() {
+  console.log('══════════════════════════════════════════════════');
+  console.log('  🗑️  BƯỚC 1: XÓA DỮ LIỆU CŨ');
+  console.log('══════════════════════════════════════════════════\n');
+
+  try {
+    // Delete Courses Data first (Child to Parent)
+    await coursePrisma.lesson.deleteMany();
+    console.log('  ✅ Đã xóa toàn bộ Lessons');
+    
+    await coursePrisma.chapter.deleteMany();
+    console.log('  ✅ Đã xóa toàn bộ Chapters');
+    
+    await coursePrisma.course.deleteMany();
+    console.log('  ✅ Đã xóa toàn bộ Courses');
+
+    await coursePrisma.category.deleteMany();
+    console.log('  ✅ Đã xóa toàn bộ Categories');
+
+    // Delete Auth Data
+    await authPrisma.user.deleteMany();
+    console.log('  ✅ Đã xóa toàn bộ Users');
+    
+    console.log('\n  Hoàn tất dọn dẹp dữ liệu cũ!\n');
+  } catch (error) {
+    console.error('  ❌ Lỗi khi xóa dữ liệu:', error);
+    throw error;
+  }
+}
+
 // ─── Seed Accounts ────────────────────────────────────────────────────────────
 
 interface SeedAccount {
@@ -125,31 +162,13 @@ const SEED_ACCOUNTS: SeedAccount[] = [
 
 async function seedAccounts(): Promise<Map<string, string>> {
   console.log('══════════════════════════════════════════════════');
-  console.log('  📋 BƯỚC 1: TẠO TÀI KHOẢN MẪU');
+  console.log('  📋 BƯỚC 2: TẠO TÀI KHOẢN MẪU');
   console.log('══════════════════════════════════════════════════\n');
 
   const userIdMap = new Map<string, string>(); // role -> userId
 
   for (const account of SEED_ACCOUNTS) {
     try {
-      const existing = await authPrisma.user.findUnique({
-        where: { email: account.email },
-      });
-
-      if (existing) {
-        if (existing.role !== account.role) {
-          await authPrisma.user.update({
-            where: { id: existing.id },
-            data: { role: account.role },
-          });
-          console.log(`  ✏️  [${account.role.padEnd(12)}] ${account.email} — cập nhật role`);
-        } else {
-          console.log(`  ⏭️  [${account.role.padEnd(12)}] ${account.email} — đã tồn tại`);
-        }
-        userIdMap.set(account.role, existing.id);
-        continue;
-      }
-
       const hashedPassword = await bcrypt.hash(account.password, BCRYPT_SALT_ROUNDS);
 
       const user = await authPrisma.user.create({
@@ -174,9 +193,48 @@ async function seedAccounts(): Promise<Map<string, string>> {
   for (const account of SEED_ACCOUNTS) {
     console.log(`    ${account.role.padEnd(12)} | ${account.email.padEnd(25)} | ${account.password}`);
   }
-  console.log('  ' + '─'.repeat(60));
+  console.log('  ' + '─'.repeat(60) + '\n');
 
   return userIdMap;
+}
+
+// ─── Seed Categories ──────────────────────────────────────────────────────────
+
+const CATEGORIES = [
+  { name: 'Web Frontend', slug: 'web-frontend', order: 1 },
+  { name: 'Web Backend', slug: 'web-backend', order: 2 },
+  { name: 'Mobile', slug: 'mobile', order: 3 },
+  { name: 'DevOps', slug: 'devops', order: 4 },
+  { name: 'System Design', slug: 'system-design', order: 5 },
+  { name: 'Data Science', slug: 'data-science', order: 6 },
+  { name: 'Trí Tuệ Nhân Tạo (AI)', slug: 'ai-ml', order: 7 },
+  { name: 'Database', slug: 'database', order: 8 },
+  { name: 'Security', slug: 'security', order: 9 },
+  { name: 'Automation', slug: 'automation', order: 10 },
+  { name: 'Soft Skills', slug: 'soft-skills', order: 11 },
+];
+
+async function seedCategories(): Promise<Map<string, string>> {
+  console.log('══════════════════════════════════════════════════');
+  console.log('  🏷️  BƯỚC 3: TẠO DANH MỤC');
+  console.log('══════════════════════════════════════════════════\n');
+
+  const categoryIdMap = new Map<string, string>(); // slug -> categoryId
+
+  for (const cat of CATEGORIES) {
+    try {
+      const category = await coursePrisma.category.create({
+        data: cat,
+      });
+      console.log(`  ✅ ${cat.name} (${cat.slug})`);
+      categoryIdMap.set(cat.slug, category.id);
+    } catch (error) {
+      console.error(`  ❌ Lỗi tạo danh mục ${cat.name}:`, error);
+    }
+  }
+  
+  console.log('');
+  return categoryIdMap;
 }
 
 // ─── Seed Courses ─────────────────────────────────────────────────────────────
@@ -207,7 +265,7 @@ interface SeedChapter {
 interface SeedCourse {
   title: string;
   description: string;
-  category: string;
+  categorySlug: string;
   thumbnailUrl: string;
   price: number;
   chapters: SeedChapter[];
@@ -217,7 +275,7 @@ const SEED_COURSES: SeedCourse[] = [
   {
     title: '5 Nền Tảng Cơ Bản Dành Cho Người Dùng AI',
     description: 'Hiểu và sử dụng AI hiệu quả không chỉ là chạy theo công cụ. Khóa học này giúp bạn nắm vững 5 nền tảng cơ bản về AI để tăng năng suất làm việc.',
-    category: 'Trí Tuệ Nhân Tạo (AI)',
+    categorySlug: 'ai-ml',
     thumbnailUrl: 'https://res.cloudinary.com/demo/image/upload/sample_ai_course.jpg',
     price: 0,
     chapters: [
@@ -265,7 +323,7 @@ const SEED_COURSES: SeedCourse[] = [
   {
     title: 'Xác Thực API Chuyên Sâu Cùng JWT',
     description: 'Nắm vững tiêu chuẩn JSON Web Token (JWT) trong xác thực và truyền dữ liệu an toàn bên trong hệ thống API.',
-    category: 'Backend Development',
+    categorySlug: 'web-backend',
     thumbnailUrl: 'https://res.cloudinary.com/demo/image/upload/sample_jwt_course.jpg',
     price: 250000,
     chapters: [
@@ -307,7 +365,7 @@ const SEED_COURSES: SeedCourse[] = [
   {
     title: 'Tự Động Hóa Với n8n: Xây Dựng Đội Quân 6 AI Agents',
     description: 'Hướng dẫn thực hành xây dựng đội quân trợ lý thông minh trên n8n, giúp tự động hóa hơn 200 tasks mỗi ngày từ email, lịch hẹn đến tìm kiếm content.',
-    category: 'Automation',
+    categorySlug: 'automation',
     thumbnailUrl: 'https://res.cloudinary.com/demo/image/upload/sample_n8n_course.jpg',
     price: 500000,
     chapters: [
@@ -348,9 +406,9 @@ const SEED_COURSES: SeedCourse[] = [
   },
 ];
 
-async function seedCourses(userIdMap: Map<string, string>) {
-  console.log('\n══════════════════════════════════════════════════');
-  console.log('  📚 BƯỚC 2: TẠO KHÓA HỌC MẪU');
+async function seedCourses(userIdMap: Map<string, string>, categoryIdMap: Map<string, string>) {
+  console.log('══════════════════════════════════════════════════');
+  console.log('  📚 BƯỚC 4: TẠO KHÓA HỌC MẪU');
   console.log('══════════════════════════════════════════════════\n');
 
   // Uu tien dung instructor ID, sau do admin, cuoi cung la system
@@ -359,25 +417,18 @@ async function seedCourses(userIdMap: Map<string, string>) {
     userIdMap.get('ADMIN') ||
     'system-instructor-00000000';
 
-  console.log(`  📝 Instructor ID: ${instructorId}\n`);
+  console.log(`  📝 Tác giả (Instructor ID): ${instructorId}\n`);
 
   for (const courseData of SEED_COURSES) {
     const slug = generateSlug(courseData.title);
 
     try {
-      const existing = await coursePrisma.course.findFirst({
-        where: { slug: { startsWith: slug } },
-      });
-
-      if (existing) {
-        console.log(`  ⏭️  "${courseData.title}" — đã tồn tại, bỏ qua`);
-        continue;
-      }
-
       const totalLessons = courseData.chapters.reduce(
         (acc, ch) => acc + ch.lessons.length,
         0,
       );
+
+      const categoryId = categoryIdMap.get(courseData.categorySlug);
 
       const course = await coursePrisma.course.create({
         data: {
@@ -388,7 +439,7 @@ async function seedCourses(userIdMap: Map<string, string>) {
           price: courseData.price,
           level: 'BEGINNER',
           status: 'PUBLISHED',
-          category: courseData.category,
+          categoryId: categoryId,
           instructorId,
           totalLessons,
           totalDuration: totalLessons * 600,
@@ -449,11 +500,17 @@ async function main() {
   console.log('\n🚀 LMS SEED DATA — Bắt đầu tạo dữ liệu mẫu\n');
 
   try {
-    // Bước 1: Tạo tài khoản
+    // Bước 1: Xóa dữ liệu cũ
+    await clearOldData();
+
+    // Bước 2: Tạo tài khoản
     const userIdMap = await seedAccounts();
 
-    // Bước 2: Tạo khóa học
-    await seedCourses(userIdMap);
+    // Bước 3: Tạo danh mục
+    const categoryIdMap = await seedCategories();
+
+    // Bước 4: Tạo khóa học
+    await seedCourses(userIdMap, categoryIdMap);
 
     console.log('══════════════════════════════════════════════════');
     console.log('  ✨ HOÀN TẤT TẤT CẢ SEED DATA!');

@@ -12,6 +12,7 @@ const createCourseSchema = z.object({
   description: z.string().optional(),
   price: z.number().min(0, 'Gia phai >= 0').default(0),
   level: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']).default('BEGINNER'),
+  categoryId: z.string().uuid('Category khong hop le').optional(),
 });
 
 // Schema cap nhat khoa hoc
@@ -22,6 +23,7 @@ const updateCourseSchema = z.object({
   level: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']).optional(),
   status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
   thumbnail: z.string().url().optional(),
+  categoryId: z.string().uuid('Category khong hop le').nullable().optional(),
 });
 
 const publishCourseSchema = z.object({
@@ -76,8 +78,37 @@ function inferSourceType(videoUrl?: string | null): 'UPLOAD' | 'YOUTUBE' {
   return videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') ? 'YOUTUBE' : 'UPLOAD';
 }
 
-async function validateCourseBeforePublish(courseId: string, thumbnail: string, traceId: string): Promise<ApiResponse<null> | null> {
-  if (!thumbnail.trim()) {
+interface PublishGuardState {
+  hasThumbnail: boolean;
+  hasAtLeastOneLesson: boolean;
+  priceValidForPaidCourse: boolean;
+  lessonCount: number;
+  paidLessonCount: number;
+}
+
+async function computePublishGuard(courseId: string, thumbnail: string, price: number): Promise<PublishGuardState> {
+  const [lessonCount, paidLessonCount] = await prisma.$transaction([
+    prisma.lesson.count({ where: { chapter: { courseId } } }),
+    prisma.lesson.count({ where: { chapter: { courseId }, isFree: false } }),
+  ]);
+
+  const hasThumbnail = Boolean(thumbnail.trim());
+  const hasAtLeastOneLesson = lessonCount > 0;
+  const priceValidForPaidCourse = paidLessonCount === 0 || price > 0;
+
+  return {
+    hasThumbnail,
+    hasAtLeastOneLesson,
+    priceValidForPaidCourse,
+    lessonCount,
+    paidLessonCount,
+  };
+}
+
+async function validateCourseBeforePublish(courseId: string, thumbnail: string, price: number, traceId: string): Promise<ApiResponse<null> | null> {
+  const guard = await computePublishGuard(courseId, thumbnail, price);
+
+  if (!guard.hasThumbnail) {
     return {
       success: false,
       code: 400,
@@ -87,30 +118,7 @@ async function validateCourseBeforePublish(courseId: string, thumbnail: string, 
     };
   }
 
-  // Kiem tra du lieu toi thieu de tranh hien thi khoa hoc rong tren trang hoc vien.
-  const [chapterCount, lessonCount, publishableLessonCount] = await prisma.$transaction([
-    prisma.chapter.count({ where: { courseId } }),
-    prisma.lesson.count({ where: { chapter: { courseId } } }),
-    prisma.lesson.count({
-      where: {
-        chapter: { courseId },
-        isPublished: true,
-        videoUrl: { not: null },
-      },
-    }),
-  ]);
-
-  if (chapterCount === 0) {
-    return {
-      success: false,
-      code: 400,
-      message: 'Khong the xuat ban khi chua co chuong hoc',
-      data: null,
-      trace_id: traceId,
-    };
-  }
-
-  if (lessonCount === 0) {
+  if (!guard.hasAtLeastOneLesson) {
     return {
       success: false,
       code: 400,
@@ -120,11 +128,11 @@ async function validateCourseBeforePublish(courseId: string, thumbnail: string, 
     };
   }
 
-  if (publishableLessonCount === 0) {
+  if (!guard.priceValidForPaidCourse) {
     return {
       success: false,
       code: 400,
-      message: 'Can it nhat 1 bai hoc da publish va co video de xuat ban khoa hoc',
+      message: 'Khoa hoc co bai hoc tra phi thi gia phai lon hon 0',
       data: null,
       trace_id: traceId,
     };
@@ -349,6 +357,52 @@ export async function getInstructorCourseById(req: Request, res: Response) {
     return handlePrismaError(err, res, traceId, 'getInstructorCourseById');
   }
 }
+
+/** GET /api/instructor/courses/:id/publish-guard - Trang thai guard de frontend khoa nut publish */
+export async function getCoursePublishGuard(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = res.locals.userRole as string;
+  const courseId = req.params.id;
+
+  try {
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) {
+      const notFound: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Course not found',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    if (course.instructorId !== instructorId && userRole?.toLowerCase() !== 'admin') {
+      const forbidden: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: 'Forbidden — not your course',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
+    }
+
+    const guard = await computePublishGuard(course.id, course.thumbnail ?? '', Number(course.price));
+
+    const response: ApiResponse<PublishGuardState> = {
+      success: true,
+      code: 200,
+      message: 'Publish guard fetched',
+      data: guard,
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'getCoursePublishGuard');
+  }
+}
 /** GET /api/courses/:id/curriculum - Lay curriculum cho giang vien/admin theo courseId */
 export async function getCourseCurriculum(req: Request, res: Response) {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -431,6 +485,7 @@ export async function createCourse(req: Request, res: Response) {
         description: validated.description,
         price: validated.price,
         level: validated.level,
+        categoryId: validated.categoryId,
         instructorId,
       },
     });
@@ -481,7 +536,8 @@ export async function updateCourse(req: Request, res: Response) {
 
     if (validated.status === 'PUBLISHED') {
       const thumbnail = validated.thumbnail ?? course.thumbnail ?? '';
-      const publishValidationError = await validateCourseBeforePublish(req.params.id, thumbnail, traceId);
+      const nextPrice = Number(validated.price ?? course.price);
+      const publishValidationError = await validateCourseBeforePublish(req.params.id, thumbnail, nextPrice, traceId);
       if (publishValidationError) {
         return res.status(publishValidationError.code).json(publishValidationError);
       }
@@ -551,7 +607,8 @@ export async function publishCourse(req: Request, res: Response) {
     }
 
     const nextThumbnail = payload.thumbnail?.trim() || course.thumbnail || '';
-    const publishValidationError = await validateCourseBeforePublish(course.id, nextThumbnail, traceId);
+    const nextPrice = Number(course.price);
+    const publishValidationError = await validateCourseBeforePublish(course.id, nextThumbnail, nextPrice, traceId);
     if (publishValidationError) {
       return res.status(publishValidationError.code).json(publishValidationError);
     }
@@ -564,6 +621,14 @@ export async function publishCourse(req: Request, res: Response) {
       // Dong bo: khi khoa da publish, tat ca chuong hien thi cong khai (tranh catalog trong khi bai da publish)
       await tx.chapter.updateMany({
         where: { courseId: course.id },
+        data: { isPublished: true },
+      });
+      // Khi publish khoa hoc, tu dong publish cac bai da co video de hoc vien thay duoc noi dung hop le.
+      await tx.lesson.updateMany({
+        where: {
+          chapter: { courseId: course.id },
+          videoUrl: { not: null },
+        },
         data: { isPublished: true },
       });
       return updated;
