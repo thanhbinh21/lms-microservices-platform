@@ -76,6 +76,7 @@ export interface CourseDto {
   thumbnail?: string | null;
   price: number;
   level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  categoryId?: string | null;
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   instructorId: string;
   totalLessons: number;
@@ -102,6 +103,7 @@ export interface LessonDto {
   order: number;
   duration: number;
   videoUrl?: string | null;
+  content?: string | null;
   sourceType: 'UPLOAD' | 'YOUTUBE';
   isPublished: boolean;
   isFree: boolean;
@@ -137,6 +139,20 @@ export interface CourseCurriculumDto {
   createdAt?: string;
   updatedAt?: string;
   chapters: ChapterDto[];
+}
+
+export interface CourseCategoryDto {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface PublishGuardDto {
+  hasThumbnail: boolean;
+  hasAtLeastOneLesson: boolean;
+  priceValidForPaidCourse: boolean;
+  lessonCount: number;
+  paidLessonCount: number;
 }
 
 async function getAccessToken() {
@@ -179,6 +195,12 @@ async function writeAuthCookies(params: { accessToken?: string; refreshToken?: s
   }
 }
 
+async function clearAuthCookies() {
+  const cookieStore = await cookies();
+  cookieStore.delete('accessToken');
+  cookieStore.delete('refreshToken');
+}
+
 async function refreshAccessToken(): Promise<string | undefined> {
   const cookieStore = await cookies();
   const refreshToken = cookieStore.get('refreshToken')?.value;
@@ -199,6 +221,9 @@ async function refreshAccessToken(): Promise<string | undefined> {
 
     const result = await response.json();
     if (!response.ok || !result.success) {
+      if (response.status === 401 || response.status === 403) {
+        await clearAuthCookies();
+      }
       return undefined;
     }
 
@@ -206,6 +231,7 @@ async function refreshAccessToken(): Promise<string | undefined> {
     const nextRefreshToken = result?.data?.refreshToken as string | undefined;
 
     if (!nextAccessToken || !nextRefreshToken) {
+      await clearAuthCookies();
       return undefined;
     }
 
@@ -486,6 +512,7 @@ export async function updateCourseAction(courseId: string, data: Partial<CourseD
   );
 
   revalidatePath(`/instructor/courses/${courseId}`);
+  revalidatePath(`/instructor/courses/${courseId}/detail`);
   return { success: result.success, message: result.message, data: result.data };
 }
 
@@ -500,8 +527,17 @@ export async function publishCourseAction(courseId: string, thumbnail?: string) 
   );
 
   revalidatePath(`/instructor/courses/${courseId}`);
+  revalidatePath(`/instructor/courses/${courseId}/detail`);
   revalidatePath('/courses');
   return { success: result.success, message: result.message, data: result.data };
+}
+
+export async function getCourseCategoriesAction() {
+  return callApi<CourseCategoryDto[]>(`/course/api/categories`, { method: 'GET' });
+}
+
+export async function getCoursePublishGuardAction(courseId: string) {
+  return callApi<PublishGuardDto>(`/course/api/instructor/courses/${courseId}/publish-guard`, { method: 'GET' }, true);
 }
 
 export async function updateCurriculumOrderAction(courseId: string, orderedChapterIds: string[]) {
@@ -563,12 +599,28 @@ export async function deleteChapterAction(courseId: string, chapterId: string) {
   return { success: result.success, message: result.message };
 }
 
-export async function createLessonAction(courseId: string, chapterId: string, title: string, isFree = false) {
+export async function createLessonAction(
+  courseId: string,
+  chapterId: string,
+  title: string,
+  isFree = false,
+  options?: {
+    sourceType?: 'UPLOAD' | 'YOUTUBE';
+    videoUrl?: string | null;
+    content?: string;
+  },
+) {
   const result = await callApi<LessonDto>(
     `/course/api/courses/${courseId}/chapters/${chapterId}/lessons`,
     {
       method: 'POST',
-      body: JSON.stringify({ title, isFree }),
+      body: JSON.stringify({
+        title,
+        isFree,
+        sourceType: options?.sourceType,
+        videoUrl: options?.videoUrl,
+        content: options?.content,
+      }),
     },
     true,
   );
@@ -581,7 +633,15 @@ export async function updateLessonAction(
   courseId: string,
   chapterId: string,
   lessonId: string,
-  data: Partial<Pick<LessonDto, 'title' | 'duration' | 'isPublished' | 'isFree' | 'videoUrl' | 'sourceType'>>,
+  data: {
+    title?: string;
+    duration?: number;
+    isPublished?: boolean;
+    isFree?: boolean;
+    videoUrl?: string | null;
+    sourceType?: 'UPLOAD' | 'YOUTUBE';
+    content?: string | null;
+  },
 ) {
   const result = await callApi<LessonDto>(
     `/course/api/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}`,

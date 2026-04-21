@@ -11,16 +11,18 @@ const createLessonSchema = z.object({
   title: z.string().min(2, 'Lesson title must be at least 2 characters'),
   isFree: z.boolean().default(false),
   sourceType: z.enum(['UPLOAD', 'YOUTUBE']).default('UPLOAD'),
-  videoUrl: z.string().url('Invalid video URL').optional(),
+  videoUrl: z.string().url('Invalid video URL').nullable().optional(),
+  content: z.string().max(5000, 'Lesson content is too long').optional(),
 });
 
 const updateLessonSchema = z.object({
   title: z.string().min(2).optional(),
-  videoUrl: z.string().url('Invalid video URL').optional(),
+  videoUrl: z.string().url('Invalid video URL').nullable().optional(),
   sourceType: z.enum(['UPLOAD', 'YOUTUBE']).optional(),
   duration: z.number().int().min(0).optional(), // seconds
   isPublished: z.boolean().optional(),
   isFree: z.boolean().optional(),
+  content: z.string().max(5000, 'Lesson content is too long').nullable().optional(),
 });
 
 function isYoutubeUrl(url: string): boolean {
@@ -36,7 +38,7 @@ function inferSourceType(videoUrl?: string | null): 'UPLOAD' | 'YOUTUBE' {
   return videoUrl && isYoutubeUrl(videoUrl) ? 'YOUTUBE' : 'UPLOAD';
 }
 
-function validateLessonVideoSource(sourceType: 'UPLOAD' | 'YOUTUBE', videoUrl?: string) {
+function validateLessonVideoSource(sourceType: 'UPLOAD' | 'YOUTUBE', videoUrl?: string | null) {
   if (sourceType === 'YOUTUBE') {
     if (!videoUrl) {
       return 'YouTube lesson requires videoUrl';
@@ -95,7 +97,9 @@ export async function createLesson(req: Request, res: Response) {
       data: {
         title: validated.title,
         isFree: validated.isFree,
-        videoUrl: validated.videoUrl,
+        sourceType: validated.sourceType,
+        videoUrl: validated.videoUrl ?? null,
+        content: validated.content?.trim() || null,
         order,
         chapterId: req.params.chapterId,
       },
@@ -103,7 +107,7 @@ export async function createLesson(req: Request, res: Response) {
 
     const lessonResponse = {
       ...lesson,
-      sourceType: inferSourceType(lesson.videoUrl),
+      sourceType: lesson.sourceType || inferSourceType(lesson.videoUrl),
     };
 
     // Cap nhat tong so bai hoc
@@ -142,7 +146,7 @@ export async function updateLesson(req: Request, res: Response) {
 
     const currentLesson = await prisma.lesson.findUnique({
       where: { id: req.params.lessonId, chapterId: req.params.chapterId },
-      select: { videoUrl: true },
+      select: { videoUrl: true, sourceType: true },
     });
 
     if (!currentLesson) {
@@ -150,24 +154,23 @@ export async function updateLesson(req: Request, res: Response) {
       return res.status(404).json(response);
     }
 
-    const nextSourceType = validated.sourceType ?? inferSourceType(currentLesson.videoUrl);
-    const nextVideoUrl = validated.videoUrl ?? currentLesson.videoUrl ?? undefined;
+    const hasVideoField = Object.prototype.hasOwnProperty.call(validated, 'videoUrl');
+    const nextSourceType = validated.sourceType ?? currentLesson.sourceType ?? inferSourceType(currentLesson.videoUrl);
+    const nextVideoUrl = hasVideoField ? validated.videoUrl : currentLesson.videoUrl;
     const sourceError = validateLessonVideoSource(nextSourceType, nextVideoUrl || undefined);
     if (sourceError) {
       const response: ApiResponse<null> = { success: false, code: 400, message: sourceError, data: null, trace_id: traceId };
       return res.status(400).json(response);
     }
 
-    const { sourceType: _sourceType, ...updateData } = validated;
-
     const lesson = await prisma.lesson.update({
       where: { id: req.params.lessonId, chapterId: req.params.chapterId },
-      data: updateData,
+      data: validated,
     });
 
     const lessonResponse = {
       ...lesson,
-      sourceType: inferSourceType(lesson.videoUrl),
+      sourceType: lesson.sourceType || inferSourceType(lesson.videoUrl),
     };
 
     // Cap nhat tong thoi luong neu duration thay doi (dung aggregate thay vi N+1)

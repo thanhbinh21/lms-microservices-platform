@@ -149,7 +149,7 @@ export async function getRequestStats(): Promise<{
   return { total, pending, approved, rejected };
 }
 
-export async function approveRequest(id: string, token: string): Promise<InstructorRequest> {
+export async function approveRequest(id: string, actor: AuthUserContext): Promise<InstructorRequest> {
   const found = await prisma.instructorRequest.findUnique({ where: { id } });
   if (!found) {
     throwHttp(404, 'Không tìm thấy đơn đăng ký');
@@ -171,7 +171,8 @@ export async function approveRequest(id: string, token: string): Promise<Instruc
     },
     {
       headers: {
-        Authorization: `Bearer ${token}`,
+        'x-user-id': actor.userId,
+        'x-user-role': actor.role,
       },
     },
   );

@@ -102,3 +102,79 @@ export interface VNPayResponse {
   vnp_SecureHash: string;
   [key: string]: string;
 }
+
+export interface RequireAdminMiddlewareOptions {
+  unauthorizedMessage?: string;
+  forbiddenMessage?: string;
+  traceIdFallback?: string;
+}
+
+type GatewayHeaderValue = string | string[] | undefined;
+
+export interface AdminGuardRequestLike {
+  headers: Record<string, GatewayHeaderValue>;
+}
+
+export interface AdminGuardResponseLike {
+  locals: Record<string, unknown>;
+  status: (code: number) => {
+    json: (body: ApiResponse<null>) => unknown;
+  };
+}
+
+export type AdminGuardNext = () => void;
+
+function readHeaderValue(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) {
+    return value[0] || '';
+  }
+  return value || '';
+}
+
+/**
+ * Tao middleware check vai tro ADMIN tu header do Gateway inject.
+ * Dung factory de cac service co the tuy bien message theo domain.
+ */
+export function createRequireAdmin(options: RequireAdminMiddlewareOptions = {}) {
+  const unauthorizedMessage = options.unauthorizedMessage || 'Unauthorized - missing x-user-id header';
+  const forbiddenMessage = options.forbiddenMessage || 'Forbidden - admin access required';
+  const traceIdFallback = options.traceIdFallback || 'unknown';
+
+  return function requireAdmin(
+    req: AdminGuardRequestLike,
+    res: AdminGuardResponseLike,
+    next: AdminGuardNext,
+  ): void {
+    const userId = readHeaderValue(req.headers['x-user-id']);
+    const userRole = readHeaderValue(req.headers['x-user-role']).toUpperCase();
+    const traceId = readHeaderValue(req.headers['x-trace-id']) || traceIdFallback;
+
+    if (!userId) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 401,
+        message: unauthorizedMessage,
+        data: null,
+        trace_id: traceId,
+      };
+      res.status(401).json(response);
+      return;
+    }
+
+    if (userRole !== 'ADMIN') {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: forbiddenMessage,
+        data: null,
+        trace_id: traceId,
+      };
+      res.status(403).json(response);
+      return;
+    }
+
+    res.locals.userId = userId;
+    res.locals.userRole = userRole;
+    next();
+  };
+}

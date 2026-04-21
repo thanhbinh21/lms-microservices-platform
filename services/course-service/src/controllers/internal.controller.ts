@@ -59,11 +59,13 @@ export const getCourseByIdInternal = async (req: Request, res: Response): Promis
       return res.status(404).json(response);
     }
 
-    const response: ApiResponse<typeof course & { price: number }> = {
+    const serializedCourse = { ...course, price: course.price.toNumber() };
+
+    const response: ApiResponse<typeof serializedCourse> = {
       success: true,
       code: 200,
       message: 'OK',
-      data: { ...course, price: course.price.toNumber() },
+      data: serializedCourse,
       trace_id: traceId,
     };
     return res.status(200).json(response);

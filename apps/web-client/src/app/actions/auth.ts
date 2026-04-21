@@ -28,6 +28,21 @@ interface TokenPayload {
   exp?: number;
 }
 
+interface BecomeEducatorApiResponse {
+  success: boolean;
+  code: number;
+  message: string;
+  data: {
+    user: {
+      id: string;
+      email: string;
+      name: string;
+      role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
+    };
+    accessToken: string;
+  } | null;
+}
+
 function normalizeRole(role?: string | null): UserRole {
   if (!role) return 'STUDENT';
   const normalized = role.toUpperCase();
@@ -113,11 +128,19 @@ async function refreshWithToken(refreshToken: string): Promise<{ accessToken: st
   });
 
   const result = await response.json();
-  if (!response.ok || !result.success) return null;
+  if (!response.ok || !result.success) {
+    if (response.status === 401 || response.status === 403) {
+      await clearAuthCookies();
+    }
+    return null;
+  }
 
   const nextAccessToken = result?.data?.accessToken as string | undefined;
   const nextRefreshToken = result?.data?.refreshToken as string | undefined;
-  if (!nextAccessToken || !nextRefreshToken) return null;
+  if (!nextAccessToken || !nextRefreshToken) {
+    await clearAuthCookies();
+    return null;
+  }
 
   return { accessToken: nextAccessToken, refreshToken: nextRefreshToken };
 }
@@ -287,6 +310,91 @@ export async function restoreSessionAction(): Promise<AuthResponse> {
       success: false,
       code: 500,
       message: 'Khong the khoi phuc phien dang nhap',
+    };
+  }
+}
+
+export async function becomeEducatorAction(): Promise<AuthResponse> {
+  try {
+    const cookieStore = await cookies();
+    let accessToken = cookieStore.get('accessToken')?.value;
+    const currentRefreshToken = cookieStore.get('refreshToken')?.value;
+
+    const tokenPayload = accessToken ? decodeTokenPayload(accessToken) : null;
+    const tokenExpired = tokenPayload?.exp ? tokenPayload.exp * 1000 <= Date.now() : true;
+
+    if ((!accessToken || tokenExpired) && currentRefreshToken) {
+      const refreshed = await refreshWithToken(currentRefreshToken);
+      if (refreshed) {
+        accessToken = refreshed.accessToken;
+        await writeAuthCookies({
+          accessToken: refreshed.accessToken,
+          refreshToken: refreshed.refreshToken,
+        });
+      }
+    }
+
+    if (!accessToken) {
+      return {
+        success: false,
+        code: 401,
+        message: 'Phien dang nhap da het han. Vui long dang nhap lai.',
+      };
+    }
+
+    const payload = decodeTokenPayload(accessToken);
+    if (!payload?.userId) {
+      await clearAuthCookies();
+      return {
+        success: false,
+        code: 401,
+        message: 'Token khong hop le',
+      };
+    }
+
+    const response = await fetch(`${GATEWAY_URL}${AUTH_PREFIX}/become-educator`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+        'x-user-id': payload.userId,
+        'x-user-role': payload.role,
+      },
+      body: JSON.stringify({}),
+    });
+
+    const result = (await response.json()) as BecomeEducatorApiResponse;
+
+    if (!response.ok || !result.success || !result.data) {
+      return {
+        success: false,
+        code: result?.code || response.status,
+        message: result?.message || 'Khong the nang cap tai khoan giang vien',
+      };
+    }
+
+    const nextAccessToken = result.data.accessToken;
+    const nextRefreshToken = response.headers.get('x-refresh-token') || currentRefreshToken;
+
+    await writeAuthCookies({
+      accessToken: nextAccessToken,
+      refreshToken: nextRefreshToken || undefined,
+      userName: result.data.user.name,
+    });
+
+    return {
+      success: true,
+      code: result.code,
+      message: result.message,
+      user: normalizeUserFromApi(result.data.user),
+      accessToken: nextAccessToken,
+    };
+  } catch (error) {
+    console.error('Become educator action error:', error);
+    return {
+      success: false,
+      code: 500,
+      message: error instanceof Error ? error.message : 'Khong the nang cap tai khoan giang vien',
     };
   }
 }
