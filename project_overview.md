@@ -180,9 +180,10 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 ### Phase 20: Deployment & Production Hardening 🚀
 - [ ] **Phase 20:** Dockerize all services, docker-compose.prod.yml, CI/CD (GitHub Actions), Nginx + SSL, monitoring, backup strategy.
 
-### Phase 21-22: Quality & Security (NEW)
-- [ ] **Phase 21:** Security Hardening — API rate limiting chuan hoa (per-user, per-endpoint), input sanitization chong XSS tren user-generated content, audit log cho admin actions, database index optimization, health check dashboard tong hop.
-- [ ] **Phase 22:** Testing & Quality Gate — Unit tests cho business logic core (enrollment, payment verify, Kafka handlers), integration tests cho payment flow E2E, API contract tests (Zod schema → validation), CI pipeline (lint + test truoc merge).
+### Phase 21-22: Performance & Security Hardening
+- [x] **Phase 21:** Performance & Caching Optimization — Khắc phục Neon cold-start bằng `withRetry`, tích hợp Upstash Redis caching (cache-aside cho course/category), tối ưu Prisma query (composite indexes, selective fields), Next.js `unstable_cache` & `revalidateTag` cho Server Actions. ✅ Completed: Apr 22, 2026
+- [ ] **Phase 22:** Security Hardening — API rate limiting chuẩn hóa, input sanitization chống XSS, audit log cho admin actions, health check dashboard tổng hợp.
+- [ ] **Phase 23:** Testing & Quality Gate — Unit tests cho business logic core (enrollment, payment verify, Kafka handlers), integration tests cho payment flow E2E, API contract tests (Zod schema → validation), CI pipeline (lint + test truoc merge).
 
 ---
 
