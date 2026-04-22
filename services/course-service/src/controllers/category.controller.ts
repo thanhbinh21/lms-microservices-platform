@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
+import { cacheGet, cacheInvalidate } from '@lms/cache';
 
 const createCategorySchema = z.object({
   name: z.string().min(2, 'Ten danh muc toi thieu 2 ky tu'),
@@ -15,14 +16,14 @@ const createCategorySchema = z.object({
 export async function listCategories(req: Request, res: Response) {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
   try {
-    const categories = await prisma.category.findMany({
-      include: {
-        _count: {
-          select: { courses: { where: { status: 'PUBLISHED' } } },
-        },
-      },
-      orderBy: { order: 'asc' },
-    });
+    const categories = await cacheGet(
+      'cache:categories:all',
+      () => prisma.category.findMany({
+        include: { _count: { select: { courses: { where: { status: 'PUBLISHED' } } } } },
+        orderBy: { order: 'asc' },
+      }),
+      600,
+    );
 
     const data = categories.map((c) => ({
       id: c.id,
@@ -66,6 +67,8 @@ export async function createCategory(req: Request, res: Response) {
       data: category,
       trace_id: traceId,
     };
+    // Xoa cache categories sau khi tao moi
+    await cacheInvalidate('cache:categories:all');
     return res.status(201).json(response);
   } catch (err) {
     if (err instanceof z.ZodError) {

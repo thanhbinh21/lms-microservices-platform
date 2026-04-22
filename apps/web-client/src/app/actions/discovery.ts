@@ -1,4 +1,5 @@
 'use server';
+import { unstable_cache } from 'next/cache';
 
 const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:8000';
 
@@ -69,9 +70,7 @@ export interface CategoriesResponse {
   trace_id: string;
 }
 
-export async function discoverCoursesAction(
-  params: DiscoveryParams,
-): Promise<DiscoveryResponse> {
+async function discoverCoursesFetch(params: DiscoveryParams): Promise<DiscoveryResponse> {
   try {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
@@ -82,7 +81,7 @@ export async function discoverCoursesAction(
 
     const res = await fetch(
       `${GATEWAY_URL}/course/api/courses?${searchParams.toString()}`,
-      { cache: 'no-store' },
+      { next: { tags: ['courses'] } },
     );
 
     const json = await res.json();
@@ -98,10 +97,21 @@ export async function discoverCoursesAction(
   }
 }
 
-export async function getCategoriesAction(): Promise<CategoriesResponse> {
+export async function discoverCoursesAction(
+  params: DiscoveryParams,
+): Promise<DiscoveryResponse> {
+  const getCachedCourses = unstable_cache(
+    (p: DiscoveryParams) => discoverCoursesFetch(p),
+    ['discovery-courses', JSON.stringify(params)],
+    { tags: ['courses'], revalidate: 60 }
+  );
+  return getCachedCourses(params);
+}
+
+async function getCategoriesFetch(): Promise<CategoriesResponse> {
   try {
     const res = await fetch(`${GATEWAY_URL}/course/api/categories`, {
-      cache: 'no-store',
+      next: { tags: ['categories'] },
     });
     const json = await res.json();
     return json as CategoriesResponse;
@@ -114,4 +124,13 @@ export async function getCategoriesAction(): Promise<CategoriesResponse> {
       trace_id: '',
     };
   }
+}
+
+export async function getCategoriesAction(): Promise<CategoriesResponse> {
+  const getCachedCategories = unstable_cache(
+    () => getCategoriesFetch(),
+    ['discovery-categories'],
+    { tags: ['categories'], revalidate: 300 }
+  );
+  return getCachedCategories();
 }

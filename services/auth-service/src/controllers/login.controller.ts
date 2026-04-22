@@ -8,6 +8,7 @@ import prisma from '../lib/prisma.js';
 import { generateTokenPair } from '../lib/jwt.js';
 import { setSession } from '../lib/redis.js';
 import { getEnv } from '../lib/env.js';
+import { withRetry } from '@lms/db-prisma';
 
 // Schema dang nhap
 const loginSchema = z.object({
@@ -26,9 +27,9 @@ export async function login(req: Request, res: Response) {
     const validatedData = loginSchema.parse(req.body);
 
     // Find user by email
-    const user = await prisma.user.findUnique({
+    const user = await withRetry(() => prisma.user.findUnique({
       where: { email: validatedData.email },
-    });
+    }));
 
     if (!user) {
       const response: ApiResponse<null> = {
@@ -66,7 +67,7 @@ export async function login(req: Request, res: Response) {
     const refreshTokenExpiry = new Date();
     refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + REFRESH_TOKEN_DAYS);
 
-    await prisma.$transaction([
+    await withRetry(() => prisma.$transaction([
       prisma.user.update({
         where: { id: user.id },
         data: { lastLoginAt: new Date() }
@@ -78,7 +79,7 @@ export async function login(req: Request, res: Response) {
           expiresAt: refreshTokenExpiry,
         },
       })
-    ]);
+    ]));
 
     // Update session in Redis
     await setSession(user.id, {

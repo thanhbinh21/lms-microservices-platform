@@ -9,11 +9,19 @@ declare global {
 const prisma: PrismaClient =
   global.prismaGlobal ??
   new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    // Chỉ log query và warn từ Prisma engine.
+    // Error sẽ được catch và log bởi @lms/logger trong ứng dụng.
+    log: process.env.NODE_ENV === 'development' ? ['query', 'warn'] : [],
   });
 
 if (process.env.NODE_ENV !== 'production') {
   global.prismaGlobal = prisma;
 }
+
+// Neon cold-start: khoi dong truoc de giam latency request dau tien.
+// Khong await — neu Neon dang sleep, service van khoi dong binh thuong.
+prisma.$connect().catch((err: Error) => {
+  console.warn('[Prisma] Initial connect failed, will retry on first query:', err.message);
+});
 
 export default prisma;

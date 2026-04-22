@@ -116,7 +116,7 @@ export const getMyEnrollments = async (req: Request, res: Response): Promise<Res
 
     const courseIds = enrollments.map(e => e.courseId);
     
-    // Get all lesson progress for these courses
+    // Chi select nhung truong can de tinh progress, tranh load toan bo chapter
     const userProgress = await prisma.lessonProgress.findMany({
       where: {
         userId: userId,
@@ -126,13 +126,17 @@ export const getMyEnrollments = async (req: Request, res: Response): Promise<Res
           }
         }
       },
-      include: {
+      select: {
+        isCompleted: true,
+        updatedAt: true,
         lesson: {
-          include: {
-            chapter: true
-          }
-        }
-      }
+          select: {
+            chapter: {
+              select: { courseId: true },  // Chi can courseId, khong can load toan bo chapter
+            },
+          },
+        },
+      },
     });
 
     // Map completed lessons count per course

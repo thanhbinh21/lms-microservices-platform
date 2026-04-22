@@ -118,6 +118,19 @@ importers:
         specifier: ^5
         version: 5.9.3
 
+  packages/cache:
+    dependencies:
+      redis:
+        specifier: ^4.6.13
+        version: 4.7.1
+    devDependencies:
+      '@types/node':
+        specifier: ^20.10.6
+        version: 20.19.37
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   packages/db-prisma:
     dependencies:
       '@prisma/client':
@@ -187,6 +200,9 @@ importers:
 
   services/auth-service:
     dependencies:
+      '@lms/db-prisma':
+        specifier: workspace:*
+        version: link:../../packages/db-prisma
       '@lms/env-validator':
         specifier: workspace:*
         version: link:../../packages/env-validator
@@ -251,6 +267,12 @@ importers:
 
   services/course-service:
     dependencies:
+      '@lms/cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
+      '@lms/db-prisma':
+        specifier: workspace:*
+        version: link:../../packages/db-prisma
       '@lms/env-validator':
         specifier: workspace:*
         version: link:../../packages/env-validator
@@ -355,6 +377,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.500.0
         version: 3.1023.0
+      '@lms/cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
       '@lms/env-validator':
         specifier: workspace:*
         version: link:../../packages/env-validator
