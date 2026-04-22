@@ -89,7 +89,11 @@ export async function login(req: Request, res: Response) {
 
     logger.info({ userId: user.id, email: user.email }, 'User logged in successfully');
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<{
+      user: { id: string; email: string; name: string; role: string };
+      accessToken: string;
+      refreshToken: string;
+    }> = {
       success: true,
       code: 200,
       message: 'Login successful',

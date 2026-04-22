@@ -1,10 +1,18 @@
 // Chuan response API thong nhat toan he thong
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   code: number;
   message: string;
   data: T | null;
   trace_id: string;
+}
+
+export function createSuccessResponse<T>(data: T, message = 'OK', traceId = '', code = 200): ApiResponse<T> {
+  return { success: true, code, message, data, trace_id: traceId };
+}
+
+export function createErrorResponse(message: string, code = 500, traceId = ''): ApiResponse<null> {
+  return { success: false, code, message, data: null, trace_id: traceId };
 }
 
 // Thong tin user tu JWT (Gateway inject vao header)
@@ -175,6 +183,41 @@ export function createRequireAdmin(options: RequireAdminMiddlewareOptions = {}) 
 
     res.locals.userId = userId;
     res.locals.userRole = userRole;
+    next();
+  };
+}
+
+/**
+ * Tao middleware check xac thuc tu header (do Gateway inject).
+ * Service con cung co the tuy bien message neu can.
+ */
+export function createRequireAuth(options: RequireAdminMiddlewareOptions = {}) {
+  const unauthorizedMessage = options.unauthorizedMessage || 'Unauthorized - missing x-user-id header';
+  const traceIdFallback = options.traceIdFallback || 'unknown';
+
+  return function requireAuth(
+    req: AdminGuardRequestLike,
+    res: AdminGuardResponseLike,
+    next: AdminGuardNext,
+  ): void {
+    const userId = readHeaderValue(req.headers['x-user-id']);
+    const traceId = readHeaderValue(req.headers['x-trace-id']) || traceIdFallback;
+
+    if (!userId) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 401,
+        message: unauthorizedMessage,
+        data: null,
+        trace_id: traceId,
+      };
+      res.status(401).json(response);
+      return;
+    }
+
+    res.locals.userId = userId;
+    // userRole co the co hoac khong, chu yeu la can userId
+    res.locals.userRole = readHeaderValue(req.headers['x-user-role']);
     next();
   };
 }

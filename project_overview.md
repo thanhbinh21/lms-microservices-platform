@@ -131,7 +131,7 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
   - Khac phuc: Tao endpoint chuyen biet `POST /become-educator` chi cho phep user tu nang cap chinh minh len INSTRUCTOR (khong nhan userId tu body, lay tu x-user-id header). Giu `PATCH /users/role` cho admin-only (them requireAdmin middleware).
   - Them audit trail: luu thoi diem, actor id, trace_id, previous role.
   - Refresh token/session sau khi doi role de frontned nhan role moi.
-- [ ] **Phase 9.15:** Route & Middleware Consolidation (Audit Phase 5, 10)
+- [x] **Phase 9.15:** Route & Middleware Consolidation (Audit Phase 5, 10) ✅ Completed: Apr 22, 2026
   - Van de 1: course-service co route trung lap — `/api/courses/:courseId/progress` duoc dang ky 2 lan (line 77 va line 117 trong index.ts). Express se match route dau tien, route thu 2 khong bao gio duoc goi.
   - Van de 2: Duplicate enrollment logic — `enrollCourse` (enrollment.controller.ts) va `enrollFree` (learning.controller.ts) lam cung viec voi logic gan nhu giong het. Can gop lai thanh 1 flow duy nhat.
   - Van de 3: requireAuth middleware bi duplicate giua services (course, payment, notification, instructor). Can tach thanh shared package `@lms/middleware` hoac gop vao `@lms/types`.
@@ -139,12 +139,12 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
   - Hotfix (Apr 21, 2026): Khoi phuc syntax hop le trong `course.controller.ts` sau merge do dang, sua them typing o `internal.controller.ts` de `@lms/course-service` build lai on dinh.
   - Hotfix (Apr 21, 2026): Web-client chu dong xoa auth cookies khi `/refresh` tra ve 401/403 de chan vong lap refresh token hong; course-service map loi Prisma init/connect thanh 503 de frontend phan biet ro DB tam thoi unavailable.
   - Van de 4: instructor-service dung CORS `cors()` khong co origin restriction (app.ts line 10), khac voi cac service khac dung `CORS_ORIGIN`.
-- [ ] **Phase 9.16:** API Response & Error Handling Standardization (Audit tat ca services)
+- [x] **Phase 9.16:** API Response & Error Handling Standardization (Audit tat ca services) ✅ Completed: Apr 22, 2026
   - Van de 1: Nhieu controller dung `ApiResponse<any>` thay vi typed response (login, register, admin). Can ep kieu cu the de tranh leak du lieu.
   - Van de 2: learning.controller va progress.controller tra ve `{ success, code, message }` khong co `trace_id` va `data` field trong mot so error path — vi pham ApiResponse<T> contract.
   - Van de 3: instructor-service dung rieng helper `errorResponse/successResponse` (utils/apiResponse.ts) khong dong nhat voi cac service khac dung truc tiep `ApiResponse<T>`.
-  - Khac phuc: Tao shared error handler va response builder trong `@lms/types` hoac `packages/api-utils`. Dam bao moi response luon co du `success`, `code`, `message`, `data`, `trace_id`.
-- [ ] **Phase 9.17:** Expired Token & Stale Session Cleanup
+  - Khac phuc: Khoi tao `createSuccessResponse` / `createErrorResponse` package chung trong `@lms/types` va ap dung khap noi nham loai bo `any`.
+- [x] **Phase 9.17:** Expired Token & Stale Session Cleanup ✅ Completed: Apr 22, 2026
   - Van de: Refresh tokens het han chi bi xoa khi user refresh lai (passive cleanup). Khong co CRON/job xoa token cu — bang refreshToken se lon dan theo thoi gian.
   - Khac phuc: Them scheduled job (node-cron hoac Prisma script) de xoa refreshToken.expiresAt < now() dinh ky (moi ngay).
   - Bo sung: Xoa session Redis cua user khi bi ban/suspend boi admin (hien tai ban user khong revoke session, user van co token hop le cho den khi het han).
@@ -158,7 +158,7 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 
 ### Phase 10.1-11.1: Learning Experience — Remaining Items
 - [ ] **Phase 10.1:** Rating & Review System — Prisma model Review (courseId, userId, rating 1-5, comment), CRUD API (createReview, listReviews, getReviewStats), 1 user = 1 review/course (unique constraint), course aggregate (avgRating, reviewCount), frontend review form + review list tren `/courses/[slug]` va `/learn/[courseId]`.
-- [ ] Phase 11.1: Direct SMTP Email Transport & Notification UI — Tích hợp hệ thống gửi email thực tế trực tiếp qua giao thức SMTP (sử dụng tài khoản thật như Gmail App Password), không phụ thuộc vào dịch vụ trung gian (như Resend/SendGrid). Xây dựng Email Templates bằng HTML (welcome, payment success, enrollment). Tích hợp Notification Bell UI trên SharedNavbar (huy hiệu số lượng chưa đọc, dropdown danh sách, tương tác đánh dấu đã đọc).
+- [x] **Phase 11.1:** Direct SMTP Email Transport & Notification UI — Tích hợp hệ thống gửi email thực tế trực tiếp qua giao thức SMTP (sử dụng tài khoản thật như Gmail App Password), không phụ thuộc vào dịch vụ trung gian (như Resend/SendGrid). Xây dựng Email Templates bằng HTML (welcome, payment success, enrollment). Tích hợp Notification Bell UI trên SharedNavbar (huy hiệu số lượng chưa đọc, dropdown danh sách, tương tác đánh dấu đã đọc). [2026-04-22]
 
 ### Phase 13-16: Commerce & Payments (VNPay + Kafka) ✅ COMPLETED
 - [x] **Phase 13:** Payment Service DB & Order CRUD — Order model, VNPayAudit model (JSONB audit), createOrder (price verify tu course-service via /internal/courses/:id), getOrder (owner check), getMyOrders, idempotency (existingPending order + alreadyPaid guard). ✅ Completed: Apr 18, 2026

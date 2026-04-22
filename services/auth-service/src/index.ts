@@ -13,7 +13,9 @@ import { logout } from './controllers/logout.controller.js';
 import { updateUserRole } from './controllers/update-role.controller.js';
 import { becomeEducator } from './controllers/become-educator.controller.js';
 import { requireAdmin } from './middlewares/requireAdmin.js';
+import { getInternalUser } from './controllers/internal.controller.js';
 import adminRouter from './routes/admin.routes.js';
+import { startCleanupJobs } from './jobs/cleanup.js';
 
 // Validate bien moi truong khi khoi dong
 const env = initEnv();
@@ -43,7 +45,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // Kiem tra suc khoe
 app.get('/health', (req: Request, res: Response) => {
-  const response: ApiResponse<any> = {
+  const response: ApiResponse<{ service: string; status: string; timestamp: string }> = {
     success: true,
     code: 200,
     message: 'Auth Service is healthy',
@@ -64,6 +66,9 @@ app.post('/refresh', refresh);
 app.post('/logout', logout);
 app.post('/become-educator', becomeEducator);
 app.patch('/users/role', requireAdmin, updateUserRole);
+
+// Internal routes (khong qua Gateway)
+app.get('/internal/users/:id', getInternalUser);
 
 // Admin routes
 app.use('/admin', requireAdmin, adminRouter);
@@ -99,6 +104,7 @@ async function startServer() {
   try {
     // Ket noi Redis
     await initRedis(env.REDIS_URL);
+    startCleanupJobs();
 
     server = app.listen(PORT, () => {
       logger.info({ port: PORT }, 'Auth Service da khoi dong');

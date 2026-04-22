@@ -7,7 +7,7 @@ import { errorResponse, successResponse } from './utils/apiResponse';
 const app: Application = express();
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000', credentials: true }));
 app.use(express.json({ limit: '5mb' }));
 
 app.get('/health', (req: Request, res: Response) => {

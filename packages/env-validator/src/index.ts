@@ -112,5 +112,20 @@ export const validatePaymentServiceEnv = () =>
 export const validateMediaServiceEnv = () =>
   validateEnv(baseEnvSchema, databaseEnvSchema, storageEnvSchema);
 
+// SMTP (Phase 11.1 - notification-service)
+const smtpEnvSchema = z.object({
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+});
+
 export const validateNotificationServiceEnv = () =>
-  validateEnv(baseEnvSchema, databaseEnvSchema, kafkaEnvSchema);
+  validateEnv(
+    baseEnvSchema, 
+    databaseEnvSchema, 
+    kafkaEnvSchema,
+    smtpEnvSchema,
+    z.object({ AUTH_SERVICE_URL: z.string().url().optional() })
+  );

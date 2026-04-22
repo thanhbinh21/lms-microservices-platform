@@ -29,7 +29,7 @@ export async function updateUserRole(req: Request, res: Response) {
 
     logger.info({ userId: user.id, role: user.role }, 'User role updated successfully');
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<{ id: string; role: string }> = {
       success: true,
       code: 200,
       message: 'User role updated successfully',

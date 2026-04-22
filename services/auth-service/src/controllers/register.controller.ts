@@ -93,7 +93,9 @@ export async function register(req: Request, res: Response) {
 
     logger.info({ userId: user.id, email: user.email }, 'User registered successfully');
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<{
+      user: { id: string; email: string; name: string; role: string };
+    }> = {
       success: true,
       code: 201,
       message: 'User registered successfully',

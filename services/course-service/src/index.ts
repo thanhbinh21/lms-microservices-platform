@@ -31,7 +31,7 @@ import {
 import { listCategories, createCategory } from './controllers/category.controller';
 import { enrollCourse, getMyEnrollments } from './controllers/enrollment.controller';
 import { getCourseProgress, updateLessonProgress } from './controllers/progress.controller';
-import { enrollFree, getLearnData, getEnrollmentStatus, completeLesson, getMyCourses } from './controllers/learning.controller';
+import { getLearnData, getEnrollmentStatus, completeLesson, getMyCourses } from './controllers/learning.controller';
 import { getCourseByIdInternal } from './controllers/internal.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import adminRouter from './routes/admin.routes';
@@ -73,11 +73,11 @@ app.get('/health', (_req: Request, res: Response) => {
 app.get('/internal/courses/:id', getCourseByIdInternal);
 
 // ─── Student Learning Routes (prefix /api/student/ to avoid /:slug conflict) ─
-app.post('/api/student/courses/:courseId/enroll-free', requireAuth, enrollFree);
+app.post('/api/student/courses/:courseId/enroll-free', requireAuth, enrollCourse);
 app.get('/api/student/courses/:courseId/learn-data', requireAuth, getLearnData);
 app.get('/api/student/courses/:courseId/progress', requireAuth, getCourseProgress);
 app.get('/api/student/courses/:courseId/enrollment-status', requireAuth, getEnrollmentStatus);
-app.post('/api/student/lessons/:lessonId/progress', requireAuth, updateLessonProgress);
+app.put('/api/student/lessons/:lessonId/progress', requireAuth, updateLessonProgress);
 app.post('/api/student/lessons/:lessonId/complete', requireAuth, completeLesson);
 app.get('/api/student/my-courses', requireAuth, getMyCourses);
 
@@ -116,8 +116,8 @@ app.get('/api/lessons/:lessonId/playback', getLessonPlayback);
 // ─── Student Learning Routes (Enrollment & Progress) ──────────────────────────
 app.post('/api/enrollments', requireAuth, enrollCourse);
 app.get('/api/enrollments/my', requireAuth, getMyEnrollments);
-app.get('/api/courses/:courseId/progress', requireAuth, getCourseProgress);
-app.put('/api/lessons/:lessonId/progress', requireAuth, updateLessonProgress);
+// app.get('/api/courses/:courseId/progress', requireAuth, getCourseProgress); // Removed duplicate
+// app.put('/api/lessons/:lessonId/progress', requireAuth, updateLessonProgress); // Removed duplicate
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {

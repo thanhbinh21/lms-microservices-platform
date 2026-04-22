@@ -1,4 +1,5 @@
 import type { Response } from 'express';
+import { createSuccessResponse, createErrorResponse } from '@lms/types';
 
 export function successResponse(
   res: Response,
@@ -7,13 +8,7 @@ export function successResponse(
   code = 200,
   traceId: string | null = null,
 ) {
-  return res.status(code).json({
-    success: true,
-    code,
-    message,
-    data,
-    trace_id: traceId,
-  });
+  return res.status(code).json(createSuccessResponse(data, message, traceId || '', code));
 }
 
 export function errorResponse(
@@ -22,11 +17,5 @@ export function errorResponse(
   code = 500,
   traceId: string | null = null,
 ) {
-  return res.status(code).json({
-    success: false,
-    code,
-    message,
-    data: null,
-    trace_id: traceId,
-  });
+  return res.status(code).json(createErrorResponse(message, code, traceId || ''));
 }

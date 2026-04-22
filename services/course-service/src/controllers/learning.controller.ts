@@ -80,7 +80,7 @@ export const getLearnData = async (req: Request, res: Response): Promise<Respons
     });
 
     if (!course) {
-      return res.status(404).json({ success: false, code: 404, message: 'Not found' });
+      return res.status(404).json({ success: false, code: 404, message: 'Not found', data: null, trace_id: traceId });
     }
 
     const userProgress = await prisma.lessonProgress.findMany({
@@ -138,11 +138,12 @@ export const getLearnData = async (req: Request, res: Response): Promise<Respons
 
     return res.status(200).json({ success: true, code: 200, message: 'Success', data, trace_id: traceId });
   } catch (err: any) {
-    return res.status(500).json({ success: false, code: 500, message: 'Server Error' });
+    return res.status(500).json({ success: false, code: 500, message: 'Server Error', data: null, trace_id: traceId });
   }
 };
 
 export const getEnrollmentStatus = async (req: Request, res: Response): Promise<Response | void> => {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
   const userId = res.locals.userId as string;
   const { courseId } = req.params;
   try {
@@ -151,14 +152,16 @@ export const getEnrollmentStatus = async (req: Request, res: Response): Promise<
     });
     return res.status(200).json({
       success: true, code: 200, message: 'Success',
-      data: { enrolled: !!enrollment, enrollment }
+      data: { enrolled: !!enrollment, enrollment },
+      trace_id: traceId
     });
   } catch (err) {
-    return res.status(500).json({ success: false, code: 500 });
+    return res.status(500).json({ success: false, code: 500, message: 'Server error', data: null, trace_id: traceId });
   }
 };
 
 export const completeLesson = async (req: Request, res: Response): Promise<Response | void> => {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
   const userId = res.locals.userId as string;
   const { lessonId } = req.params;
   try {
@@ -166,13 +169,13 @@ export const completeLesson = async (req: Request, res: Response): Promise<Respo
       where: { id: lessonId },
       include: { chapter: true }
     });
-    if (!lesson) return res.status(404).json({ success: false, message: 'Lesson not found' });
+    if (!lesson) return res.status(404).json({ success: false, code: 404, message: 'Lesson not found', data: null, trace_id: traceId });
     
     const courseId = lesson.chapter.courseId;
     const enrollment = await prisma.enrollment.findUnique({
       where: { userId_courseId: { userId, courseId } }
     });
-    if (!enrollment) return res.status(403).json({ success: false, message: 'Not enrolled' });
+    if (!enrollment) return res.status(403).json({ success: false, code: 403, message: 'Not enrolled', data: null, trace_id: traceId });
 
     const progress = await prisma.lessonProgress.upsert({
       where: { userId_lessonId: { userId, lessonId } },
@@ -180,13 +183,14 @@ export const completeLesson = async (req: Request, res: Response): Promise<Respo
       update: { isCompleted: true }
     });
     
-    return res.status(200).json({ success: true, code: 200, data: { ...progress, courseCompleted: false } });
+    return res.status(200).json({ success: true, code: 200, message: 'Target completed', data: { ...progress, courseCompleted: false }, trace_id: traceId });
   } catch (err) {
-    return res.status(500).json({ success: false, code: 500 });
+    return res.status(500).json({ success: false, code: 500, message: 'Server error', data: null, trace_id: traceId });
   }
 };
 
-export const getMyCourses = async (_req: Request, res: Response): Promise<Response | void> => {
+export const getMyCourses = async (req: Request, res: Response): Promise<Response | void> => {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
   const userId = res.locals.userId as string;
   try {
     const enrollments = await prisma.enrollment.findMany({
@@ -213,8 +217,8 @@ export const getMyCourses = async (_req: Request, res: Response): Promise<Respon
       lastAccessedAt: e.enrolledAt
     }));
 
-    return res.status(200).json({ success: true, code: 200, data });
+    return res.status(200).json({ success: true, code: 200, message: 'OK', data, trace_id: traceId });
   } catch (err) {
-    return res.status(500).json({ success: false, code: 500 });
+    return res.status(500).json({ success: false, code: 500, message: 'Server error', data: null, trace_id: traceId });
   }
 };
