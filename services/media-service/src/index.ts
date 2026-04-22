@@ -13,6 +13,7 @@ import { getMediaAsset, getMediaByLesson, getMediaByCourse, deleteMediaAsset } f
 import { getActiveStorageProvider, shouldEnableLocalUploadRoutes } from './storage';
 import { LocalStorageProvider } from './storage/local.storage';
 import prisma from './lib/prisma';
+import { initCache, closeCache } from '@lms/cache';
 
 // Validate bien moi truong khi khoi dong
 validateMediaServiceEnv();
@@ -190,14 +191,33 @@ const server = app.listen(PORT, () => {
   );
 });
 
-// Tat server an toan
-const shutdown = (signal: string) => {
-  logger.info(`${signal} - dang tat server`);
-  server.close(() => {
-    logger.info('Server closed');
-    process.exit(0);
+// Khoi dong Redis cache (Upstash) — non-blocking
+if (process.env.CACHE_REDIS_URL) {
+  initCache(process.env.CACHE_REDIS_URL).catch((err) => {
+    logger.warn({ err }, '[MEDIA-SERVICE] Cache Redis init failed — se chay khong co cache');
   });
-  setTimeout(() => process.exit(1), 10_000);
+} else {
+  logger.warn('CACHE_REDIS_URL chua set — bo qua cache layer');
+}
+
+// Tat server an toan — giai phong Prisma + cache
+const shutdown = async (signal: string) => {
+  logger.info(`${signal} - dang tat server`);
+  const forceExitTimer = setTimeout(() => process.exit(1), 10_000);
+
+  server.close(async () => {
+    try {
+      await prisma.$disconnect();
+      await closeCache();
+      clearTimeout(forceExitTimer);
+      logger.info('Server closed');
+      process.exit(0);
+    } catch (error) {
+      logger.error({ error }, 'Loi khi dong service');
+      clearTimeout(forceExitTimer);
+      process.exit(1);
+    }
+  });
 };
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));

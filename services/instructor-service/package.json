@@ -13,6 +13,7 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "@lms/types": "workspace:*",
     "@prisma/client": "^6.6.0",
     "axios": "^1.9.0",
     "cors": "^2.8.5",

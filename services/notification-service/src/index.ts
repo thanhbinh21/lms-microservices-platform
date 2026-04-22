@@ -20,6 +20,8 @@ import {
   markAllAsRead,
   markAsRead,
 } from './controllers/notification.controller';
+import { sendEmail, getPaymentSuccessTemplate, getEnrollmentCreatedTemplate } from './lib/mailer';
+import { getUserData } from './lib/user';
 
 // Validate env khi khoi dong
 validateNotificationServiceEnv();
@@ -76,13 +78,13 @@ async function startConsumers() {
       const { order_id, user_id, course_id, amount, currency } = event.data;
 
       // Idempotent upsert — neu event_id da ton tai thi bo qua.
-      await prisma.notification.upsert({
+      const notification = await prisma.notification.upsert({
         where: { eventId: event.event_id },
         create: {
           userId: user_id,
           type: 'PAYMENT_SUCCESS',
-          channel: 'IN_APP',
-          status: 'MOCKED',
+          channel: 'EMAIL',
+          status: 'PENDING',
           title: 'Thanh toan thanh cong',
           body: `Ban da thanh toan ${amount.toLocaleString('vi-VN')} ${currency} cho don hang ${order_id}. Cam on da mua khoa hoc!`,
           metadata: {
@@ -94,22 +96,33 @@ async function startConsumers() {
           },
           eventId: event.event_id,
           traceId: event.trace_id,
-          sentAt: new Date(),
         },
         update: {}, // Khong update neu da ton tai — giu nguyen de idempotent.
       });
 
-      logger.info(
-        {
-          orderId: order_id,
-          userId: user_id,
-          courseId: course_id,
-          amount,
-          currency,
-          eventId: event.event_id,
-        },
-        '[MOCK EMAIL] Cam on ban da mua khoa hoc — notification luu DB thanh cong.',
-      );
+      // Fetch user email
+      const userData = await getUserData(user_id);
+      if (userData) {
+        const html = getPaymentSuccessTemplate(userData.name, amount, currency, order_id);
+        
+        // Fire and forget email to not block Kafka consumer
+        sendEmail(userData.email, 'Thanh toán thành công đơn hàng trên LMS', html)
+          .then(async () => {
+            await prisma.notification.update({
+              where: { id: notification.id },
+              data: { status: 'SENT', sentAt: new Date() }
+            });
+            logger.info({ orderId: order_id, userId: user_id }, 'Email Payment Success sent.');
+          })
+          .catch(async (err) => {
+            await prisma.notification.update({
+              where: { id: notification.id },
+              data: { status: 'FAILED' }
+            });
+            logger.error({ err, orderId: order_id }, 'Email Payment Success failed.');
+          });
+      }
+
     },
   });
   logger.info('Subscribed to payment.order.completed');
@@ -122,13 +135,13 @@ async function startConsumers() {
     handler: async (event: KafkaEventEnvelope<EnrollmentCreatedEvent>) => {
       const { user_id, course_id, order_id } = event.data;
 
-      await prisma.notification.upsert({
+      const notification = await prisma.notification.upsert({
         where: { eventId: event.event_id },
         create: {
           userId: user_id,
           type: 'ENROLLMENT_CREATED',
-          channel: 'IN_APP',
-          status: 'MOCKED',
+          channel: 'EMAIL',
+          status: 'PENDING',
           title: 'Ghi danh thanh cong',
           body: 'Chuc mung! Ban da duoc ghi danh vao khoa hoc. Vao trang Hoc cua toi de bat dau.',
           metadata: {
@@ -137,20 +150,33 @@ async function startConsumers() {
           },
           eventId: event.event_id,
           traceId: event.trace_id,
-          sentAt: new Date(),
         },
         update: {},
       });
 
-      logger.info(
-        {
-          userId: user_id,
-          courseId: course_id,
-          orderId: order_id,
-          eventId: event.event_id,
-        },
-        '[MOCK EMAIL] Chuc mung! Ban da duoc ghi danh vao khoa hoc.',
-      );
+      // Fetch user email
+      const userData = await getUserData(user_id);
+      if (userData) {
+        const html = getEnrollmentCreatedTemplate(userData.name);
+        
+        // Fire and forget email to not block Kafka consumer
+        sendEmail(userData.email, 'Ghi danh thành công khóa học trên LMS', html)
+          .then(async () => {
+            await prisma.notification.update({
+              where: { id: notification.id },
+              data: { status: 'SENT', sentAt: new Date() }
+            });
+            logger.info({ courseId: course_id, userId: user_id }, 'Email Enrollment Created sent.');
+          })
+          .catch(async (err) => {
+            await prisma.notification.update({
+              where: { id: notification.id },
+              data: { status: 'FAILED' }
+            });
+            logger.error({ err, courseId: course_id }, 'Email Enrollment Created failed.');
+          });
+      }
+
     },
   });
   logger.info('Subscribed to learning.enrollment.created');

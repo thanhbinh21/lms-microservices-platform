@@ -9,8 +9,14 @@ const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 ngay
 export async function initRedis(redisUrl: string): Promise<RedisClientType> {
   if (redisClient) return redisClient;
 
+  // Upstash dung rediss:// (TLS) — node-redis tu xu ly khi url bat dau bang rediss://
   redisClient = createClient({
     url: redisUrl,
+    socket: {
+      // Bat TLS neu URL la rediss:// (Upstash), tat voi redis:// (local)
+      tls: redisUrl.startsWith('rediss://'),
+      rejectUnauthorized: false, // Upstash dung self-signed cert o mot so region
+    },
   });
 
   redisClient.on('error', (err) => {

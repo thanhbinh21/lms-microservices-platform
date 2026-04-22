@@ -83,6 +83,10 @@ model Course {
   @@index([averageRating(sort: Desc), enrollmentCount(sort: Desc)])
   @@index([price])
   @@index([createdAt(sort: Desc)])
+  // Composite indexes cho discovery queries (luon filter status truoc)
+  @@index([status, categoryId])
+  @@index([status, level])
+  @@index([status, createdAt(sort: Desc)])
   @@map("courses")
 }
 

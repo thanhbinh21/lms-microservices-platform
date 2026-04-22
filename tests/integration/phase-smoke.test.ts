@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
-const gatewayUrl = process.env.GATEWAY_BASE_URL || 'http://localhost:3000';
+const gatewayUrl = process.env.GATEWAY_BASE_URL || 'http://localhost:8000';
 const authServiceUrl = process.env.AUTH_SERVICE_BASE_URL || 'http://localhost:3101';
 const courseServiceUrl = process.env.COURSE_SERVICE_BASE_URL || 'http://localhost:3002';
 const mediaServiceUrl = process.env.MEDIA_SERVICE_BASE_URL || 'http://localhost:3004';

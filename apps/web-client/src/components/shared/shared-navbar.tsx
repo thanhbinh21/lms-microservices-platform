@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { logoutAction } from '@/app/actions/auth';
 import { logout } from '@/lib/redux/authSlice';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
+import { NotificationBell } from './notification-bell';
 
 const navItems = [
   { label: 'Trang chủ', href: '/' },
@@ -108,6 +109,7 @@ export function SharedNavbar() {
                   <Button className="font-bold shadow-md shadow-primary/20">Đăng ký làm Giảng viên</Button>
                 </Link>
               )}
+              <NotificationBell />
               <Button
                 type="button"
                 variant="ghost"

@@ -8,6 +8,7 @@ import prisma from '../lib/prisma.js';
 import { generateTokenPair } from '../lib/jwt.js';
 import { setSession } from '../lib/redis.js';
 import { getEnv } from '../lib/env.js';
+import { withRetry } from '@lms/db-prisma';
 
 // Schema dang ky - ADMIN chi duoc tao boi admin hien tai, khong cho phep tu dang ky
 const registerSchema = z.object({
@@ -29,9 +30,9 @@ export async function register(req: Request, res: Response) {
     const validatedData = registerSchema.parse(req.body);
 
     // Check if email already exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await withRetry(() => prisma.user.findUnique({
       where: { email: validatedData.email },
-    });
+    }));
 
     if (existingUser) {
       const response: ApiResponse<null> = {
@@ -48,7 +49,7 @@ export async function register(req: Request, res: Response) {
     const hashedPassword = await bcrypt.hash(validatedData.password, BCRYPT_SALT_ROUNDS);
 
     // Create user
-    const user = await prisma.user.create({
+    const user = await withRetry(() => prisma.user.create({
       data: {
         email: validatedData.email,
         password: hashedPassword,
@@ -63,7 +64,7 @@ export async function register(req: Request, res: Response) {
         role: true,
         createdAt: true,
       },
-    });
+    }));
 
     // Tao cap token JWT
     const env = getEnv();
@@ -76,13 +77,13 @@ export async function register(req: Request, res: Response) {
     const refreshTokenExpiry = new Date();
     refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + REFRESH_TOKEN_DAYS);
 
-    await prisma.refreshToken.create({
+    await withRetry(() => prisma.refreshToken.create({
       data: {
         token: tokens.refreshToken,
         userId: user.id,
         expiresAt: refreshTokenExpiry,
       },
-    });
+    }));
 
     // Luu session vao Redis
     await setSession(user.id, {
@@ -93,7 +94,9 @@ export async function register(req: Request, res: Response) {
 
     logger.info({ userId: user.id, email: user.email }, 'User registered successfully');
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<{
+      user: { id: string; email: string; name: string; role: string };
+    }> = {
       success: true,
       code: 201,
       message: 'User registered successfully',

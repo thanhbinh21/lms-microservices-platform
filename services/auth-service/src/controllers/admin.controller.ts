@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { logger } from '@lms/logger';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma.js';
+import { deleteSession } from '../lib/redis.js';
 
 const USER_SELECT = {
   id: true,
@@ -64,7 +65,15 @@ export async function listUsers(req: Request, res: Response) {
       prisma.user.count({ where }),
     ]);
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<{
+      users: typeof users;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    }> = {
       success: true,
       code: 200,
       message: 'Users retrieved successfully',
@@ -118,7 +127,7 @@ export async function getUser(req: Request, res: Response) {
       return res.status(404).json(response);
     }
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<typeof user> = {
       success: true,
       code: 200,
       message: 'User retrieved successfully',
@@ -192,7 +201,7 @@ export async function updateUserRole(req: Request, res: Response) {
 
     logger.info({ userId: id, newRole: role.toUpperCase(), adminId: res.locals.userId }, 'User role updated');
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<typeof updated> = {
       success: true,
       code: 200,
       message: 'User role updated successfully',
@@ -258,15 +267,30 @@ export async function updateUserStatus(req: Request, res: Response) {
       return res.status(403).json(response);
     }
 
-    const updated = await prisma.user.update({
-      where: { id },
-      data: { status: status.toUpperCase() },
-      select: USER_SELECT,
-    });
+    const isRestricting = status.toUpperCase() === 'BANNED' || status.toUpperCase() === 'SUSPENDED';
+
+    const [updated] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id },
+        data: { status: status.toUpperCase() as any },
+        select: USER_SELECT,
+      }),
+      // Nếu ban/suspend, thu hồi refresh tokens trong db  
+      ...(isRestricting ? [
+        prisma.refreshToken.deleteMany({
+          where: { userId: id }
+        })
+      ] : [])
+    ]);
+
+    // Thu hồi session Redis để token không còn hoạt động lập tức
+    if (isRestricting) {
+      await deleteSession(id);
+    }
 
     logger.info({ userId: id, newStatus: status.toUpperCase(), adminId: res.locals.userId }, 'User status updated');
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<typeof updated> = {
       success: true,
       code: 200,
       message: 'User status updated successfully',
@@ -402,7 +426,12 @@ export async function getStats(req: Request, res: Response) {
       statusMap[entry.status] = entry._count.status;
     }
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<{
+      totalUsers: number;
+      usersByRole: Record<string, number>;
+      newUsersThisMonth: number;
+      usersByStatus: Record<string, number>;
+    }> = {
       success: true,
       code: 200,
       message: 'Stats retrieved successfully',

@@ -106,7 +106,10 @@ export async function refresh(req: Request, res: Response) {
 
     logger.info({ userId: storedToken.user.id }, 'Token refreshed successfully');
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<{
+      accessToken: string;
+      refreshToken: string;
+    }> = {
       success: true,
       code: 200,
       message: 'Token refreshed successfully',

@@ -9,7 +9,9 @@ declare global {
 export const prisma: PrismaClient =
   global.prismaGlobal ??
   new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    // Chỉ log query và warn từ Prisma engine.
+    // Error sẽ được catch và log bởi @lms/logger trong ứng dụng.
+    log: process.env.NODE_ENV === 'development' ? ['query', 'warn'] : [],
   });
 
 if (process.env.NODE_ENV !== 'production') {

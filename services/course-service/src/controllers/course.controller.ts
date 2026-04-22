@@ -5,6 +5,8 @@ import type { Prisma } from '../generated/prisma/index.js';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
+import { withRetry } from '@lms/db-prisma';
+import { cacheGet } from '@lms/cache';
 
 // Schema tao khoa hoc
 const createCourseSchema = z.object({
@@ -29,6 +31,16 @@ const updateCourseSchema = z.object({
 const publishCourseSchema = z.object({
   thumbnail: z.string().url().optional(),
 });
+
+// Tao hash ngan tu query params de lam cache key cho list endpoint
+function buildCacheKey(prefix: string, params: Record<string, unknown>): string {
+  const sorted = Object.keys(params).sort().reduce((acc: Record<string, unknown>, k) => {
+    if (params[k] !== undefined && params[k] !== '') acc[k] = params[k];
+    return acc;
+  }, {});
+  const hash = crypto.createHash('md5').update(JSON.stringify(sorted)).digest('hex').slice(0, 12);
+  return `${prefix}:${hash}`;
+}
 
 // Tao slug tu tieu de
 function generateSlug(title: string): string {
@@ -193,32 +205,57 @@ export async function listCourses(req: Request, res: Response) {
 
     const orderBy = SORT_MAP[sortBy] || SORT_MAP.newest;
 
-    const [courses, total, categories, priceAgg] = await prisma.$transaction([
-      prisma.course.findMany({
-        where,
-        select: {
-          id: true, title: true, slug: true, description: true,
-          thumbnail: true, price: true, level: true, instructorId: true,
-          totalLessons: true, totalDuration: true, createdAt: true,
-          averageRating: true, ratingCount: true, enrollmentCount: true,
-          category: { select: { name: true, slug: true } },
-          _count: { select: { enrollments: true } },
-        },
-        orderBy,
-        skip,
-        take: limit,
-      }),
-      prisma.course.count({ where }),
-      prisma.category.findMany({
-        include: { _count: { select: { courses: { where: { status: 'PUBLISHED' } } } } },
-        orderBy: { order: 'asc' },
-      }),
-      prisma.course.aggregate({
-        where: { status: 'PUBLISHED' },
-        _min: { price: true },
-        _max: { price: true },
-      }),
+    // Static data: categories + priceRange it thay doi -> cache 10 phut, lay song song
+    const [categories, priceAgg] = await Promise.all([
+      cacheGet(
+        'cache:categories:all',
+        () => prisma.category.findMany({
+          include: { _count: { select: { courses: { where: { status: 'PUBLISHED' } } } } },
+          orderBy: { order: 'asc' },
+        }),
+        600,
+      ),
+      cacheGet(
+        'cache:courses:price-range',
+        () => prisma.course.aggregate({
+          where: { status: 'PUBLISHED' },
+          _min: { price: true },
+          _max: { price: true },
+        }),
+        600,
+      ),
     ]);
+
+    // Dynamic data: cache 3 phut theo query hash
+    const listCacheKey = buildCacheKey('cache:courses:list', {
+      q, categorySlug, sortBy, minPrice, maxPrice, minRating, level, page, limit,
+    });
+
+    const { courses, total } = await cacheGet(
+      listCacheKey,
+      async () => {
+        const [c, t] = await withRetry(() =>
+          prisma.$transaction([
+            prisma.course.findMany({
+              where,
+              select: {
+                id: true, title: true, slug: true, description: true,
+                thumbnail: true, price: true, level: true, instructorId: true,
+                totalLessons: true, totalDuration: true, createdAt: true,
+                averageRating: true, ratingCount: true, enrollmentCount: true,
+                category: { select: { name: true, slug: true } },
+              },
+              orderBy,
+              skip,
+              take: limit,
+            }),
+            prisma.course.count({ where }),
+          ])
+        );
+        return { courses: c, total: t };
+      },
+      180,
+    );
 
     const response: ApiResponse<unknown> = {
       success: true, code: 200, message: 'Courses fetched successfully',
@@ -314,11 +351,17 @@ export async function getInstructorCourses(req: Request, res: Response) {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
   const instructorId = res.locals.userId as string;
   try {
-    const courses = await prisma.course.findMany({
+    // Chi select truong can thiet cho instructor dashboard (C3)
+    const courses = await withRetry(() => prisma.course.findMany({
       where: { instructorId },
-      include: { _count: { select: { chapters: true, enrollments: true } } },
+      select: {
+        id: true, title: true, slug: true, status: true, price: true,
+        thumbnail: true, enrollmentCount: true, level: true,
+        updatedAt: true, createdAt: true,
+        _count: { select: { chapters: true } },
+      },
       orderBy: { updatedAt: 'desc' },
-    });
+    }));
 
     const response: ApiResponse<unknown> = {
       success: true, code: 200, message: 'Instructor courses fetched',

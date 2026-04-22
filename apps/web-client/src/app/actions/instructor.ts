@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { cookies } from 'next/headers';
 
 const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:8000';
@@ -513,6 +513,8 @@ export async function updateCourseAction(courseId: string, data: Partial<CourseD
 
   revalidatePath(`/instructor/courses/${courseId}`);
   revalidatePath(`/instructor/courses/${courseId}/detail`);
+  revalidateTag('courses');
+  revalidateTag('categories');
   return { success: result.success, message: result.message, data: result.data };
 }
 
@@ -529,6 +531,8 @@ export async function publishCourseAction(courseId: string, thumbnail?: string) 
   revalidatePath(`/instructor/courses/${courseId}`);
   revalidatePath(`/instructor/courses/${courseId}/detail`);
   revalidatePath('/courses');
+  revalidateTag('courses');
+  revalidateTag('categories');
   return { success: result.success, message: result.message, data: result.data };
 }
 

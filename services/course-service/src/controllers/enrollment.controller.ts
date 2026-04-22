@@ -6,7 +6,7 @@ import type { ApiResponse } from '@lms/types';
 export const enrollCourse = async (req: Request, res: Response): Promise<Response | void> => {
   const traceId = (req.headers['x-trace-id'] as string) || '';
   const userId = res.locals.userId as string;
-  const { courseId } = req.body;
+  const courseId = req.params.courseId || req.body.courseId;
 
   if (!courseId) {
     const response: ApiResponse<null> = {
@@ -116,7 +116,7 @@ export const getMyEnrollments = async (req: Request, res: Response): Promise<Res
 
     const courseIds = enrollments.map(e => e.courseId);
     
-    // Get all lesson progress for these courses
+    // Chi select nhung truong can de tinh progress, tranh load toan bo chapter
     const userProgress = await prisma.lessonProgress.findMany({
       where: {
         userId: userId,
@@ -126,13 +126,17 @@ export const getMyEnrollments = async (req: Request, res: Response): Promise<Res
           }
         }
       },
-      include: {
+      select: {
+        isCompleted: true,
+        updatedAt: true,
         lesson: {
-          include: {
-            chapter: true
-          }
-        }
-      }
+          select: {
+            chapter: {
+              select: { courseId: true },  // Chi can courseId, khong can load toan bo chapter
+            },
+          },
+        },
+      },
     });
 
     // Map completed lessons count per course
@@ -163,11 +167,12 @@ export const getMyEnrollments = async (req: Request, res: Response): Promise<Res
       };
     });
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<typeof formattedData> = {
       success: true, code: 200, message: 'My enrollments retrieved', data: formattedData, trace_id: traceId,
     };
     return res.status(200).json(response);
   } catch (error: any) {
-    return res.status(500).json({ success: false, code: 500, message: 'Server Error' });
+    const response: ApiResponse<null> = { success: false, code: 500, message: 'Server Error', data: null, trace_id: traceId };
+    return res.status(500).json(response);
   }
 };

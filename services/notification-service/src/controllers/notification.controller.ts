@@ -11,7 +11,7 @@ import { logger } from '@lms/logger';
  */
 export async function listMyNotifications(req: Request, res: Response): Promise<void> {
   const userId = res.locals.userId as string;
-  const traceId = res.locals.traceId as string;
+  const traceId = (req.headers['x-trace-id'] as string) || '';
   const unreadOnly = req.query.unread === '1' || req.query.unread === 'true';
   const limit = Math.min(parseInt((req.query.limit as string) || '20', 10) || 20, 100);
   const cursor = req.query.cursor as string | undefined;
@@ -65,7 +65,7 @@ export async function listMyNotifications(req: Request, res: Response): Promise<
  */
 export async function markAsRead(req: Request, res: Response): Promise<void> {
   const userId = res.locals.userId as string;
-  const traceId = res.locals.traceId as string;
+  const traceId = (req.headers['x-trace-id'] as string) || '';
   const id = req.params.id;
 
   try {
@@ -99,9 +99,9 @@ export async function markAsRead(req: Request, res: Response): Promise<void> {
  * POST /notification/api/read-all
  * Danh dau tat ca notification cua user la da doc.
  */
-export async function markAllAsRead(_req: Request, res: Response): Promise<void> {
+export async function markAllAsRead(req: Request, res: Response): Promise<void> {
   const userId = res.locals.userId as string;
-  const traceId = res.locals.traceId as string;
+  const traceId = (req.headers['x-trace-id'] as string) || '';
 
   try {
     const updated = await prisma.notification.updateMany({

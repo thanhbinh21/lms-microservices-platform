@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { callApi } from './instructor';
 
 const COURSE_PREFIX = '/course';
@@ -28,6 +28,7 @@ export async function enrollCourseAction(courseId: string): Promise<ApiResponse<
       revalidatePath(`/courses/${courseId}`);
       revalidatePath(`/learn/${courseId}`);
       revalidatePath(`/dashboard`);
+      revalidateTag('courses');
     }
     return res;
   } catch (error) {

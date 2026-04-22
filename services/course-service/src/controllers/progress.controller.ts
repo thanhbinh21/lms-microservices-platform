@@ -34,12 +34,13 @@ export const getCourseProgress = async (req: Request, res: Response): Promise<Re
       },
     });
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<typeof progressList> = {
       success: true, code: 200, message: 'Progress retrieved', data: progressList, trace_id: traceId,
     };
     return res.status(200).json(response);
   } catch (error: any) {
-    return res.status(500).json({ success: false, code: 500, message: 'Server Error' });
+    const response: ApiResponse<null> = { success: false, code: 500, message: 'Server Error', data: null, trace_id: traceId };
+    return res.status(500).json(response);
   }
 };
 
@@ -68,11 +69,12 @@ export const updateLessonProgress = async (req: Request, res: Response): Promise
       },
     });
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<typeof progress> = {
       success: true, code: 200, message: 'Progress updated', data: progress, trace_id: traceId,
     };
     return res.status(200).json(response);
   } catch (error: any) {
-    return res.status(500).json({ success: false, code: 500, message: 'Server Error' });
+    const response: ApiResponse<null> = { success: false, code: 500, message: 'Server Error', data: null, trace_id: traceId };
+    return res.status(500).json(response);
   }
 };

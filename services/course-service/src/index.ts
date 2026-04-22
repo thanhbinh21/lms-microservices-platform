@@ -31,13 +31,14 @@ import {
 import { listCategories, createCategory } from './controllers/category.controller';
 import { enrollCourse, getMyEnrollments } from './controllers/enrollment.controller';
 import { getCourseProgress, updateLessonProgress } from './controllers/progress.controller';
-import { enrollFree, getLearnData, getEnrollmentStatus, completeLesson, getMyCourses } from './controllers/learning.controller';
+import { getLearnData, getEnrollmentStatus, completeLesson, getMyCourses } from './controllers/learning.controller';
 import { getCourseByIdInternal } from './controllers/internal.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import adminRouter from './routes/admin.routes';
 import prisma from './lib/prisma';
 import { disconnectProducer } from './lib/kafka-producer';
 import { startKafkaConsumers } from './lib/kafka-consumer';
+import { initCache, closeCache } from '@lms/cache';
 
 // Validate bien moi truong khi khoi dong
 validateCourseServiceEnv();
@@ -73,11 +74,11 @@ app.get('/health', (_req: Request, res: Response) => {
 app.get('/internal/courses/:id', getCourseByIdInternal);
 
 // ─── Student Learning Routes (prefix /api/student/ to avoid /:slug conflict) ─
-app.post('/api/student/courses/:courseId/enroll-free', requireAuth, enrollFree);
+app.post('/api/student/courses/:courseId/enroll-free', requireAuth, enrollCourse);
 app.get('/api/student/courses/:courseId/learn-data', requireAuth, getLearnData);
 app.get('/api/student/courses/:courseId/progress', requireAuth, getCourseProgress);
 app.get('/api/student/courses/:courseId/enrollment-status', requireAuth, getEnrollmentStatus);
-app.post('/api/student/lessons/:lessonId/progress', requireAuth, updateLessonProgress);
+app.put('/api/student/lessons/:lessonId/progress', requireAuth, updateLessonProgress);
 app.post('/api/student/lessons/:lessonId/complete', requireAuth, completeLesson);
 app.get('/api/student/my-courses', requireAuth, getMyCourses);
 
@@ -116,8 +117,8 @@ app.get('/api/lessons/:lessonId/playback', getLessonPlayback);
 // ─── Student Learning Routes (Enrollment & Progress) ──────────────────────────
 app.post('/api/enrollments', requireAuth, enrollCourse);
 app.get('/api/enrollments/my', requireAuth, getMyEnrollments);
-app.get('/api/courses/:courseId/progress', requireAuth, getCourseProgress);
-app.put('/api/lessons/:lessonId/progress', requireAuth, updateLessonProgress);
+// app.get('/api/courses/:courseId/progress', requireAuth, getCourseProgress); // Removed duplicate
+// app.put('/api/lessons/:lessonId/progress', requireAuth, updateLessonProgress); // Removed duplicate
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {
@@ -150,6 +151,15 @@ const server = app.listen(PORT, () => {
   logger.info(`Moi truong: ${process.env.NODE_ENV}`);
 });
 
+// Khoi dong Redis cache (Upstash) — non-blocking
+if (process.env.CACHE_REDIS_URL) {
+  initCache(process.env.CACHE_REDIS_URL).catch((err) => {
+    logger.warn({ err }, '[COURSE-SERVICE] Cache Redis init failed — se chay khong co cache');
+  });
+} else {
+  logger.warn('CACHE_REDIS_URL chua set — bo qua cache layer');
+}
+
 // Khoi dong Kafka consumer (Phase 16: payment.order.completed -> enrollment).
 // Khong block khoi dong HTTP server; neu Kafka chua san, log warning va thu lai.
 if (process.env.KAFKA_BROKER) {
@@ -174,6 +184,7 @@ const shutdown = async (signal: string) => {
     try {
       await disconnectProducer();
       await prisma.$disconnect();
+      await closeCache();
       clearTimeout(forceExitTimer);
       logger.info('Server closed');
       process.exit(0);

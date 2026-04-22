@@ -16,9 +16,15 @@ const kafkaEnvSchema = z.object({
   KAFKA_BROKER: z.string().min(1, 'KAFKA_BROKER is required'),
 });
 
-// Redis
+// Redis (auth-service session store — Docker Redis)
 const redisEnvSchema = z.object({
   REDIS_URL: z.string().url('REDIS_URL must be valid URL'),
+});
+
+// Cache Redis — Upstash cho course-service, media-service
+// Dung chung 1 Upstash instance, phan biet bang key prefix 'cache:'
+const cacheRedisEnvSchema = z.object({
+  CACHE_REDIS_URL: z.string().url('CACHE_REDIS_URL must be valid URL'),
 });
 
 // Database (Neon PostgreSQL)
@@ -40,7 +46,6 @@ const vnpayEnvSchema = z.object({
   VNPAY_URL: z.string().url('VNPAY_URL must be valid URL'),
   VNPAY_RETURN_URL: z.string().url('VNPAY_RETURN_URL must be valid URL'),
   VNPAY_IPN_URL: z.string().url('VNPAY_IPN_URL must be valid URL').optional(),
-  // Payment metadata
   PAYMENT_CURRENCY: z.string().default('VND'),
   PAYMENT_TIMEOUT: z.string().default('15'),
   PAYMENT_VERSION: z.string().default('2.1.0'),
@@ -58,6 +63,15 @@ const internalServiceEnvSchema = z.object({
 const storageEnvSchema = z.object({
   STORAGE_PROVIDER: z.enum(['local', 's3', 'cloudinary']).default('local'),
   CLOUDINARY_URL: z.string().url('CLOUDINARY_URL must be valid URL').optional(),
+});
+
+// SMTP (Phase 11.1 - notification-service)
+const smtpEnvSchema = z.object({
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
 });
 
 /**
@@ -85,6 +99,7 @@ export const envSchemas = {
   base: baseEnvSchema,
   kafka: kafkaEnvSchema,
   redis: redisEnvSchema,
+  cacheRedis: cacheRedisEnvSchema,
   database: databaseEnvSchema,
   jwt: jwtEnvSchema,
   vnpay: vnpayEnvSchema,
@@ -96,9 +111,9 @@ export const envSchemas = {
 export const validateAuthServiceEnv = () =>
   validateEnv(baseEnvSchema, databaseEnvSchema, redisEnvSchema, jwtEnvSchema);
 
-// Course-service: Phase 16 them Kafka consumer nen can Kafka env.
+// Course-service: Kafka consumer + Upstash Redis cache
 export const validateCourseServiceEnv = () =>
-  validateEnv(baseEnvSchema, databaseEnvSchema, kafkaEnvSchema.partial());
+  validateEnv(baseEnvSchema, databaseEnvSchema, kafkaEnvSchema.partial(), cacheRedisEnvSchema);
 
 export const validatePaymentServiceEnv = () =>
   validateEnv(
@@ -109,8 +124,15 @@ export const validatePaymentServiceEnv = () =>
     internalServiceEnvSchema,
   );
 
+// Media-service: Storage provider + Upstash Redis cache
 export const validateMediaServiceEnv = () =>
-  validateEnv(baseEnvSchema, databaseEnvSchema, storageEnvSchema);
+  validateEnv(baseEnvSchema, databaseEnvSchema, storageEnvSchema, cacheRedisEnvSchema);
 
 export const validateNotificationServiceEnv = () =>
-  validateEnv(baseEnvSchema, databaseEnvSchema, kafkaEnvSchema);
+  validateEnv(
+    baseEnvSchema,
+    databaseEnvSchema,
+    kafkaEnvSchema,
+    smtpEnvSchema,
+    z.object({ AUTH_SERVICE_URL: z.string().url().optional() }),
+  );
