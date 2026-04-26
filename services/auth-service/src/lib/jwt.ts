@@ -66,6 +66,19 @@ export function verifyToken(token: string, secret: string): JwtPayload | null {
     });
     return decoded as JwtPayload;
   } catch (err) {
+    const errorName = err instanceof Error ? err.name : 'UnknownError';
+    const errorMessage = err instanceof Error ? err.message : 'Unknown token verification error';
+
+    // Loi JWT thong thuong (het han/sai chu ky) la expected path, tranh log stack qua on.
+    if (
+      errorName === 'TokenExpiredError'
+      || errorName === 'JsonWebTokenError'
+      || errorName === 'NotBeforeError'
+    ) {
+      logger.info({ errorName, errorMessage }, 'Token khong hop le hoac da het han');
+      return null;
+    }
+
     logger.warn({ err }, 'Xac thuc token that bai');
     return null;
   }

@@ -48,29 +48,85 @@ export const updateLessonProgress = async (req: Request, res: Response): Promise
   const traceId = (req.headers['x-trace-id'] as string) || '';
   const userId = res.locals.userId as string;
   const { lessonId } = req.params;
-  const { isCompleted, lastWatched } = req.body;
+  const {
+    isCompleted,
+    lastWatched,
+    watchedDuration,
+    lastPosition,
+  } = (req.body || {}) as {
+    isCompleted?: boolean;
+    lastWatched?: number;
+    watchedDuration?: number;
+    lastPosition?: number;
+  };
 
   try {
+    const lesson = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: { chapter: { select: { courseId: true } } },
+    });
+    if (!lesson) {
+      const notFound: ApiResponse<null> = {
+        success: false, code: 404, message: 'Lesson not found', data: null, trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { userId_courseId: { userId, courseId: lesson.chapter.courseId } },
+      select: { id: true },
+    });
+    if (!enrollment) {
+      const forbidden: ApiResponse<null> = {
+        success: false, code: 403, message: 'Not enrolled in this course', data: null, trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
+    }
+
+    const normalizedLastWatchedRaw = lastWatched ?? watchedDuration ?? lastPosition;
+    const normalizedLastWatched = normalizedLastWatchedRaw !== undefined
+      ? Math.max(0, Math.floor(Number(normalizedLastWatchedRaw)))
+      : undefined;
+
     // Upsert progress
-    // @ts-ignore
     const progress = await prisma.lessonProgress.upsert({
       where: {
         userId_lessonId: { userId, lessonId },
       },
       update: {
         ...(isCompleted !== undefined && { isCompleted }),
-        ...(lastWatched !== undefined && { lastWatched }),
+        ...(normalizedLastWatched !== undefined && { lastWatched: normalizedLastWatched }),
       },
       create: {
         userId,
         lessonId,
         isCompleted: isCompleted || false,
-        lastWatched: lastWatched || 0,
+        lastWatched: normalizedLastWatched || 0,
       },
     });
 
-    const response: ApiResponse<typeof progress> = {
-      success: true, code: 200, message: 'Progress updated', data: progress, trace_id: traceId,
+    const response: ApiResponse<{
+      id: string;
+      userId: string;
+      lessonId: string;
+      isCompleted: boolean;
+      watchedDuration: number;
+      lastPosition: number;
+      updatedAt: Date;
+    }> = {
+      success: true,
+      code: 200,
+      message: 'Progress updated',
+      data: {
+        id: progress.id,
+        userId: progress.userId,
+        lessonId: progress.lessonId,
+        isCompleted: progress.isCompleted,
+        watchedDuration: progress.lastWatched,
+        lastPosition: progress.lastWatched,
+        updatedAt: progress.updatedAt,
+      },
+      trace_id: traceId,
     };
     return res.status(200).json(response);
   } catch (error: any) {

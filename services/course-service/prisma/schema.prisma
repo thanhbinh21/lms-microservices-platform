@@ -76,6 +76,7 @@ model Course {
   chapters    Chapter[]
   enrollments Enrollment[]
   reviews     Review[]
+  certificates Certificate[]
 
   @@index([instructorId])
   @@index([status])
@@ -157,10 +158,31 @@ model Enrollment {
   enrolledAt DateTime @default(now()) @map("enrolled_at")
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  certificates Certificate[]
 
   @@unique([userId, courseId])
   @@index([userId])
   @@map("enrollments")
+}
+
+model Certificate {
+  id                String   @id @default(uuid())
+  certificateNumber String   @unique @map("certificate_number")
+  userId            String   @map("user_id")
+  courseId          String   @map("course_id")
+  enrollmentId      String   @map("enrollment_id")
+  issuedAt          DateTime @default(now()) @map("issued_at")
+  completedAt       DateTime @map("completed_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  enrollment  Enrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId, issuedAt(sort: Desc)])
+  @@index([courseId])
+  @@map("certificates")
 }
 
 model Review {

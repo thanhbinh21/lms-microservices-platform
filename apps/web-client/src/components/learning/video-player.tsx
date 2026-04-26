@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { updateLessonProgressAction, completeLessonAction } from '@/app/actions/learning';
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2, CircleDashed, Youtube } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -16,7 +16,10 @@ interface VideoPlayerProps {
   duration: number;
   lastPosition: number;
   isCompleted: boolean;
-  onComplete?: () => void;
+  onComplete?: (payload?: {
+    courseCompleted?: boolean;
+    certificateNumber?: string | null;
+  }) => void;
 }
 
 function extractYoutubeId(url: string): string | null {
@@ -41,39 +44,43 @@ export function VideoPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const watchedRef = useRef(0);
   const positionRef = useRef(lastPosition);
-  const trackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isCompleted, setIsCompleted] = useState(initialCompleted);
   const [canComplete, setCanComplete] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [completionMessage, setCompletionMessage] = useState('');
 
   const syncProgress = useCallback(async () => {
+    if (sourceType === 'YOUTUBE') return;
     try {
       await updateLessonProgressAction(lessonId, {
         watchedDuration: Math.floor(watchedRef.current),
         lastPosition: Math.floor(positionRef.current),
       });
-    } catch { /* non-critical */ }
-  }, [lessonId]);
+    } catch {
+      // non-critical
+    }
+  }, [lessonId, sourceType]);
 
   useEffect(() => {
     const timer = setInterval(syncProgress, TRACK_INTERVAL_MS);
-    trackTimerRef.current = timer;
     return () => {
       clearInterval(timer);
-      syncProgress();
+      void syncProgress();
     };
   }, [syncProgress]);
 
   useEffect(() => {
     setIsCompleted(initialCompleted);
-    setCanComplete(false);
+    setCanComplete(sourceType === 'YOUTUBE');
     watchedRef.current = 0;
     positionRef.current = lastPosition;
-  }, [lessonId, initialCompleted, lastPosition]);
+    setCompletionMessage('');
+  }, [lessonId, initialCompleted, lastPosition, sourceType]);
 
   const handleTimeUpdate = () => {
     const el = videoRef.current;
     if (!el) return;
+
     positionRef.current = el.currentTime;
     watchedRef.current = Math.max(watchedRef.current, el.currentTime);
 
@@ -91,12 +98,29 @@ export function VideoPlayer({
 
   const handleComplete = async () => {
     if (isCompleted || completing) return;
+
     setCompleting(true);
     try {
       const res = await completeLessonAction(lessonId);
       if (res.success) {
         setIsCompleted(true);
-        onComplete?.();
+
+        if (res.data?.certificate) {
+          setCompletionMessage('Chuc mung! Ban da duoc cap chung chi cho khoa hoc nay.');
+        } else if (res.data?.courseCompleted) {
+          setCompletionMessage('Ban da hoan thanh khoa hoc.');
+        } else {
+          setCompletionMessage('Ban da hoan thanh bai hoc nay.');
+        }
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('lms:learn-progress-updated'));
+        }
+
+        onComplete?.({
+          courseCompleted: res.data?.courseCompleted ?? false,
+          certificateNumber: res.data?.certificate?.certificateNumber ?? null,
+        });
       }
     } finally {
       setCompleting(false);
@@ -104,10 +128,12 @@ export function VideoPlayer({
   };
 
   const youtubeId = sourceType === 'YOUTUBE' ? extractYoutubeId(videoUrl) : null;
+  const watchedPercent = duration > 0
+    ? Math.min(100, Math.round((watchedRef.current / duration) * 100))
+    : 0;
 
   return (
     <div className="space-y-4">
-      {/* Video container — cinema ratio */}
       <div className="relative overflow-hidden rounded-2xl bg-slate-900 shadow-2xl shadow-black/30">
         <div className="relative aspect-video w-full">
           {sourceType === 'YOUTUBE' && youtubeId ? (
@@ -116,7 +142,7 @@ export function VideoPlayer({
               className="absolute inset-0 h-full w-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
-              title="Video bài học"
+              title="Video bai hoc"
             />
           ) : (
             <video
@@ -132,7 +158,37 @@ export function VideoPlayer({
         </div>
       </div>
 
-      {/* Complete button */}
+      {!isCompleted && sourceType !== 'YOUTUBE' && duration > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-600">
+            <span className="inline-flex items-center gap-1">
+              <CircleDashed className="size-3.5" />
+              Tien do xem video
+            </span>
+            <span>{watchedPercent}%</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-300"
+              style={{ width: `${watchedPercent}%` }}
+            />
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Nut hoan thanh mo sau khi ban xem toi thieu 80% video.
+          </p>
+        </div>
+      )}
+
+      {!isCompleted && sourceType === 'YOUTUBE' && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+          <p className="inline-flex items-center gap-1 font-semibold">
+            <Youtube className="size-3.5" />
+            Bai hoc YouTube khong the track chinh xac thoi luong xem.
+          </p>
+          <p className="mt-1">Sau khi hoc xong, bam nut ben duoi de danh dau hoan thanh bai hoc.</p>
+        </div>
+      )}
+
       {!isCompleted && (canComplete || duration === 0) && (
         <div className="animate-fade-up">
           <Button
@@ -145,18 +201,20 @@ export function VideoPlayer({
             ) : (
               <CheckCircle2 className="size-5" />
             )}
-            Hoàn thành bài học
+            Danh dau hoan thanh bai hoc
           </Button>
         </div>
       )}
 
       {isCompleted && (
-        <div className={cn(
-          'flex items-center gap-2 rounded-xl border border-emerald-200/50 bg-emerald-50/60 px-4 py-3',
-          'text-sm font-semibold text-emerald-700 backdrop-blur-sm',
-        )}>
+        <div
+          className={cn(
+            'flex items-center gap-2 rounded-xl border border-emerald-200/50 bg-emerald-50/60 px-4 py-3',
+            'text-sm font-semibold text-emerald-700 backdrop-blur-sm',
+          )}
+        >
           <CheckCircle2 className="size-5 text-emerald-500" />
-          Bạn đã hoàn thành bài học này
+          {completionMessage || 'Ban da hoan thanh bai hoc nay'}
         </div>
       )}
     </div>

@@ -4,12 +4,11 @@ import { Clock3, PlayCircle, Lock } from 'lucide-react';
 import { getPublicCourseDetailAction } from '@/app/actions/instructor';
 import { getCourseProgressAction } from '@/app/actions/student';
 
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
 
-import { EnrollButton } from './enroll-button';
+import { EnrollButton, CourseReviewPanel } from './enroll-button';
 
 
 interface CourseDetailPageProps {
@@ -45,6 +44,11 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
   // Kiem tra enrollment bang cach get progress
   const progressRes = await getCourseProgressAction(course.id);
   const isEnrolled = progressRes.success && progressRes.code === 200;
+  const completedLessons =
+    isEnrolled && Array.isArray(progressRes.data)
+      ? progressRes.data.filter((item) => item?.isCompleted).length
+      : 0;
+  const isCourseCompleted = isEnrolled && totalLessons > 0 && completedLessons >= totalLessons;
 
   return (
     <div className="glass-page min-h-screen text-foreground relative overflow-hidden">
@@ -147,6 +151,13 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
             ))}
           </div>
         </section>
+
+        <CourseReviewPanel
+          courseId={course.id}
+          isEnrolled={isEnrolled}
+          isCourseCompleted={isCourseCompleted}
+          heading="Danh gia va nhan xet"
+        />
       </main>
 
       <SharedFooter />

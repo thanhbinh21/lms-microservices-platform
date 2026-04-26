@@ -10,20 +10,40 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
 import { useAppSelector } from '@/lib/redux/hooks';
-import { getMyEnrollmentsAction } from '@/app/actions/student';
+import { getMyCertificatesAction, type MyCertificateSummary } from '@/app/actions/learning';
 
-interface Enrollment {
-  id: string;
-  courseId: string;
-  progress: number;
-  enrolledAt: string;
-  course?: { title?: string; slug?: string };
+function downloadCertificateText(params: {
+  certificateNumber: string;
+  learnerName: string;
+  courseTitle: string;
+  completedAt: string;
+  issuedAt: string;
+}) {
+  const content = [
+    'LMS CERTIFICATE OF COMPLETION',
+    '',
+    `Certificate Number: ${params.certificateNumber}`,
+    `Learner: ${params.learnerName}`,
+    `Course: ${params.courseTitle}`,
+    `Completed At: ${new Date(params.completedAt).toLocaleDateString('vi-VN')}`,
+    `Issued At: ${new Date(params.issuedAt).toLocaleDateString('vi-VN')}`,
+  ].join('\n');
+
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `certificate-${params.certificateNumber}.txt`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  window.URL.revokeObjectURL(url);
 }
 
 export default function CertificatesPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAppSelector((state) => state.auth);
-  const [items, setItems] = useState<Enrollment[] | null>(null);
+  const [items, setItems] = useState<MyCertificateSummary[] | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
@@ -31,10 +51,11 @@ export default function CertificatesPage() {
       router.push('/login');
       return;
     }
+
     (async () => {
-      const res = await getMyEnrollmentsAction();
-      const data: Enrollment[] = res.success && res.data ? (res.data as Enrollment[]) : [];
-      setItems(data.filter((item) => (item.progress ?? 0) >= 100));
+      const res = await getMyCertificatesAction();
+      const data: MyCertificateSummary[] = res.success && res.data ? res.data : [];
+      setItems(data);
     })();
   }, [isAuthenticated, isLoading, router]);
 
@@ -52,9 +73,9 @@ export default function CertificatesPage() {
               <Trophy className="size-7" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Chứng chỉ của tôi</h1>
+              <h1 className="text-3xl font-bold tracking-tight">Chung chi cua toi</h1>
               <p className="text-sm font-medium text-muted-foreground">
-                Tải chứng chỉ cho các khóa học bạn đã hoàn thành 100%.
+                Danh sach chung chi duoc cap tu cac khoa hoc ban da hoan thanh.
               </p>
             </div>
           </div>
@@ -63,19 +84,18 @@ export default function CertificatesPage() {
         {items === null ? (
           <div className="flex flex-col items-center justify-center py-20 opacity-60">
             <Loader2 className="size-10 animate-spin text-primary mb-4" />
-            <p className="font-medium text-muted-foreground">Đang kiểm tra chứng chỉ...</p>
+            <p className="font-medium text-muted-foreground">Dang kiem tra chung chi...</p>
           </div>
         ) : items.length === 0 ? (
           <ScrollReveal>
             <Card className="glass-panel border-dashed border-2 py-16 flex flex-col items-center justify-center text-center">
               <Award className="size-20 text-amber-500/30 mb-4" />
-              <h3 className="text-xl font-bold mb-2">Chưa có chứng chỉ nào</h3>
+              <h3 className="text-xl font-bold mb-2">Chua co chung chi nao</h3>
               <p className="text-muted-foreground text-sm font-medium max-w-md mb-6">
-                Hoàn thành 100% một khóa học để nhận chứng chỉ. Chứng chỉ sẽ được tự động tạo và có
-                thể tải về dưới định dạng PDF.
+                Hoan thanh 100% mot khoa hoc de duoc cap chung chi. Chung chi se duoc tao tu dong.
               </p>
               <Link href="/dashboard/courses">
-                <Button className="px-8 font-bold shadow-md rounded-full">Xem khóa học của tôi</Button>
+                <Button className="px-8 font-bold shadow-md rounded-full">Xem khoa hoc cua toi</Button>
               </Link>
             </Card>
           </ScrollReveal>
@@ -91,35 +111,41 @@ export default function CertificatesPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
-                          Chứng chỉ hoàn thành
+                          Chung chi hoan thanh
                         </p>
-                        <h3 className="mt-1 font-bold leading-tight line-clamp-2">
-                          {item.course?.title || 'Khóa học'}
-                        </h3>
+                        <h3 className="mt-1 font-bold leading-tight line-clamp-2">{item.course.title}</h3>
                         <p className="mt-1 text-xs font-medium text-muted-foreground">
-                          Cấp cho: <span className="font-bold text-foreground">{user?.name}</span>
+                          Cap cho: <span className="font-bold text-foreground">{user?.name}</span>
                         </p>
                         <p className="mt-0.5 text-xs font-medium text-muted-foreground">
-                          Hoàn thành: {new Date(item.enrolledAt).toLocaleDateString('vi-VN')}
+                          Hoan thanh: {new Date(item.completedAt).toLocaleDateString('vi-VN')}
+                        </p>
+                        <p className="mt-0.5 text-[11px] font-semibold text-amber-700">
+                          Ma chung chi: {item.certificateNumber}
                         </p>
                       </div>
                     </div>
+
                     <div className="flex gap-2 pt-2 border-t border-amber-200/60">
                       <Button
                         variant="outline"
                         className="flex-1 gap-2 rounded-xl font-bold border-amber-300/60"
                         onClick={() =>
-                          alert(
-                            'Tính năng tải chứng chỉ PDF sẽ được phát hành trong Phase 12. Vui lòng quay lại sau!',
-                          )
+                          downloadCertificateText({
+                            certificateNumber: item.certificateNumber,
+                            learnerName: user?.name || 'Hoc vien',
+                            courseTitle: item.course.title,
+                            completedAt: item.completedAt,
+                            issuedAt: item.issuedAt,
+                          })
                         }
                       >
                         <Download className="size-4" />
-                        Tải PDF
+                        Tai chung chi
                       </Button>
-                      <Link href={`/courses/${item.course?.slug || item.courseId}`} className="flex-1">
+                      <Link href={`/courses/${item.course.slug}`} className="flex-1">
                         <Button variant="ghost" className="w-full rounded-xl font-bold">
-                          Xem khóa học
+                          Xem khoa hoc
                         </Button>
                       </Link>
                     </div>

@@ -96,6 +96,8 @@ export async function register(req: Request, res: Response) {
 
     const response: ApiResponse<{
       user: { id: string; email: string; name: string; role: string };
+      accessToken: string;
+      refreshToken: string;
     }> = {
       success: true,
       code: 201,

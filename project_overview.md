@@ -138,6 +138,7 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
   - Update (Apr 21, 2026): Da tach middleware `requireAdmin` thanh shared factory `createRequireAdmin()` trong `@lms/types` va auth-service da import lai tu package chung.
   - Hotfix (Apr 21, 2026): Khoi phuc syntax hop le trong `course.controller.ts` sau merge do dang, sua them typing o `internal.controller.ts` de `@lms/course-service` build lai on dinh.
   - Hotfix (Apr 21, 2026): Web-client chu dong xoa auth cookies khi `/refresh` tra ve 401/403 de chan vong lap refresh token hong; course-service map loi Prisma init/connect thanh 503 de frontend phan biet ro DB tam thoi unavailable.
+  - Hotfix (Apr 26, 2026): auth-service giam log nhieu khi refresh token cu/sai chu ky (`invalid signature`) va uu tien kiem tra token ton tai trong DB truoc khi verify chu ky de tranh spam log luc mo trang dang nhap.
   - Van de 4: instructor-service dung CORS `cors()` khong co origin restriction (app.ts line 10), khac voi cac service khac dung `CORS_ORIGIN`.
 - [x] **Phase 9.16:** API Response & Error Handling Standardization (Audit tat ca services) ✅ Completed: Apr 22, 2026
   - Van de 1: Nhieu controller dung `ApiResponse<any>` thay vi typed response (login, register, admin). Can ep kieu cu the de tranh leak du lieu.
@@ -152,12 +153,16 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 ### Phase 10-12: Learning Experience ✅ COMPLETED (core)
 - [x] **Phase 10:** Student Learning UI — `/learn/[courseId]` layout (8KB), lesson sub-route, LessonProgress model (upsert), video player, progress tracking (getCourseProgress, updateLessonProgress, completeLesson), free enrollment (enrollFree voi idempotency + price guard + transaction), getMyCourses. ✅ Completed: Apr 18, 2026
   - Review UI chuyen sang Phase 10.1.
+  - Hotfix (Apr 26, 2026): Sua dong bo API update progress lesson (`PUT /api/student/lessons/:lessonId/progress`) va bo sung fallback payload de khong mat tien do khi FE gui du lieu cu; nang UX trang lesson (hien tien do xem, CTA hoan thanh ro hon, ho tro danh dau hoan thanh cho bai YouTube).
+  - Hotfix (Apr 26, 2026): Learn layout lang nghe su kien cap nhat tien do de dong bo sidebar/progress ngay sau khi complete lesson; cai thien LessonNavigation de can bo cuc khi thieu prev/next va them action sau bai cuoi (hoan thanh khoa, xem chung chi, danh gia).
 - [x] **Phase 11:** **Notification Service** (partial) — Kafka consumers (payment.order.completed + learning.enrollment.created), idempotent notification (upsert by eventId), CRUD API (listMyNotifications + markAsRead + markAllAsRead), cursor-based pagination, Kong Gateway route. ✅ Completed: Apr 18, 2026
   - Email transport (Nodemailer/Resend) va notification bell UI chuyen sang Phase 11.1. Status hien dang la MOCKED.
 - [x] **Phase 12:** Student Dashboard — `/dashboard` (37KB) voi tabs overview/my-courses/certificates/community/orders, progress cards voi progressPercent + completedLessons, course filter (all/in-progress/completed), sort (recent/progress), getMyEnrollmentsAction, CTA Become Educator. ✅ Completed: Apr 18, 2026
+  - Hotfix (Apr 26, 2026): Trien khai chung chi that trong course-service (model Certificate + auto issue khi hoc vien hoan thanh 100% + API `/api/student/certificates`), thay the luong dashboard certificates gia lap bang du lieu chung chi thuc te.
 
 ### Phase 10.1-11.1: Learning Experience — Remaining Items
-- [ ] **Phase 10.1:** Rating & Review System — Prisma model Review (courseId, userId, rating 1-5, comment), CRUD API (createReview, listReviews, getReviewStats), 1 user = 1 review/course (unique constraint), course aggregate (avgRating, reviewCount), frontend review form + review list tren `/courses/[slug]` va `/learn/[courseId]`.
+- [x] **Phase 10.1:** Rating & Review System — Prisma model Review (courseId, userId, rating 1-5, comment), CRUD API (createReview/listReviews/getReviewStats + getMyReview), 1 user = 1 review/course (unique constraint), course aggregate (avgRating, reviewCount), frontend review form + review list tren `/courses/[slug]` va `/learn/[courseId]`. ✅ Completed: Apr 26, 2026
+  - Hotfix (Apr 26, 2026): Chi cho phep tao review 1 lan sau khi hoc vien hoan thanh 100% khoa hoc; bo review panel khoi trang hoc video, giu review o trang chi tiet khoa hoc.
 - [x] **Phase 11.1:** Direct SMTP Email Transport & Notification UI — Tích hợp hệ thống gửi email thực tế trực tiếp qua giao thức SMTP (sử dụng tài khoản thật như Gmail App Password), không phụ thuộc vào dịch vụ trung gian (như Resend/SendGrid). Xây dựng Email Templates bằng HTML (welcome, payment success, enrollment). Tích hợp Notification Bell UI trên SharedNavbar (huy hiệu số lượng chưa đọc, dropdown danh sách, tương tác đánh dấu đã đọc). [2026-04-22]
 
 ### Phase 13-16: Commerce & Payments (VNPay + Kafka) ✅ COMPLETED
@@ -205,51 +210,4 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 *   **Server Actions for API Calls:** All API calls from Next.js to Microservices are done via Server Actions (`actions/`) using the internal `GATEWAY_URL`.
 *   **Client vs Server Components:** Limit `"use client"` as much as possible, mostly used for simple state hooks or highly interactive elements. Do not pass complex API functionality directly down tree.
 
-## 7. Ke hoach chinh sua role dang ky va Become Educator
 
-Trang thai roadmap lien quan:
-- Phase 9.4: Auth Role Policy Refactor
-- Phase 9.5: Become Educator Backend Flow
-- Phase 9.6: Become Educator Frontend UX
-- Phase 9.7: System Seed Content (Admin-managed sample courses)
-- Phase 9.8: Media Provider Unification (Cloudinary Free)
-
-### 7.1 Muc tieu nghiep vu
-- Tat ca tai khoan moi dang ky se mac dinh role la STUDENT.
-- Bo chon role tai man hinh dang ky de tranh nham luong va gian lan role.
-- User can action "Become Educator" de nang cap role sau khi dap ung dieu kien.
-- Chi user da duoc nang cap INSTRUCTOR moi co quyen tao va upload khoa hoc.
-
-### 7.2 Acceptance Criteria
-- Dang ky moi khong truyen role tu client; auth-service luon tao user role STUDENT.
-- UI Register khong con field chon role.
-- Dashboard/Profile co CTA "Become Educator" cho user role STUDENT.
-- API Become Educator cap nhat role INSTRUCTOR va ghi nhan audit thong tin nang cap.
-- Truoc khi co giang vien upload khoa hoc that, he thong phai co bo khoa hoc mau do admin them, trong do co lesson free de hoc vien xem.
-- Sau khi nang cap thanh cong, user co the truy cap khu vuc giang vien va tao khoa hoc.
-- Neu role chua du, route/endpoint instructor tra ve 403 nhu hien tai.
-
-### 7.3 Pham vi code du kien
-- services/auth-service
-  - register controller: bo nhan role tu request, role mac dinh STUDENT.
-  - them endpoint become-educator (controller + validate + service).
-  - bo sung co che audit nang cap role (truong note hoac bang audit rieng neu can).
-- apps/web-client
-  - register form: bo UI role selector, chi con thong tin co ban.
-  - profile/dashboard: them action/button Become Educator.
-  - instructor gating: giu nguyen guard role INSTRUCTOR/ADMIN.
-  - server actions auth/instructor: bo sung goi API nang cap role va dong bo auth state.
-
-### 7.4 De xuat API
-- POST /auth/become-educator
-  - Header: Authorization bearer token (qua Gateway)
-  - Input: co the de rong hoac them motivation/profile fields o phase sau
-  - Output: ApiResponse<User> voi role da cap nhat INSTRUCTOR
-
-### 7.5 Rui ro va giam thieu
-- Rui ro stale token sau khi doi role:
-  - Giam thieu: refresh token ngay sau khi upgrade role hoac bat buoc login lai.
-- Rui ro user da co session tab cu:
-  - Giam thieu: middleware/guard kiem tra role moi o moi request nhay cam.
-- Rui ro nang cap role khong co audit:
-  - Giam thieu: luu thoi diem, actor id, trace_id cho action Become Educator.

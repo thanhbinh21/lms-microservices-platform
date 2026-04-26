@@ -1,6 +1,10 @@
 'use server';
 import { getPublicCoursesAction } from '@/app/actions/instructor';
-import { getMyCoursesAction, type MyCourseSummary } from '@/app/actions/learning';
+import {
+  getMyCoursesAction,
+  getMyCertificatesAction,
+  type MyCourseSummary,
+} from '@/app/actions/learning';
 
 interface DashboardData {
   stats: {
@@ -30,19 +34,21 @@ interface DashboardData {
 }
 
 export async function getDashboardData(): Promise<{ success: boolean; data?: DashboardData; seeded: boolean }> {
-  const [myCoursesResult, publicResult] = await Promise.all([
+  const [myCoursesResult, publicResult, certificatesResult] = await Promise.all([
     getMyCoursesAction(),
     getPublicCoursesAction(1, 6),
+    getMyCertificatesAction(),
   ]);
 
   const myCourses = myCoursesResult.success && myCoursesResult.data ? myCoursesResult.data : [];
   const publicCourses = publicResult.success && publicResult.data ? publicResult.data.courses : [];
+  const certificates = certificatesResult.success && certificatesResult.data ? certificatesResult.data : [];
 
   const dashboardData: DashboardData = {
     stats: {
       totalHours: myCourses.reduce((acc: number, item: MyCourseSummary) => acc + Math.floor((item.totalWatchedSeconds || 0) / 3600), 0),
       coursesCompleted: myCourses.filter((item: MyCourseSummary) => item.progressPercent === 100).length,
-      certificates: myCourses.filter((item: MyCourseSummary) => item.progressPercent === 100).length,
+      certificates: certificates.length,
       activeDiscussions: myCourses.length, // Placeholder
     },
     activeCourses: myCourses

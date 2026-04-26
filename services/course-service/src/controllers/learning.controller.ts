@@ -3,6 +3,103 @@ import prisma from '../lib/prisma';
 import type { ApiResponse } from '@lms/types';
 import { randomUUID } from 'crypto';
 
+function createCertificateNumber() {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const d = String(today.getDate()).padStart(2, '0');
+  const suffix = randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
+  return `LMS-${y}${m}${d}-${suffix}`;
+}
+
+async function computeCourseCompletion(userId: string, courseId: string) {
+  const [totalLessons, completedLessons] = await prisma.$transaction([
+    prisma.lesson.count({
+      where: {
+        isPublished: true,
+        chapter: { courseId },
+      },
+    }),
+    prisma.lessonProgress.count({
+      where: {
+        userId,
+        isCompleted: true,
+        lesson: {
+          isPublished: true,
+          chapter: { courseId },
+        },
+      },
+    }),
+  ]);
+
+  const progressPercent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+  const isCompleted = totalLessons > 0 && completedLessons >= totalLessons;
+
+  return {
+    totalLessons,
+    completedLessons,
+    progressPercent,
+    isCompleted,
+  };
+}
+
+async function issueCertificateIfEligible(params: {
+  userId: string;
+  courseId: string;
+  enrollmentId: string;
+}) {
+  const { userId, courseId, enrollmentId } = params;
+  const completion = await computeCourseCompletion(userId, courseId);
+
+  if (!completion.isCompleted) {
+    return {
+      issued: false,
+      certificate: null,
+      completion,
+    };
+  }
+
+  const existed = await prisma.certificate.findUnique({
+    where: { userId_courseId: { userId, courseId } },
+    select: {
+      id: true,
+      certificateNumber: true,
+      issuedAt: true,
+      completedAt: true,
+    },
+  });
+
+  if (existed) {
+    return {
+      issued: false,
+      certificate: existed,
+      completion,
+    };
+  }
+
+  const created = await prisma.certificate.create({
+    data: {
+      userId,
+      courseId,
+      enrollmentId,
+      certificateNumber: createCertificateNumber(),
+      completedAt: new Date(),
+    },
+    select: {
+      id: true,
+      certificateNumber: true,
+      issuedAt: true,
+      completedAt: true,
+    },
+  });
+
+  return {
+    issued: true,
+    certificate: created,
+    completion,
+  };
+}
+
 export const enrollFree = async (req: Request, res: Response): Promise<Response | void> => {
   const traceId = (req.headers['x-trace-id'] as string) || '';
   const userId = res.locals.userId as string;
@@ -182,10 +279,130 @@ export const completeLesson = async (req: Request, res: Response): Promise<Respo
       create: { userId, lessonId, isCompleted: true, lastWatched: 0 },
       update: { isCompleted: true }
     });
-    
-    return res.status(200).json({ success: true, code: 200, message: 'Target completed', data: { ...progress, courseCompleted: false }, trace_id: traceId });
+
+    const certificateResult = await issueCertificateIfEligible({
+      userId,
+      courseId,
+      enrollmentId: enrollment.id,
+    });
+
+    const response: ApiResponse<{
+      id: string;
+      userId: string;
+      lessonId: string;
+      isCompleted: boolean;
+      lastWatched: number;
+      createdAt: Date;
+      updatedAt: Date;
+      courseCompleted: boolean;
+      progressPercent: number;
+      certificate: {
+        id: string;
+        certificateNumber: string;
+        issuedAt: Date;
+        completedAt: Date;
+      } | null;
+    }> = {
+      success: true,
+      code: 200,
+      message: certificateResult.issued ? 'Target completed and certificate issued' : 'Target completed',
+      data: {
+        ...progress,
+        courseCompleted: certificateResult.completion.isCompleted,
+        progressPercent: certificateResult.completion.progressPercent,
+        certificate: certificateResult.certificate,
+      },
+      trace_id: traceId,
+    };
+
+    return res.status(200).json(response);
   } catch (err) {
     return res.status(500).json({ success: false, code: 500, message: 'Server error', data: null, trace_id: traceId });
+  }
+};
+
+export const getMyCertificates = async (req: Request, res: Response): Promise<Response | void> => {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const userId = res.locals.userId as string;
+
+  try {
+    const enrollments = await prisma.enrollment.findMany({
+      where: { userId },
+      select: { id: true, courseId: true },
+    });
+
+    // Backfill: nhung khoa hoc da hoc xong tu truoc se duoc cap chung chi khi goi API lan dau.
+    await Promise.all(
+      enrollments.map((enrollment) =>
+        issueCertificateIfEligible({
+          userId,
+          courseId: enrollment.courseId,
+          enrollmentId: enrollment.id,
+        }),
+      ),
+    );
+
+    const certificates = await prisma.certificate.findMany({
+      where: { userId },
+      orderBy: { issuedAt: 'desc' },
+      select: {
+        id: true,
+        certificateNumber: true,
+        issuedAt: true,
+        completedAt: true,
+        course: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            level: true,
+          },
+        },
+      },
+    });
+
+    const response: ApiResponse<
+      Array<{
+        id: string;
+        certificateNumber: string;
+        issuedAt: Date;
+        completedAt: Date;
+        course: {
+          id: string;
+          title: string;
+          slug: string;
+          level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+        };
+      }>
+    > = {
+      success: true,
+      code: 200,
+      message: 'Certificates fetched successfully',
+      data: certificates as Array<{
+        id: string;
+        certificateNumber: string;
+        issuedAt: Date;
+        completedAt: Date;
+        course: {
+          id: string;
+          title: string;
+          slug: string;
+          level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+        };
+      }>,
+      trace_id: traceId,
+    };
+
+    return res.status(200).json(response);
+  } catch (err) {
+    const response: ApiResponse<null> = {
+      success: false,
+      code: 500,
+      message: 'Server error',
+      data: null,
+      trace_id: traceId,
+    };
+    return res.status(500).json(response);
   }
 };
 
