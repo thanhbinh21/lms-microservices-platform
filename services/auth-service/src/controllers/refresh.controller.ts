@@ -23,22 +23,8 @@ export async function refresh(req: Request, res: Response) {
     // Validate request body
     const validatedData = refreshSchema.parse(req.body);
 
-    // Xac thuc refresh token
-    const env = getEnv();
-    const payload = verifyToken(validatedData.refreshToken, env.JWT_SECRET);
-
-    if (!payload) {
-      const response: ApiResponse<null> = {
-        success: false,
-        code: 401,
-        message: 'Invalid or expired refresh token',
-        data: null,
-        trace_id: traceId,
-      };
-      return res.status(401).json(response);
-    }
-
-    // Check if refresh token exists in database
+    // Check if refresh token exists in database truoc khi verify chu ky.
+    // Muc tieu: giam spam log khi trinh duyet gui cookie cu khong con ton tai.
     const storedToken = await prisma.refreshToken.findUnique({
       where: { token: validatedData.refreshToken },
       include: { user: true },
@@ -49,6 +35,26 @@ export async function refresh(req: Request, res: Response) {
         success: false,
         code: 401,
         message: 'Refresh token not found or revoked',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(401).json(response);
+    }
+
+    // Xac thuc refresh token sau khi da xac nhan ton tai trong DB.
+    const env = getEnv();
+    const payload = verifyToken(validatedData.refreshToken, env.JWT_SECRET);
+
+    if (!payload || payload.type !== 'refresh' || payload.userId !== storedToken.user.id) {
+      // Token da bi thay doi secret/du lieu khong khop -> xoa de tranh retry vo han.
+      await prisma.refreshToken.delete({
+        where: { id: storedToken.id },
+      });
+
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 401,
+        message: 'Invalid or expired refresh token',
         data: null,
         trace_id: traceId,
       };

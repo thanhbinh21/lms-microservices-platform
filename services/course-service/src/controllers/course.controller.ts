@@ -32,6 +32,11 @@ const publishCourseSchema = z.object({
   thumbnail: z.string().url().optional(),
 });
 
+const reviewBodySchema = z.object({
+  rating: z.number().int().min(1, 'Rating toi thieu 1 sao').max(5, 'Rating toi da 5 sao'),
+  comment: z.string().trim().max(1000, 'Comment toi da 1000 ky tu').optional(),
+});
+
 // Tao hash ngan tu query params de lam cache key cho list endpoint
 function buildCacheKey(prefix: string, params: Record<string, unknown>): string {
   const sorted = Object.keys(params).sort().reduce((acc: Record<string, unknown>, k) => {
@@ -98,6 +103,13 @@ interface PublishGuardState {
   paidLessonCount: number;
 }
 
+interface RatingStatItem {
+  rating: number;
+  count: number;
+}
+
+type PrismaTransactionClient = Prisma.TransactionClient;
+
 async function computePublishGuard(courseId: string, thumbnail: string, price: number): Promise<PublishGuardState> {
   const [lessonCount, paidLessonCount] = await prisma.$transaction([
     prisma.lesson.count({ where: { chapter: { courseId } } }),
@@ -151,6 +163,104 @@ async function validateCourseBeforePublish(courseId: string, thumbnail: string, 
   }
 
   return null;
+}
+
+function buildReviewAuthor(userId: string) {
+  return `Hoc vien #${userId.slice(0, 8)}`;
+}
+
+function normalizeReviewComment(comment?: string) {
+  if (!comment) return null;
+  const trimmed = comment.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+async function recalculateCourseRating(courseId: string, tx: PrismaTransactionClient) {
+  const aggregate = await tx.review.aggregate({
+    where: { courseId, isFlagged: false },
+    _avg: { rating: true },
+    _count: { rating: true },
+  });
+
+  await tx.course.update({
+    where: { id: courseId },
+    data: {
+      averageRating: aggregate._avg.rating ?? 0,
+      ratingCount: aggregate._count.rating,
+    },
+  });
+
+  return {
+    averageRating: aggregate._avg.rating ?? 0,
+    ratingCount: aggregate._count.rating,
+  };
+}
+
+async function buildCourseReviewStats(courseId: string): Promise<{
+  averageRating: number;
+  ratingCount: number;
+  distribution: RatingStatItem[];
+}> {
+  const [course, groupedRaw] = await prisma.$transaction([
+    prisma.course.findUnique({
+      where: { id: courseId },
+      select: { averageRating: true, ratingCount: true },
+    }),
+    prisma.review.groupBy({
+      by: ['rating'] as const,
+      where: { courseId, isFlagged: false },
+      orderBy: { rating: 'desc' },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const grouped = groupedRaw as Array<{ rating: number; _count: { _all: number } }>;
+  const groupedMap = new Map<number, number>();
+  for (const item of grouped) {
+    groupedMap.set(item.rating, item._count._all);
+  }
+
+  const distribution: RatingStatItem[] = [5, 4, 3, 2, 1].map((rating) => ({
+    rating,
+    count: groupedMap.get(rating) ?? 0,
+  }));
+
+  return {
+    averageRating: course?.averageRating ?? 0,
+    ratingCount: course?.ratingCount ?? 0,
+    distribution,
+  };
+}
+
+async function getUserCourseCompletionState(userId: string, courseId: string) {
+  const [totalLessons, completedLessons] = await prisma.$transaction([
+    prisma.lesson.count({
+      where: {
+        isPublished: true,
+        chapter: { courseId },
+      },
+    }),
+    prisma.lessonProgress.count({
+      where: {
+        userId,
+        isCompleted: true,
+        lesson: {
+          isPublished: true,
+          chapter: { courseId },
+        },
+      },
+    }),
+  ]);
+
+  const progressPercent =
+    totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+  return {
+    totalLessons,
+    completedLessons,
+    progressPercent,
+    completed: totalLessons > 0 && completedLessons >= totalLessons,
+  };
 }
 
 // ─── Controllers ──────────────────────────────────────────────────────────────
@@ -282,6 +392,310 @@ export async function listCourses(req: Request, res: Response) {
     return res.status(200).json(response);
   } catch (err) {
     return handlePrismaError(err, res, traceId, 'listCourses');
+  }
+}
+
+/** GET /api/courses/:courseId/reviews - Lay danh sach review cong khai */
+export async function listCourseReviews(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+
+  try {
+    const courseId = req.params.courseId;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
+    const sortBy = (req.query.sortBy as string) || 'newest';
+
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, status: true },
+    });
+
+    if (!course || course.status !== 'PUBLISHED') {
+      const notFound: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Course not found',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    const orderBy: Prisma.ReviewOrderByWithRelationInput =
+      sortBy === 'highest'
+        ? { rating: 'desc' }
+        : sortBy === 'lowest'
+          ? { rating: 'asc' }
+          : { createdAt: 'desc' };
+
+    const [reviews, total, stats] = await Promise.all([
+      prisma.review.findMany({
+        where: { courseId, isFlagged: false },
+        orderBy,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          userId: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.review.count({ where: { courseId, isFlagged: false } }),
+      buildCourseReviewStats(courseId),
+    ]);
+
+    const response: ApiResponse<{
+      reviews: Array<{
+        id: string;
+        rating: number;
+        comment: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        author: string;
+      }>;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+      stats: {
+        averageRating: number;
+        ratingCount: number;
+        distribution: RatingStatItem[];
+      };
+    }> = {
+      success: true,
+      code: 200,
+      message: 'Course reviews fetched',
+      data: {
+        reviews: reviews.map((review) => ({
+          id: review.id,
+          rating: review.rating,
+          comment: review.comment,
+          createdAt: review.createdAt,
+          updatedAt: review.updatedAt,
+          author: buildReviewAuthor(review.userId),
+        })),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+        stats,
+      },
+      trace_id: traceId,
+    };
+
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'listCourseReviews');
+  }
+}
+
+/** GET /api/courses/:courseId/reviews/stats - Lay thong ke review */
+export async function getCourseReviewStats(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+
+  try {
+    const courseId = req.params.courseId;
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, status: true },
+    });
+
+    if (!course || course.status !== 'PUBLISHED') {
+      const notFound: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Course not found',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    const stats = await buildCourseReviewStats(courseId);
+
+    const response: ApiResponse<typeof stats> = {
+      success: true,
+      code: 200,
+      message: 'Course review stats fetched',
+      data: stats,
+      trace_id: traceId,
+    };
+
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'getCourseReviewStats');
+  }
+}
+
+/** GET /api/courses/:courseId/reviews/me - Lay review cua user hien tai */
+export async function getMyCourseReview(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+
+  try {
+    const courseId = req.params.courseId;
+    const userId = res.locals.userId as string;
+
+    const review = await prisma.review.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+      select: {
+        id: true,
+        rating: true,
+        comment: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const response: ApiResponse<typeof review> = {
+      success: true,
+      code: 200,
+      message: 'My course review fetched',
+      data: review,
+      trace_id: traceId,
+    };
+
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'getMyCourseReview');
+  }
+}
+
+/** POST /api/courses/:courseId/reviews - Tao review 1 lan (yeu cau hoc xong khoa) */
+export async function upsertCourseReview(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+
+  try {
+    const courseId = req.params.courseId;
+    const userId = res.locals.userId as string;
+    const payload = reviewBodySchema.parse(req.body ?? {});
+
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, status: true },
+    });
+
+    if (!course || course.status !== 'PUBLISHED') {
+      const notFound: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Course not found',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+      select: { id: true },
+    });
+
+    if (!enrollment) {
+      const forbidden: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: 'Ban can ghi danh khoa hoc truoc khi danh gia',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
+    }
+
+    const existedReview = await prisma.review.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+      select: { id: true },
+    });
+
+    if (existedReview) {
+      const conflict: ApiResponse<null> = {
+        success: false,
+        code: 409,
+        message: 'Ban da gui danh gia cho khoa hoc nay',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(409).json(conflict);
+    }
+
+    const completionState = await getUserCourseCompletionState(userId, courseId);
+    if (!completionState.completed) {
+      const forbidden: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: 'Chi co the danh gia sau khi hoan thanh 100% khoa hoc',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
+    }
+
+    const comment = normalizeReviewComment(payload.comment);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const review = await tx.review.create({
+        data: {
+          userId,
+          courseId,
+          rating: payload.rating,
+          comment,
+        },
+      });
+
+      const stats = await recalculateCourseRating(courseId, tx);
+      return { review, stats };
+    });
+
+    const response: ApiResponse<{
+      review: {
+        id: string;
+        rating: number;
+        comment: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      };
+      stats: {
+        averageRating: number;
+        ratingCount: number;
+      };
+    }> = {
+      success: true,
+      code: 200,
+      message: 'Course review saved',
+      data: {
+        review: {
+          id: result.review.id,
+          rating: result.review.rating,
+          comment: result.review.comment,
+          createdAt: result.review.createdAt,
+          updatedAt: result.review.updatedAt,
+        },
+        stats: result.stats,
+      },
+      trace_id: traceId,
+    };
+
+    return res.status(200).json(response);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const bad: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: err.errors[0]?.message || 'Invalid review payload',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(bad);
+    }
+    return handlePrismaError(err, res, traceId, 'upsertCourseReview');
   }
 }
 

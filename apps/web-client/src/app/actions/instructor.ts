@@ -513,8 +513,8 @@ export async function updateCourseAction(courseId: string, data: Partial<CourseD
 
   revalidatePath(`/instructor/courses/${courseId}`);
   revalidatePath(`/instructor/courses/${courseId}/detail`);
-  revalidateTag('courses');
-  revalidateTag('categories');
+  revalidateTag('courses', 'max');
+  revalidateTag('categories', 'max');
   return { success: result.success, message: result.message, data: result.data };
 }
 
@@ -531,8 +531,8 @@ export async function publishCourseAction(courseId: string, thumbnail?: string) 
   revalidatePath(`/instructor/courses/${courseId}`);
   revalidatePath(`/instructor/courses/${courseId}/detail`);
   revalidatePath('/courses');
-  revalidateTag('courses');
-  revalidateTag('categories');
+  revalidateTag('courses', 'max');
+  revalidateTag('categories', 'max');
   return { success: result.success, message: result.message, data: result.data };
 }
 

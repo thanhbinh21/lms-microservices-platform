@@ -68,6 +68,19 @@ export interface MyCourseSummary {
   lastAccessedAt: string;
 }
 
+export interface MyCertificateSummary {
+  id: string;
+  certificateNumber: string;
+  issuedAt: string;
+  completedAt: string;
+  course: {
+    id: string;
+    title: string;
+    slug: string;
+    level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  };
+}
+
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
 export async function enrollFreeAction(courseId: string) {
@@ -114,13 +127,34 @@ export async function updateLessonProgressAction(
 ) {
   return callApi<LessonProgressDto>(
     `/course/api/student/lessons/${lessonId}/progress`,
-    { method: 'POST', body: JSON.stringify(data) },
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        lastWatched: Math.max(
+          0,
+          Math.floor(
+            Number.isFinite(data.watchedDuration)
+              ? data.watchedDuration
+              : data.lastPosition,
+          ),
+        ),
+      }),
+    },
     true,
   );
 }
 
 export async function completeLessonAction(lessonId: string) {
-  return callApi<LessonProgressDto & { courseCompleted: boolean }>(
+  return callApi<LessonProgressDto & {
+    courseCompleted: boolean;
+    progressPercent: number;
+    certificate: {
+      id: string;
+      certificateNumber: string;
+      issuedAt: string;
+      completedAt: string;
+    } | null;
+  }>(
     `/course/api/student/lessons/${lessonId}/complete`,
     { method: 'POST' },
     true,
@@ -130,6 +164,14 @@ export async function completeLessonAction(lessonId: string) {
 export async function getMyCoursesAction() {
   return callApi<MyCourseSummary[]>(
     `/course/api/student/my-courses`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function getMyCertificatesAction() {
+  return callApi<MyCertificateSummary[]>(
+    `/course/api/student/certificates`,
     { method: 'GET' },
     true,
   );

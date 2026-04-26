@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Menu, X, Loader2 } from 'lucide-react';
@@ -22,7 +22,7 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     const res = await getLearnDataAction(courseId);
@@ -32,7 +32,7 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
       setError(res.message || 'Không thể tải dữ liệu khóa học');
     }
     setLoading(false);
-  };
+  }, [courseId]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -40,9 +40,19 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
       router.push('/login');
       return;
     }
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseId, isAuthenticated, authLoading]);
+    void fetchData();
+  }, [courseId, isAuthenticated, authLoading, fetchData]);
+
+  useEffect(() => {
+    const handleProgressUpdated = () => {
+      void fetchData();
+    };
+
+    window.addEventListener('lms:learn-progress-updated', handleProgressUpdated);
+    return () => {
+      window.removeEventListener('lms:learn-progress-updated', handleProgressUpdated);
+    };
+  }, [fetchData]);
 
   const handleEnrollFree = async () => {
     setEnrolling(true);

@@ -212,6 +212,21 @@ export async function flagReview(req: Request, res: Response) {
     const review = await prisma.review.update({
       where: { id },
       data: { isFlagged },
+      select: { id: true, courseId: true, isFlagged: true },
+    });
+
+    const agg = await prisma.review.aggregate({
+      where: { courseId: review.courseId, isFlagged: false },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+
+    await prisma.course.update({
+      where: { id: review.courseId },
+      data: {
+        averageRating: agg._avg.rating ?? 0,
+        ratingCount: agg._count.rating,
+      },
     });
 
     logger.info({ reviewId: id, isFlagged }, 'Admin toggled review flag');
@@ -250,7 +265,7 @@ export async function deleteReview(req: Request, res: Response) {
     await prisma.review.delete({ where: { id } });
 
     const agg = await prisma.review.aggregate({
-      where: { courseId: review.courseId },
+      where: { courseId: review.courseId, isFlagged: false },
       _avg: { rating: true },
       _count: { rating: true },
     });
