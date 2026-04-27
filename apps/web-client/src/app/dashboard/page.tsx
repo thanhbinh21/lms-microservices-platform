@@ -182,8 +182,8 @@ export default function DashboardPage() {
                     <div className="absolute top-0 right-0 w-80 h-80 bg-white/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
                     <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="space-y-3">
-                        <h1 className="text-3xl md:text-4xl font-bold">{getGreeting()}, {user.name}! 👋</h1>
+                      <div className="space-y-3 flex-1 min-w-0">
+                        <h1 className="text-3xl md:text-4xl font-bold break-words">{getGreeting()}, {user.name}! 👋</h1>
                         <p className="text-white/80 max-w-xl text-sm md:text-base leading-relaxed">
                           {data?.activeCourses?.length > 0
                             ? `Bạn đang làm rất tốt! Tiếp tục chuỗi ${streak > 0 ? `${streak} ngày` : ''} học tập để hoàn thành khóa "${data.activeCourses[0].title}" nhé.`
@@ -191,11 +191,13 @@ export default function DashboardPage() {
                           }
                         </p>
                       </div>
-                      <Link href={data?.activeCourses?.[0] ? `/learn/${data.activeCourses[0].id}` : "/courses"}>
-                        <Button className="w-fit bg-white text-primary hover:bg-white/90 shadow-xl rounded-xl px-6 h-12 font-bold whitespace-nowrap">
-                          {data?.activeCourses?.length > 0 ? 'Tiếp tục học' : 'Khám phá khóa học'} <PlayCircle className="ml-2 size-5" />
-                        </Button>
-                      </Link>
+                      <div className="shrink-0">
+                        <Link href={data?.activeCourses?.[0] ? `/learn/${data.activeCourses[0].id}` : "/courses"}>
+                          <Button className="w-fit bg-white text-primary hover:bg-white/90 shadow-xl rounded-xl px-6 h-12 font-bold whitespace-nowrap">
+                            {data?.activeCourses?.length > 0 ? 'Tiếp tục học' : 'Khám phá khóa học'} <PlayCircle className="ml-2 size-5" />
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </ScrollReveal>

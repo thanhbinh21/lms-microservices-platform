@@ -250,3 +250,46 @@ export const getMyOrders = async (req: Request, res: Response): Promise<Response
     return apiError(res, 500, 'Internal server error', traceId);
   }
 };
+
+/**
+ * POST /api/orders/analytics/revenue — tinh doanh thu tu danh sach khoa hoc (dung cho instructor dashboard).
+ */
+export const getRevenueAnalytics = async (req: Request, res: Response): Promise<Response | void> => {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+
+  try {
+    const { courseIds } = req.body as { courseIds: string[] };
+    if (!Array.isArray(courseIds) || courseIds.length === 0) {
+      const response: ApiResponse<{ totalRevenue: number }> = {
+        success: true,
+        code: 200,
+        message: 'No courses provided',
+        data: { totalRevenue: 0 },
+        trace_id: traceId,
+      };
+      return res.status(200).json(response);
+    }
+
+    const aggregate = await prisma.order.aggregate({
+      where: {
+        courseId: { in: courseIds },
+        status: 'COMPLETED',
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    const response: ApiResponse<{ totalRevenue: number }> = {
+      success: true,
+      code: 200,
+      message: 'OK',
+      data: { totalRevenue: Number(aggregate._sum.amount ?? 0) },
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    logger.error({ err }, 'getRevenueAnalytics error');
+    return apiError(res, 500, 'Internal server error', traceId);
+  }
+};

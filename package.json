@@ -21,6 +21,7 @@
     "prisma:migrate:deploy:all": "pnpm -r --workspace-concurrency=1 --filter ./services/* exec prisma migrate deploy",
     "prisma:migrate:status:all": "pnpm -r --workspace-concurrency=1 --filter ./services/* exec prisma migrate status",
     "prisma:push:all": "pnpm -r --workspace-concurrency=1 --filter ./services/* run prisma:push",
+    "setup": "pnpm install && pnpm docker:up && pnpm setup:db && pnpm seed",
     "setup:db": "pnpm prisma:migrate:deploy:all && pnpm prisma:generate:all",
     "db:sync": "pnpm prisma:push:all && pnpm prisma:generate:all",
     "docker:up": "docker-compose up -d",
