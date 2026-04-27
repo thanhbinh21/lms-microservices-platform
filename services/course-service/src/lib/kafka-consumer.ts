@@ -6,10 +6,12 @@ import {
   PAYMENT_ORDER_COMPLETED_RETRY,
   publishEvent,
   type PaymentOrderCompletedEvent,
+  type EnrollmentCreatedEvent,
   type KafkaTopic,
 } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
 import prisma from './prisma';
+import { ensureCommunityMembershipForCourse } from './community';
 
 /**
  * Course-service Kafka consumers (Phase 16).
@@ -98,4 +100,31 @@ export async function startKafkaConsumers(): Promise<void> {
       logger.info({ topic }, 'Kafka consumer running');
     }),
   );
+
+  // Auto-join community theo event da enroll thanh cong.
+  const communityConsumer = await createConsumer('course-service.community.autojoin');
+  await consumeWithRetry<EnrollmentCreatedEvent>(communityConsumer, producer, {
+    topic: TOPICS.ENROLLMENT_CREATED,
+    groupId: 'course-service.community.autojoin',
+    handler: async (event) => {
+      const { user_id, course_id } = event.data;
+      const result = await ensureCommunityMembershipForCourse({
+        userId: user_id,
+        courseId: course_id,
+      });
+
+      logger.info(
+        {
+          userId: user_id,
+          courseId: course_id,
+          groupId: result.group.id,
+          memberCreated: result.memberCreated,
+        },
+        'Community auto-join handled from learning.enrollment.created',
+      );
+    },
+    onError: (err) => logger.error({ err }, 'Community auto-join consumer failed'),
+  });
+
+  logger.info({ topic: TOPICS.ENROLLMENT_CREATED }, 'Kafka consumer running');
 }

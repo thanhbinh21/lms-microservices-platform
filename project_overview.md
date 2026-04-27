@@ -197,9 +197,9 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 - [x] **Phase UI-2:** Design System Consolidation — Tao them CSS utility classes cho cac pattern lap lai (`.glass-card`, `.gradient-hero`, semantic color vars). Chuan hoa border-radius (chi dung `rounded-lg/xl/2xl`), icon sizes (`size-4/5/6`). Di chuyen tat ca hardcoded stats (500+, 150k, 12.000) ra constants hoac fetch tu API. ✅ Completed: Apr 27, 2026
 - [x] **Phase UI-3:** Component Decomposition — Tach `dashboard/page.tsx` (653 dong) thanh OverviewTab/MyCoursesTab/CertificatesTab/CommunityTab. Tao reusable `CourseCard`, `StatCard`, `EmptyState`. Tach components >300 dong. ✅ Completed: Apr 27, 2026
 
-### Phase C: Community Feature ⏳ PENDING
-- [ ] **Phase C-1:** Community Backend — Model CommunityGroup/CommunityMember/CommunityPost trong course_db. Auto-join via Kafka event `learning.enrollment.created`. API CRUD: listGroups, listPosts (cursor pagination), createPost/reply, joinGroup. Kong route `/community/*`.
-- [ ] **Phase C-2:** Community Frontend — `/dashboard/community` list nhom da tham gia, `/community/[groupId]` feed bai viet + form dang bai + reply, `/learn/[courseId]` sidebar tab "Thao luan" link toi community group. Thay the placeholder "Sap ra mat".
+### Phase C: Community Feature ✅ COMPLETED
+- [x] **Phase C-1:** Community Backend — Model CommunityGroup/CommunityMember/CommunityPost trong course_db. Auto-join via Kafka event `learning.enrollment.created`. API CRUD: listGroups, listPosts (cursor pagination), createPost/reply, joinGroup. Kong route `/community/*`. ✅ Completed: Apr 27, 2026 (done - 2026-04-27 - by BINH)
+- [x] **Phase C-2:** Community Frontend — `/dashboard/community` list nhom da tham gia, `/community/[groupId]` feed bai viet + form dang bai + reply, `/learn/[courseId]` sidebar tab "Thao luan" link toi community group. Thay the placeholder "Sap ra mat". ✅ Completed: Apr 27, 2026 (done - 2026-04-27 - by BINH)
 
 ### Phase AI: AI Features ⏳ PENDING (Setup)
 - [ ] **Phase AI-1:** AI Course Recommendation — Goi y khoa hoc dua tren learning history, enrollment patterns, rating. Dung Gemini API. Can: ai-service, Gemini API key, Kong route `/ai/*`.

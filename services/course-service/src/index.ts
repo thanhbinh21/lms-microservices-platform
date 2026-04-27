@@ -21,6 +21,13 @@ import {
   upsertCourseReview,
 } from './controllers/course.controller';
 import {
+  listCommunityGroups,
+  listCommunityPosts,
+  createCommunityPost,
+  replyCommunityPost,
+  joinCommunityGroup,
+} from './controllers/community.controller';
+import {
   createChapter,
   updateChapter,
   deleteChapter,
@@ -86,6 +93,13 @@ app.put('/api/student/lessons/:lessonId/progress', requireAuth, updateLessonProg
 app.post('/api/student/lessons/:lessonId/complete', requireAuth, completeLesson);
 app.get('/api/student/my-courses', requireAuth, getMyCourses);
 app.get('/api/student/certificates', requireAuth, getMyCertificates);
+
+// ─── Community Routes ───────────────────────────────────────────────────────
+app.get('/api/community/groups', requireAuth, listCommunityGroups);
+app.post('/api/community/groups/:groupId/join', requireAuth, joinCommunityGroup);
+app.get('/api/community/groups/:groupId/posts', requireAuth, listCommunityPosts);
+app.post('/api/community/groups/:groupId/posts', requireAuth, createCommunityPost);
+app.post('/api/community/groups/:groupId/posts/:postId/reply', requireAuth, replyCommunityPost);
 
 // ─── Public Routes ────────────────────────────────────────────────────────────
 app.get('/api/categories', listCategories);
