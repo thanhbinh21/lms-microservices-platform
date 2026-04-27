@@ -25,6 +25,7 @@ import {
   listCommunityPosts,
   createCommunityPost,
   replyCommunityPost,
+  reactCommunityPost,
   joinCommunityGroup,
   createPublicCommunityGroup,
 } from './controllers/community.controller';
@@ -101,6 +102,7 @@ app.post('/api/community/groups/:groupId/join', requireAuth, joinCommunityGroup)
 app.get('/api/community/groups/:groupId/posts', requireAuth, listCommunityPosts);
 app.post('/api/community/groups/:groupId/posts', requireAuth, createCommunityPost);
 app.post('/api/community/groups/:groupId/posts/:postId/reply', requireAuth, replyCommunityPost);
+app.post('/api/community/groups/:groupId/posts/:postId/react', requireAuth, reactCommunityPost);
 
 // ─── Public Routes ────────────────────────────────────────────────────────────
 app.get('/api/categories', listCategories);

@@ -8,13 +8,14 @@ import {
   createCommunityPostAction,
   getCommunityPostsAction,
   replyCommunityPostAction,
+  toggleCommunityPostReactAction,
   type CommunityPostDto,
   type CommunityPostsResult,
 } from '@/app/actions/community';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Users, MessageSquare, Send, ArrowLeft, Globe, Lock } from 'lucide-react';
+import { Loader2, Users, MessageSquare, Send, ArrowLeft, Globe, Lock, ThumbsUp, Image as ImageIcon } from 'lucide-react';
 
 function formatDate(dateIso: string) {
   return new Date(dateIso).toLocaleString('vi-VN', {
@@ -129,6 +130,7 @@ export default function CommunityGroupPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [composerValue, setComposerValue] = useState('');
+  const [composerImageUrl, setComposerImageUrl] = useState('');
   const [posting, setPosting] = useState(false);
   const [replyingPostId, setReplyingPostId] = useState<string | null>(null);
   const [replySubmittingForPost, setReplySubmittingForPost] = useState<string | null>(null);
@@ -187,12 +189,10 @@ export default function CommunityGroupPage() {
 
   const handleCreatePost = async () => {
     const content = composerValue.trim();
-    if (!content) {
-      return;
-    }
+    if (!content) return;
 
     setPosting(true);
-    const result = await createCommunityPostAction(groupId, content);
+    const result = await createCommunityPostAction(groupId, content, composerImageUrl || undefined);
     setPosting(false);
 
     if (!result.success) {
@@ -201,9 +201,30 @@ export default function CommunityGroupPage() {
     }
 
     setComposerValue('');
+    setComposerImageUrl('');
     setRefreshing(true);
     await loadInitial();
     setRefreshing(false);
+  };
+
+  const handleReact = async (postId: string) => {
+    // Optimistic update
+    setPosts(prev => prev.map(p => {
+      if (p.id === postId) {
+        return {
+          ...p,
+          likedByMe: !p.likedByMe,
+          likeCount: (p.likeCount || 0) + (p.likedByMe ? -1 : 1)
+        };
+      }
+      return p;
+    }));
+
+    const result = await toggleCommunityPostReactAction(groupId, postId);
+    if (!result.success) {
+      // Revert optimistic update
+      await loadInitial();
+    }
   };
 
   const handleReply = async (postId: string, content: string) => {
@@ -292,17 +313,32 @@ export default function CommunityGroupPage() {
             <textarea
               value={composerValue}
               onChange={(e) => setComposerValue(e.target.value)}
-              placeholder="Viết bài đăng của bạn..."
-              className="mt-3 min-h-28 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary"
+              placeholder="Bạn đang nghĩ gì?"
+              className="mt-4 min-h-24 w-full resize-y rounded-xl border-none bg-transparent px-4 py-3 text-lg outline-none transition placeholder:text-slate-400"
             />
-            <div className="mt-3 flex items-center justify-end">
+            {composerImageUrl && (
+              <div className="mt-2 relative">
+                <img src={composerImageUrl} alt="Preview" className="max-h-60 rounded-xl object-cover" />
+                <button onClick={() => setComposerImageUrl('')} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70">✕</button>
+              </div>
+            )}
+            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" className="text-slate-500 hover:bg-slate-100 rounded-full" onClick={() => {
+                  const url = prompt('Nhập đường dẫn hình ảnh (URL):');
+                  if (url) setComposerImageUrl(url);
+                }}>
+                  <ImageIcon className="size-5 mr-2 text-emerald-500" />
+                  Ảnh/Video
+                </Button>
+              </div>
               <Button
-                className="gap-2 rounded-xl"
-                disabled={posting || refreshing}
+                className="gap-2 rounded-full font-bold px-6"
+                disabled={posting || refreshing || !composerValue.trim()}
                 onClick={handleCreatePost}
               >
                 {posting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-                Đăng bài
+                Đăng
               </Button>
             </div>
           </Card>
@@ -330,17 +366,46 @@ export default function CommunityGroupPage() {
                     {formatDate(post.createdAt)}
                   </p>
                 </div>
-                <button
-                  onClick={() => setReplyingPostId((current) => (current === post.id ? null : post.id))}
-                  className="text-xs font-semibold text-primary hover:underline"
-                >
-                  Phản hồi
-                </button>
               </div>
 
-              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+              <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-slate-800">
                 {post.content}
               </p>
+
+              {post.imageUrl && (
+                <div className="mt-4 -mx-6 sm:mx-0">
+                  <img src={post.imageUrl} alt="Post attachment" className="w-full sm:rounded-2xl max-h-96 object-cover border border-slate-100" />
+                </div>
+              )}
+
+              <div className="mt-4 flex items-center justify-between text-sm text-slate-500 px-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="flex size-5 items-center justify-center rounded-full bg-blue-500 text-white">
+                    <ThumbsUp className="size-3" />
+                  </div>
+                  <span>{post.likeCount || 0}</span>
+                </div>
+                <div>{post.replies.length} bình luận</div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
+                <Button 
+                  variant="ghost" 
+                  className={`flex-1 gap-2 rounded-xl font-semibold ${post.likedByMe ? 'text-blue-600' : 'text-slate-600'}`}
+                  onClick={() => handleReact(post.id)}
+                >
+                  <ThumbsUp className="size-5" />
+                  Thích
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  className="flex-1 gap-2 rounded-xl font-semibold text-slate-600"
+                  onClick={() => setReplyingPostId((current) => (current === post.id ? null : post.id))}
+                >
+                  <MessageSquare className="size-5" />
+                  Bình luận
+                </Button>
+              </div>
 
               {post.replies.length > 0 ? (
                 <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
@@ -355,7 +420,10 @@ export default function CommunityGroupPage() {
                           {formatDate(reply.createdAt)}
                         </p>
                       </div>
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{reply.content}</p>
+                      <p className="mt-1 whitespace-pre-wrap text-[14px] text-slate-800 leading-relaxed">{reply.content}</p>
+                      {reply.imageUrl && (
+                        <img src={reply.imageUrl} alt="Reply attachment" className="mt-2 max-h-48 rounded-xl object-cover" />
+                      )}
                     </div>
                   ))}
                 </div>

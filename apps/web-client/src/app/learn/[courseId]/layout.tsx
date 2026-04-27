@@ -40,7 +40,7 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
     }
 
     if (groupsResult.success && groupsResult.data) {
-      const matchedGroup = groupsResult.data.groups.find(
+      const matchedGroup = groupsResult.data.joinedGroups.find(
         (group) => group.courseId === courseId,
       );
       setDiscussionGroupId(matchedGroup?.id || null);

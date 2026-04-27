@@ -17,6 +17,7 @@ import bcrypt from 'bcryptjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Redis } from 'ioredis';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -144,6 +145,17 @@ async function clearOldData() {
     // Delete Auth Data
     await authPrisma.user.deleteMany();
     console.log('  ✅ Đã xóa toàn bộ Users');
+
+    // Flush Redis Cache
+    const redisUrl = 
+      readEnvVarFromFile(path.join(__dirname, '../services/course-service/.env'), 'CACHE_REDIS_URL') || 
+      process.env.CACHE_REDIS_URL;
+    if (redisUrl) {
+      const redis = new Redis(redisUrl);
+      await redis.flushall();
+      await redis.quit();
+      console.log('  ✅ Đã dọn dẹp Redis Cache toàn hệ thống');
+    }
     
     console.log('\n  Hoàn tất dọn dẹp dữ liệu cũ!\n');
   } catch (error) {

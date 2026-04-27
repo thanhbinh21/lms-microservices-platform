@@ -27,6 +27,7 @@ const listPostsQuerySchema = z.object({
 
 const postBodySchema = z.object({
   content: z.string().trim().min(1, 'Nội dung không được rỗng').max(3000, 'Nội dung tối đa 3000 ký tự'),
+  imageUrl: z.string().url('URL ảnh không hợp lệ').optional(),
 });
 
 // Schema tao public community (admin-only)
@@ -189,6 +190,80 @@ export async function listCommunityGroups(req: Request, res: Response): Promise<
     return res.status(200).json(response);
   } catch (err) {
     return handlePrismaError(err, res, traceId, 'listCommunityGroups');
+  }
+}
+
+/**
+ * POST /api/community/groups/:groupId/posts/:postId/react
+ */
+export async function reactCommunityPost(req: Request, res: Response): Promise<Response | void> {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const userId = res.locals.userId as string;
+
+  const parsedParams = replyParamsSchema.safeParse(req.params);
+  if (!parsedParams.success) {
+    const response: ApiResponse<null> = {
+      success: false,
+      code: 400,
+      message: parsedParams.error.issues[0]?.message || 'Tham số không hợp lệ',
+      data: null,
+      trace_id: traceId,
+    };
+    return res.status(400).json(response);
+  }
+
+  try {
+    const post = await prisma.communityPost.findUnique({
+      where: {
+        id: parsedParams.data.postId,
+        groupId: parsedParams.data.groupId,
+      },
+      select: {
+        id: true,
+        likedByIds: true,
+        likeCount: true,
+      },
+    });
+
+    if (!post) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Không tìm thấy bài viết',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(response);
+    }
+
+    const hasLiked = post.likedByIds.includes(userId);
+    const newLikedByIds = hasLiked
+      ? post.likedByIds.filter((id) => id !== userId)
+      : [...post.likedByIds, userId];
+    const newLikeCount = newLikedByIds.length;
+
+    await prisma.communityPost.update({
+      where: { id: post.id },
+      data: {
+        likedByIds: newLikedByIds,
+        likeCount: newLikeCount,
+      },
+    });
+
+    const response: ApiResponse<{ liked: boolean; likeCount: number }> = {
+      success: true,
+      code: 200,
+      message: hasLiked ? 'Đã bỏ thích bài viết' : 'Đã thích bài viết',
+      data: {
+        liked: !hasLiked,
+        likeCount: newLikeCount,
+      },
+      trace_id: traceId,
+    };
+
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'reactCommunityPost');
   }
 }
 
@@ -357,6 +432,9 @@ export async function listCommunityPosts(req: Request, res: Response): Promise<R
         id: true,
         authorId: true,
         content: true,
+        imageUrl: true,
+        likeCount: true,
+        likedByIds: true,
         createdAt: true,
         updatedAt: true,
         replies: {
@@ -365,6 +443,9 @@ export async function listCommunityPosts(req: Request, res: Response): Promise<R
             id: true,
             authorId: true,
             content: true,
+            imageUrl: true,
+            likeCount: true,
+            likedByIds: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -423,6 +504,9 @@ export async function listCommunityPosts(req: Request, res: Response): Promise<R
         items: items.map((post) => ({
           id: post.id,
           content: post.content,
+          imageUrl: post.imageUrl,
+          likeCount: post.likeCount,
+          likedByMe: post.likedByIds.includes(userId),
           createdAt: post.createdAt,
           updatedAt: post.updatedAt,
           author: {
@@ -432,6 +516,9 @@ export async function listCommunityPosts(req: Request, res: Response): Promise<R
           replies: post.replies.map((reply) => ({
             id: reply.id,
             content: reply.content,
+            imageUrl: reply.imageUrl,
+            likeCount: reply.likeCount,
+            likedByMe: reply.likedByIds.includes(userId),
             createdAt: reply.createdAt,
             updatedAt: reply.updatedAt,
             author: {
@@ -516,11 +603,13 @@ export async function createCommunityPost(req: Request, res: Response): Promise<
           groupId: parsedParams.data.groupId,
           authorId: userId,
           content: parsedBody.data.content,
+          imageUrl: parsedBody.data.imageUrl || null,
         },
         select: {
           id: true,
           authorId: true,
           content: true,
+          imageUrl: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -540,6 +629,7 @@ export async function createCommunityPost(req: Request, res: Response): Promise<
     const response: ApiResponse<{
       id: string;
       content: string;
+      imageUrl: string | null;
       createdAt: Date;
       updatedAt: Date;
       author: {
@@ -553,6 +643,7 @@ export async function createCommunityPost(req: Request, res: Response): Promise<
       data: {
         id: post.id,
         content: post.content,
+        imageUrl: post.imageUrl,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
         author: {
@@ -666,11 +757,13 @@ export async function replyCommunityPost(req: Request, res: Response): Promise<R
           authorId: userId,
           parentId: parsedParams.data.postId,
           content: parsedBody.data.content,
+          imageUrl: parsedBody.data.imageUrl || null,
         },
         select: {
           id: true,
           authorId: true,
           content: true,
+          imageUrl: true,
           createdAt: true,
           updatedAt: true,
         },

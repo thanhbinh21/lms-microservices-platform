@@ -101,7 +101,7 @@ export async function resolveUserNames(
     });
 
     if (response.ok) {
-      const json = await response.json();
+      const json = (await response.json()) as any;
       const usersMap = json?.data?.users as Record<string, { name: string; username: string | null }> | undefined;
 
       if (usersMap) {

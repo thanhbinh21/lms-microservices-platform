@@ -32,6 +32,9 @@ export interface CommunityGroupDto {
 export interface CommunityReplyDto {
   id: string;
   content: string;
+  imageUrl?: string | null;
+  likeCount?: number;
+  likedByMe?: boolean;
   createdAt: string;
   updatedAt: string;
   author: {
@@ -43,6 +46,9 @@ export interface CommunityReplyDto {
 export interface CommunityPostDto {
   id: string;
   content: string;
+  imageUrl?: string | null;
+  likeCount?: number;
+  likedByMe?: boolean;
   createdAt: string;
   updatedAt: string;
   author: {
@@ -104,12 +110,12 @@ export async function getCommunityPostsAction(
   );
 }
 
-export async function createCommunityPostAction(groupId: string, content: string) {
+export async function createCommunityPostAction(groupId: string, content: string, imageUrl?: string) {
   return callApi<CommunityPostDto>(
     buildCommunityPath(`/api/community/groups/${groupId}/posts`),
     {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, imageUrl }),
     },
     true,
   );
@@ -119,13 +125,25 @@ export async function replyCommunityPostAction(
   groupId: string,
   postId: string,
   content: string,
+  imageUrl?: string,
 ) {
   return callApi<CommunityReplyDto>(
     buildCommunityPath(`/api/community/groups/${groupId}/posts/${postId}/reply`),
     {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, imageUrl }),
     },
+    true,
+  );
+}
+
+export async function toggleCommunityPostReactAction(
+  groupId: string,
+  postId: string,
+) {
+  return callApi<{ liked: boolean; likeCount: number }>(
+    buildCommunityPath(`/api/community/groups/${groupId}/posts/${postId}/react`),
+    { method: 'POST' },
     true,
   );
 }

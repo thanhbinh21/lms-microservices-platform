@@ -46,7 +46,7 @@ export async function getDashboardData(): Promise<{ success: boolean; data?: Das
   const publicCourses = publicResult.success && publicResult.data ? publicResult.data.courses : [];
   const certificates = certificatesResult.success && certificatesResult.data ? certificatesResult.data : [];
   const communityGroups = communityGroupsResult.success && communityGroupsResult.data
-    ? communityGroupsResult.data.joinedGroups
+    ? (communityGroupsResult.data.joinedGroups || [])
     : [];
 
   const dashboardData: DashboardData = {

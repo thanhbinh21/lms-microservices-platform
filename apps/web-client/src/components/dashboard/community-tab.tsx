@@ -132,8 +132,8 @@ export function CommunityTab() {
       return;
     }
 
-    setJoinedGroups(result.data.joinedGroups);
-    setPublicGroups(result.data.publicGroups);
+    setJoinedGroups(result.data.joinedGroups.filter(g => g.type === 'COURSE_PRIVATE'));
+    setPublicGroups([]);
     setLoading(false);
   };
 
@@ -185,7 +185,7 @@ export function CommunityTab() {
           <h2 className="text-xl font-bold">Chưa có nhóm cộng đồng nào</h2>
           <p className="mt-2 max-w-md text-sm text-muted-foreground">
             Khi bạn ghi danh khóa học, hệ thống sẽ tự động thêm bạn vào nhóm thảo luận
-            của khóa học đó. Các nhóm công khai sẽ xuất hiện ở đây khi quản trị viên tạo.
+            của khóa học đó.
           </p>
         </Card>
       </ScrollReveal>
