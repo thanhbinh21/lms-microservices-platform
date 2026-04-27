@@ -26,6 +26,7 @@ import {
   createCommunityPost,
   replyCommunityPost,
   joinCommunityGroup,
+  createPublicCommunityGroup,
 } from './controllers/community.controller';
 import {
   createChapter,
@@ -112,6 +113,7 @@ app.get('/api/courses/:slug', getCourseBySlug);
 
 // ─── Admin Routes ─────────────────────────────────────────────────────────────
 app.post('/api/admin/categories', ...requireRole('admin'), createCategory);
+app.post('/api/admin/community/groups', ...requireRole('admin'), createPublicCommunityGroup);
 app.use('/api/admin', ...requireRole('admin'), adminRouter);
 
 // ─── Instructor Routes (Kong injects x-user-id, x-user-role) ─────────────────

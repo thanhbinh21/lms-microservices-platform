@@ -4,6 +4,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  username: string | null;
   role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
 }
 

@@ -14,7 +14,7 @@ import {
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Users, MessageSquare, Send, ArrowLeft } from 'lucide-react';
+import { Loader2, Users, MessageSquare, Send, ArrowLeft, Globe, Lock } from 'lucide-react';
 
 function formatDate(dateIso: string) {
   return new Date(dateIso).toLocaleString('vi-VN', {
@@ -31,24 +31,44 @@ function GroupHeader({
 }: {
   group: CommunityPostsResult['group'];
 }) {
+  const isPublic = group.type === 'PUBLIC';
+
   return (
     <Card className="glass-panel rounded-2xl border-white/60 p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="space-y-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Cong dong khoa hoc
-          </p>
+          <div className="flex items-center gap-2">
+            {isPublic ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+                <Globe className="size-3" />
+                Công khai
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                <Lock className="size-3" />
+                Riêng tư
+              </span>
+            )}
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Cộng đồng
+            </p>
+          </div>
           <h1 className="text-2xl font-extrabold text-slate-800">{group.name}</h1>
-          <p className="text-sm text-muted-foreground">{group.course.title}</p>
+          {group.description && (
+            <p className="text-sm text-muted-foreground">{group.description}</p>
+          )}
+          {group.course && (
+            <p className="text-sm text-muted-foreground">{group.course.title}</p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-500">
           <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1">
             <Users className="size-3.5" />
-            {group.memberCount} thanh vien
+            {group.memberCount} thành viên
           </span>
           <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1">
             <MessageSquare className="size-3.5" />
-            {group.postCount} bai viet
+            {group.postCount} bài viết
           </span>
         </div>
       </div>
@@ -70,7 +90,7 @@ function ReplyComposer({
       <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Viet phan hoi cua ban..."
+        placeholder="Viết phản hồi của bạn..."
         className="min-h-20 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary"
       />
       <div className="flex justify-end">
@@ -88,7 +108,7 @@ function ReplyComposer({
           }}
         >
           {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-          Gui tra loi
+          Gửi trả lời
         </Button>
       </div>
     </div>
@@ -100,7 +120,7 @@ export default function CommunityGroupPage() {
   const router = useRouter();
   const groupId = params.groupId as string;
 
-  const { isAuthenticated, isLoading: authLoading } = useAppSelector((s) => s.auth);
+  const { isAuthenticated, isLoading: authLoading, user } = useAppSelector((state) => state.auth);
 
   const [group, setGroup] = useState<CommunityPostsResult['group'] | null>(null);
   const [posts, setPosts] = useState<CommunityPostDto[]>([]);
@@ -124,7 +144,7 @@ export default function CommunityGroupPage() {
       if (!result.success || !result.data) {
         return {
           ok: false as const,
-          message: result.message || 'Khong the tai bai viet',
+          message: result.message || 'Không thể tải bài viết',
         };
       }
 
@@ -176,7 +196,7 @@ export default function CommunityGroupPage() {
     setPosting(false);
 
     if (!result.success) {
-      setError(result.message || 'Khong the dang bai viet');
+      setError(result.message || 'Không thể đăng bài viết');
       return;
     }
 
@@ -192,7 +212,7 @@ export default function CommunityGroupPage() {
     setReplySubmittingForPost(null);
 
     if (!result.success) {
-      setError(result.message || 'Khong the gui phan hoi');
+      setError(result.message || 'Không thể gửi phản hồi');
       return;
     }
 
@@ -233,7 +253,7 @@ export default function CommunityGroupPage() {
         <div className="mx-auto flex max-w-4xl items-center justify-center px-4 py-24">
           <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
-            Dang tai thao luan...
+            Đang tải thảo luận...
           </div>
         </div>
       </div>
@@ -251,39 +271,42 @@ export default function CommunityGroupPage() {
             className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-primary"
           >
             <ArrowLeft className="size-4" />
-            Quay lai dashboard
+            Quay lại Dashboard
           </Link>
-          {group ? (
+          {group?.course ? (
             <Link href={`/courses/${group.course.slug}`} className="text-sm font-semibold text-primary hover:underline">
-              Xem khoa hoc
+              Xem khóa học
             </Link>
           ) : null}
         </div>
 
         {group ? <GroupHeader group={group} /> : null}
 
-        <Card className="glass-panel rounded-2xl border-white/60 p-5">
-          <h2 className="text-base font-bold text-slate-800">Tao bai viet moi</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Dat cau hoi, chia se kinh nghiem va ho tro nhung hoc vien khac trong khoa hoc.
-          </p>
-          <textarea
-            value={composerValue}
-            onChange={(e) => setComposerValue(e.target.value)}
-            placeholder="Viet bai dang cua ban..."
-            className="mt-3 min-h-28 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary"
-          />
-          <div className="mt-3 flex items-center justify-end">
-            <Button
-              className="gap-2 rounded-xl"
-              disabled={posting || refreshing}
-              onClick={handleCreatePost}
-            >
-              {posting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-              Dang bai
-            </Button>
-          </div>
-        </Card>
+        {/* Chỉ cho phép giảng viên khóa học (group.owner) tạo bài viết mới */}
+        {group && group.ownerId === user?.id && (
+          <Card className="glass-panel rounded-2xl border-white/60 p-5">
+            <h2 className="text-base font-bold text-slate-800">Tạo bài viết mới</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Tạo bài thảo luận, đặt câu hỏi, chia sẻ kinh nghiệm cho học viên.
+            </p>
+            <textarea
+              value={composerValue}
+              onChange={(e) => setComposerValue(e.target.value)}
+              placeholder="Viết bài đăng của bạn..."
+              className="mt-3 min-h-28 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary"
+            />
+            <div className="mt-3 flex items-center justify-end">
+              <Button
+                className="gap-2 rounded-xl"
+                disabled={posting || refreshing}
+                onClick={handleCreatePost}
+              >
+                {posting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                Đăng bài
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {error ? (
           <Card className="rounded-2xl border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
@@ -294,7 +317,7 @@ export default function CommunityGroupPage() {
         <div className="space-y-4">
           {sortedPosts.length === 0 ? (
             <Card className="rounded-2xl border-dashed border-slate-300 bg-white/80 p-8 text-center text-sm text-muted-foreground">
-              Chua co bai viet nao. Hay la nguoi mo man cuoc thao luan dau tien.
+              Chưa có bài viết nào. Hãy là người mở màn cuộc thảo luận đầu tiên!
             </Card>
           ) : null}
 
@@ -311,7 +334,7 @@ export default function CommunityGroupPage() {
                   onClick={() => setReplyingPostId((current) => (current === post.id ? null : post.id))}
                   className="text-xs font-semibold text-primary hover:underline"
                 >
-                  Phan hoi
+                  Phản hồi
                 </button>
               </div>
 
@@ -361,10 +384,10 @@ export default function CommunityGroupPage() {
               {loadingMore ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />
-                  Dang tai them
+                  Đang tải thêm
                 </>
               ) : (
-                'Tai them bai viet'
+                'Tải thêm bài viết'
               )}
             </Button>
           </div>

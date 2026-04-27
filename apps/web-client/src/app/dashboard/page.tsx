@@ -18,15 +18,13 @@ import { DashboardTabs } from '@/components/dashboard/dashboard-tabs';
 import { OverviewTab } from '@/components/dashboard/overview-tab';
 import { MyCoursesTab } from '@/components/dashboard/my-courses-tab';
 import { CertificatesTab } from '@/components/dashboard/certificates-tab';
-import { CommunityTab } from '@/components/dashboard/community-tab';
 
-type TabId = 'overview' | 'my-courses' | 'certificates' | 'community';
+type TabId = 'overview' | 'my-courses' | 'certificates';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Tổng quan' },
   { id: 'my-courses', label: 'Khóa học của tôi' },
   { id: 'certificates', label: 'Chứng chỉ' },
-  { id: 'community', label: 'Cộng đồng' },
 ];
 
 type CourseFilter = 'all' | 'in-progress' | 'completed';
@@ -199,9 +197,6 @@ export default function DashboardPage() {
 
             {/* ════════ TAB: CHỨNG CHỈ ════════ */}
             {activeTab === 'certificates' && <CertificatesTab />}
-
-            {/* ════════ TAB: CỘNG ĐỒNG ════════ */}
-            {activeTab === 'community' && <CommunityTab />}
           </>
         )}
       </main>

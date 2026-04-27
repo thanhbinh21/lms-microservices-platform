@@ -14,6 +14,7 @@ interface AuthResponse {
     id: string;
     email: string;
     name: string;
+    username: string | null;
     role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
   };
   accessToken?: string;
@@ -37,6 +38,7 @@ interface BecomeEducatorApiResponse {
       id: string;
       email: string;
       name: string;
+      username: string | null;
       role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
     };
     accessToken: string;
@@ -55,12 +57,14 @@ function normalizeUserFromApi(user: {
   id: string;
   email: string;
   name: string;
+  username?: string | null;
   role?: string;
 }): NonNullable<AuthResponse['user']> {
   return {
     id: user.id,
     email: user.email,
     name: user.name,
+    username: user.username ?? null,
     role: normalizeRole(user.role ?? 'STUDENT'),
   };
 }
@@ -81,9 +85,10 @@ async function clearAuthCookies() {
   cookieStore.delete('accessToken');
   cookieStore.delete('refreshToken');
   cookieStore.delete('userName');
+  cookieStore.delete('userUsername');
 }
 
-async function writeAuthCookies(params: { accessToken?: string; refreshToken?: string; userName?: string }) {
+async function writeAuthCookies(params: { accessToken?: string; refreshToken?: string; userName?: string; userUsername?: string | null }) {
   const cookieStore = await cookies();
 
   if (params.accessToken) {
@@ -115,6 +120,20 @@ async function writeAuthCookies(params: { accessToken?: string; refreshToken?: s
       maxAge: 7 * 24 * 60 * 60,
       path: '/',
     });
+  }
+  
+  if (params.userUsername !== undefined) {
+    if (params.userUsername) {
+      cookieStore.set('userUsername', params.userUsername, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60,
+        path: '/',
+      });
+    } else {
+      cookieStore.delete('userUsername');
+    }
   }
 }
 
@@ -164,14 +183,19 @@ export async function loginAction(data: LoginInput): Promise<AuthResponse> {
     if (!response.ok || !result.success) {
       return {
         success: false,
-        message: result.message || 'Login failed',
+        message: result.message || 'Đăng nhập thất bại',
       };
     }
 
     // Extract data from backend response structure
     const { user, accessToken, refreshToken } = result.data;
 
-    await writeAuthCookies({ accessToken, refreshToken, userName: user?.name });
+    await writeAuthCookies({ 
+      accessToken, 
+      refreshToken, 
+      userName: user?.name,
+      userUsername: user?.username 
+    });
 
     return {
       success: true,
@@ -183,7 +207,7 @@ export async function loginAction(data: LoginInput): Promise<AuthResponse> {
     console.error('Login action error:', error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'An error occurred',
+      message: error instanceof Error ? error.message : 'Đã có lỗi xảy ra',
     };
   }
 }
@@ -210,18 +234,23 @@ export async function registerAction(data: RegisterInput): Promise<AuthResponse>
     if (!response.ok || !result.success) {
       return {
         success: false,
-        message: result.message || 'Registration failed',
+        message: result.message || 'Đăng ký thất bại',
       };
     }
 
     // Extract data from backend response structure
     const { user, accessToken, refreshToken } = result.data;
 
-    await writeAuthCookies({ accessToken, refreshToken, userName: user?.name });
+    await writeAuthCookies({ 
+      accessToken, 
+      refreshToken, 
+      userName: user?.name,
+      userUsername: user?.username
+    });
 
     return {
       success: true,
-      code: 200,
+      code: 201,
       user: normalizeUserFromApi(user),
       accessToken,
     };
@@ -229,7 +258,7 @@ export async function registerAction(data: RegisterInput): Promise<AuthResponse>
     console.error('Register action error:', error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'An error occurred',
+      message: error instanceof Error ? error.message : 'Đã có lỗi xảy ra',
     };
   }
 }
@@ -240,6 +269,7 @@ export async function restoreSessionAction(): Promise<AuthResponse> {
     const currentAccessToken = cookieStore.get('accessToken')?.value;
     const currentRefreshToken = cookieStore.get('refreshToken')?.value;
     const savedUserName = cookieStore.get('userName')?.value;
+    const savedUserUsername = cookieStore.get('userUsername')?.value;
 
     if (!currentAccessToken && !currentRefreshToken) {
       return { success: false, code: 401, message: 'Khong tim thay phien dang nhap' };
@@ -300,6 +330,7 @@ export async function restoreSessionAction(): Promise<AuthResponse> {
         id: payload.userId,
         email: payload.email,
         name: userName,
+        username: savedUserUsername || null,
         role: normalizeRole(payload.role),
       },
     };
@@ -380,6 +411,7 @@ export async function becomeEducatorAction(): Promise<AuthResponse> {
       accessToken: nextAccessToken,
       refreshToken: nextRefreshToken || undefined,
       userName: result.data.user.name,
+      userUsername: result.data.user.username,
     });
 
     return {

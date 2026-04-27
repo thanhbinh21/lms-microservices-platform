@@ -15,16 +15,18 @@ export interface CommunityGroupCourseDto {
 
 export interface CommunityGroupDto {
   id: string;
-  courseId: string;
+  type: 'PUBLIC' | 'COURSE_PRIVATE';
+  courseId: string | null;
+  ownerId: string;
   name: string;
   slug: string;
   description: string | null;
   memberCount: number;
   postCount: number;
-  joinedAt: string;
+  joinedAt?: string;
   createdAt: string;
   updatedAt: string;
-  course: CommunityGroupCourseDto;
+  course: CommunityGroupCourseDto | null;
 }
 
 export interface CommunityReplyDto {
@@ -51,11 +53,12 @@ export interface CommunityPostDto {
 }
 
 export interface CommunityGroupsResult {
-  groups: CommunityGroupDto[];
+  joinedGroups: (CommunityGroupDto & { joinedAt: string })[];
+  publicGroups: CommunityGroupDto[];
 }
 
 export interface CommunityPostsResult {
-  group: Omit<CommunityGroupDto, 'joinedAt'>;
+  group: CommunityGroupDto;
   items: CommunityPostDto[];
   nextCursor: string | null;
 }
@@ -74,7 +77,7 @@ export async function getMyCommunityGroupsAction() {
 
 export async function joinCommunityGroupAction(groupId: string) {
   return callApi<{
-    group: Omit<CommunityGroupDto, 'joinedAt'>;
+    group: CommunityGroupDto;
     joined: boolean;
   }>(
     buildCommunityPath(`/api/community/groups/${groupId}/join`),

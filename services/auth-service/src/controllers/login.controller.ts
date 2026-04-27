@@ -29,6 +29,9 @@ export async function login(req: Request, res: Response) {
     // Find user by email
     const user = await withRetry(() => prisma.user.findUnique({
       where: { email: validatedData.email },
+      select: {
+        id: true, email: true, password: true, name: true, username: true, role: true,
+      },
     }));
 
     if (!user) {
@@ -91,18 +94,19 @@ export async function login(req: Request, res: Response) {
     logger.info({ userId: user.id, email: user.email }, 'User logged in successfully');
 
     const response: ApiResponse<{
-      user: { id: string; email: string; name: string; role: string };
+      user: { id: string; email: string; name: string; username: string | null; role: string };
       accessToken: string;
       refreshToken: string;
     }> = {
       success: true,
       code: 200,
-      message: 'Login successful',
+      message: 'Đăng nhập thành công',
       data: {
         user: {
           id: user.id,
           email: user.email,
           name: user.name,
+          username: user.username ?? null,
           role: user.role,
         },
         accessToken: tokens.accessToken,

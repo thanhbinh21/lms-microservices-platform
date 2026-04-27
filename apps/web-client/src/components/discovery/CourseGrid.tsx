@@ -2,11 +2,15 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, MouseEvent } from 'react';
+import { useState, useEffect, MouseEvent } from 'react';
 import { Star, Clock, Users, BookOpen, ShoppingCart, Loader2 } from 'lucide-react';
 import type { DiscoveryCourse } from '@/app/actions/discovery';
 import { createOrderAction } from '@/app/actions/payment';
 import { useAppSelector } from '@/lib/redux/hooks';
+
+import { getMyCoursesAction } from '@/app/actions/learning';
+import { Badge } from '@/components/ui/badge';
+import { Flame, Sparkles, CheckCircle2 } from 'lucide-react';
 
 interface CourseGridProps {
   courses: DiscoveryCourse[];
@@ -24,7 +28,7 @@ const LEVEL_COLORS: Record<string, string> = {
   ADVANCED: 'bg-purple-100 text-purple-700',
 };
 
-function CourseCard({ course }: { course: DiscoveryCourse }) {
+function CourseCard({ course, isEnrolled }: { course: DiscoveryCourse; isEnrolled: boolean }) {
   const router = useRouter();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [buying, setBuying] = useState(false);
@@ -39,9 +43,17 @@ function CourseCard({ course }: { course: DiscoveryCourse }) {
     course.title.match(/[A-Za-z]/g)?.slice(0, 3).join('') || 'CRS'
   ).toUpperCase();
 
+  const isNew = new Date(course.createdAt).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const isPopular = course.enrollmentCount >= 5;
+
   const handleBuy = async (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (isEnrolled) {
+      router.push(`/learn/${course.id}`);
+      return;
+    }
 
     if (!isAuthenticated) {
       router.push('/login');
@@ -99,6 +111,28 @@ function CourseCard({ course }: { course: DiscoveryCourse }) {
               {course.category.name}
             </span>
           )}
+
+          {/* Status Badges */}
+          <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5">
+            {isEnrolled && (
+              <Badge variant="default" className="bg-primary hover:bg-primary gap-1 shadow-sm text-[10px] px-2 py-0.5 border-none h-6">
+                <CheckCircle2 className="size-3" />
+                Đã đăng ký
+              </Badge>
+            )}
+            {!isEnrolled && isPopular && (
+              <Badge variant="destructive" className="bg-rose-500 hover:bg-rose-500 gap-1 shadow-sm text-[10px] px-2 py-0.5 border-none h-6">
+                <Flame className="size-3" />
+                Phổ biến
+              </Badge>
+            )}
+            {!isEnrolled && isNew && (
+              <Badge variant="secondary" className="bg-blue-500 hover:bg-blue-500 text-white gap-1 shadow-sm text-[10px] px-2 py-0.5 border-none h-6">
+                <Sparkles className="size-3" />
+                Mới
+              </Badge>
+            )}
+          </div>
 
           {/* Play overlay */}
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
@@ -160,12 +194,21 @@ function CourseCard({ course }: { course: DiscoveryCourse }) {
               >
                 {priceLabel}
               </span>
-              {!isFree && (
+              {isEnrolled ? (
+                <button
+                  type="button"
+                  onClick={handleBuy}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1.5 text-xs font-bold hover:bg-primary/20 transition-colors"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  Vào học
+                </button>
+              ) : !isFree ? (
                 <button
                   type="button"
                   onClick={handleBuy}
                   disabled={buying}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-60 transition-colors"
                 >
                   {buying ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -174,7 +217,7 @@ function CourseCard({ course }: { course: DiscoveryCourse }) {
                   )}
                   Mua
                 </button>
-              )}
+              ) : null}
             </div>
             {buyError && (
               <p className="text-[11px] text-rose-500 font-semibold">{buyError}</p>
@@ -187,6 +230,21 @@ function CourseCard({ course }: { course: DiscoveryCourse }) {
 }
 
 export function CourseGrid({ courses }: CourseGridProps) {
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      getMyCoursesAction().then((res) => {
+        if (res.success && res.data) {
+          setEnrolledCourseIds(new Set(res.data.map((c) => c.id)));
+        }
+      });
+    } else {
+      setEnrolledCourseIds(new Set());
+    }
+  }, [isAuthenticated]);
+
   if (courses.length === 0) {
     return (
       <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
@@ -204,7 +262,11 @@ export function CourseGrid({ courses }: CourseGridProps) {
   return (
     <>
       {courses.map((course) => (
-        <CourseCard key={course.id} course={course} />
+        <CourseCard 
+          key={course.id} 
+          course={course} 
+          isEnrolled={enrolledCourseIds.has(course.id)} 
+        />
       ))}
     </>
   );

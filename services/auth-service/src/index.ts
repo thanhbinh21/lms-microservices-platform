@@ -13,7 +13,7 @@ import { logout } from './controllers/logout.controller.js';
 import { updateUserRole } from './controllers/update-role.controller.js';
 import { becomeEducator } from './controllers/become-educator.controller.js';
 import { requireAdmin } from './middlewares/requireAdmin.js';
-import { getInternalUser } from './controllers/internal.controller.js';
+import { getInternalUser, getInternalUsersBatch } from './controllers/internal.controller.js';
 import adminRouter from './routes/admin.routes.js';
 import { startCleanupJobs } from './jobs/cleanup.js';
 
@@ -69,6 +69,7 @@ app.patch('/users/role', requireAdmin, updateUserRole);
 
 // Internal routes (khong qua Gateway)
 app.get('/internal/users/:id', getInternalUser);
+app.post('/internal/users/batch', getInternalUsersBatch);
 
 // Admin routes
 app.use('/admin', requireAdmin, adminRouter);
