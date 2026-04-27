@@ -21,6 +21,15 @@ import {
   upsertCourseReview,
 } from './controllers/course.controller';
 import {
+  listCommunityGroups,
+  listCommunityPosts,
+  createCommunityPost,
+  replyCommunityPost,
+  reactCommunityPost,
+  joinCommunityGroup,
+  createPublicCommunityGroup,
+} from './controllers/community.controller';
+import {
   createChapter,
   updateChapter,
   deleteChapter,
@@ -87,6 +96,14 @@ app.post('/api/student/lessons/:lessonId/complete', requireAuth, completeLesson)
 app.get('/api/student/my-courses', requireAuth, getMyCourses);
 app.get('/api/student/certificates', requireAuth, getMyCertificates);
 
+// ─── Community Routes ───────────────────────────────────────────────────────
+app.get('/api/community/groups', requireAuth, listCommunityGroups);
+app.post('/api/community/groups/:groupId/join', requireAuth, joinCommunityGroup);
+app.get('/api/community/groups/:groupId/posts', requireAuth, listCommunityPosts);
+app.post('/api/community/groups/:groupId/posts', requireAuth, createCommunityPost);
+app.post('/api/community/groups/:groupId/posts/:postId/reply', requireAuth, replyCommunityPost);
+app.post('/api/community/groups/:groupId/posts/:postId/react', requireAuth, reactCommunityPost);
+
 // ─── Public Routes ────────────────────────────────────────────────────────────
 app.get('/api/categories', listCategories);
 app.get('/api/courses', listCourses);
@@ -98,6 +115,7 @@ app.get('/api/courses/:slug', getCourseBySlug);
 
 // ─── Admin Routes ─────────────────────────────────────────────────────────────
 app.post('/api/admin/categories', ...requireRole('admin'), createCategory);
+app.post('/api/admin/community/groups', ...requireRole('admin'), createPublicCommunityGroup);
 app.use('/api/admin', ...requireRole('admin'), adminRouter);
 
 // ─── Instructor Routes (Kong injects x-user-id, x-user-role) ─────────────────

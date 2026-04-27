@@ -5,17 +5,19 @@
  * 
  * Thực hiện:
  *   1. Xóa toàn bộ dữ liệu mẫu cũ (Clear Data)
- *   2. Tạo tài khoản (Student, Instructor, Admin)
+ *   2. Tạo tài khoản: 1 Admin, 1 Instructor, 2 Students
  *   3. Tạo danh mục (Categories)
- *   4. Tạo khóa học mẫu với chapters và lessons
+ *   4. Tạo khóa học mẫu (10 khóa: 7 free, 3 paid) kèm private groups
+ *   5. Tạo public community group & bài post mẫu của học viên
  */
 
-import { PrismaClient as CoursePrisma } from '../services/course-service/src/generated/prisma/index.js';
+import { PrismaClient as CoursePrisma, Prisma } from '../services/course-service/src/generated/prisma/index.js';
 import { PrismaClient as AuthPrisma } from '../services/auth-service/src/generated/prisma/index.js';
 import bcrypt from 'bcryptjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Redis } from 'ioredis';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -121,6 +123,12 @@ async function clearOldData() {
   console.log('══════════════════════════════════════════════════\n');
 
   try {
+    // Delete Community
+    await coursePrisma.communityPost.deleteMany();
+    await coursePrisma.communityMember.deleteMany();
+    await coursePrisma.communityGroup.deleteMany();
+    console.log('  ✅ Đã xóa toàn bộ Community (Groups, Members, Posts)');
+
     // Delete Courses Data first (Child to Parent)
     await coursePrisma.lesson.deleteMany();
     console.log('  ✅ Đã xóa toàn bộ Lessons');
@@ -137,6 +145,17 @@ async function clearOldData() {
     // Delete Auth Data
     await authPrisma.user.deleteMany();
     console.log('  ✅ Đã xóa toàn bộ Users');
+
+    // Flush Redis Cache
+    const redisUrl = 
+      readEnvVarFromFile(path.join(__dirname, '../services/course-service/.env'), 'CACHE_REDIS_URL') || 
+      process.env.CACHE_REDIS_URL;
+    if (redisUrl) {
+      const redis = new Redis(redisUrl);
+      await redis.flushall();
+      await redis.quit();
+      console.log('  ✅ Đã dọn dẹp Redis Cache toàn hệ thống');
+    }
     
     console.log('\n  Hoàn tất dọn dẹp dữ liệu cũ!\n');
   } catch (error) {
@@ -151,13 +170,16 @@ interface SeedAccount {
   email: string;
   password: string;
   name: string;
+  username: string;
   role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
+  key: string;
 }
 
 const SEED_ACCOUNTS: SeedAccount[] = [
-  { email: 'student@nexedu.vn', password: 'Student@123', name: 'Nguyễn Văn Học Viên', role: 'STUDENT' },
-  { email: 'instructor@nexedu.vn', password: 'Instructor@123', name: 'Trần Thị Giảng Viên', role: 'INSTRUCTOR' },
-  { email: 'admin@nexedu.vn', password: 'Admin@123', name: 'Lê Văn Admin', role: 'ADMIN' },
+  { key: 'ADMIN', email: 'admin@nexedu.vn', password: 'Admin@123', name: 'Lê Văn Admin', username: 'admin_nexedu', role: 'ADMIN' },
+  { key: 'INSTRUCTOR', email: 'instructor@nexedu.vn', password: 'Instructor@123', name: 'Trần Thị Giảng Viên', username: 'gv_tran', role: 'INSTRUCTOR' },
+  { key: 'STUDENT_1', email: 'student1@nexedu.vn', password: 'Student@123', name: 'Học Viên Số 1', username: 'hocvien_1', role: 'STUDENT' },
+  { key: 'STUDENT_2', email: 'student2@nexedu.vn', password: 'Student@123', name: 'Học Viên Số 2', username: 'hocvien_2', role: 'STUDENT' },
 ];
 
 async function seedAccounts(): Promise<Map<string, string>> {
@@ -165,7 +187,7 @@ async function seedAccounts(): Promise<Map<string, string>> {
   console.log('  📋 BƯỚC 2: TẠO TÀI KHOẢN MẪU');
   console.log('══════════════════════════════════════════════════\n');
 
-  const userIdMap = new Map<string, string>(); // role -> userId
+  const userIdMap = new Map<string, string>(); // key -> userId
 
   for (const account of SEED_ACCOUNTS) {
     try {
@@ -176,24 +198,25 @@ async function seedAccounts(): Promise<Map<string, string>> {
           email: account.email,
           password: hashedPassword,
           name: account.name,
+          username: account.username,
           role: account.role,
           sourceType: 'CREDENTIALS',
         },
       });
 
       console.log(`  ✅ [${account.role.padEnd(12)}] ${account.email} — ID: ${user.id}`);
-      userIdMap.set(account.role, user.id);
+      userIdMap.set(account.key, user.id);
     } catch (error) {
-      console.error(`  ❌ [${account.role}] ${account.email} — Lỗi:`, error);
+      console.error(`  ❌ Lỗi khi tạo ${account.email}:`, error);
     }
   }
 
   console.log('\n  📋 Thông tin đăng nhập:');
-  console.log('  ' + '─'.repeat(60));
+  console.log('  ' + '─'.repeat(80));
   for (const account of SEED_ACCOUNTS) {
-    console.log(`    ${account.role.padEnd(12)} | ${account.email.padEnd(25)} | ${account.password}`);
+    console.log(`    ${account.role.padEnd(12)} | ${account.email.padEnd(25)} | Pass: ${account.password}`);
   }
-  console.log('  ' + '─'.repeat(60) + '\n');
+  console.log('  ' + '─'.repeat(80) + '\n');
 
   return userIdMap;
 }
@@ -205,13 +228,8 @@ const CATEGORIES = [
   { name: 'Web Backend', slug: 'web-backend', order: 2 },
   { name: 'Mobile', slug: 'mobile', order: 3 },
   { name: 'DevOps', slug: 'devops', order: 4 },
-  { name: 'System Design', slug: 'system-design', order: 5 },
-  { name: 'Data Science', slug: 'data-science', order: 6 },
-  { name: 'Trí Tuệ Nhân Tạo (AI)', slug: 'ai-ml', order: 7 },
-  { name: 'Database', slug: 'database', order: 8 },
-  { name: 'Security', slug: 'security', order: 9 },
-  { name: 'Automation', slug: 'automation', order: 10 },
-  { name: 'Soft Skills', slug: 'soft-skills', order: 11 },
+  { name: 'Trí Tuệ Nhân Tạo (AI)', slug: 'ai-ml', order: 5 },
+  { name: 'Soft Skills', slug: 'soft-skills', order: 6 },
 ];
 
 async function seedCategories(): Promise<Map<string, string>> {
@@ -219,14 +237,14 @@ async function seedCategories(): Promise<Map<string, string>> {
   console.log('  🏷️  BƯỚC 3: TẠO DANH MỤC');
   console.log('══════════════════════════════════════════════════\n');
 
-  const categoryIdMap = new Map<string, string>(); // slug -> categoryId
+  const categoryIdMap = new Map<string, string>();
 
   for (const cat of CATEGORIES) {
     try {
       const category = await coursePrisma.category.create({
         data: cat,
       });
-      console.log(`  ✅ ${cat.name} (${cat.slug})`);
+      console.log(`  ✅ ${cat.name}`);
       categoryIdMap.set(cat.slug, category.id);
     } catch (error) {
       console.error(`  ❌ Lỗi tạo danh mục ${cat.name}:`, error);
@@ -248,250 +266,193 @@ function generateSlug(title: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-interface SeedLesson {
-  title: string;
-  order: number;
-  videoUrl: string;
-  content: string;
-  isFree: boolean;
-}
-
-interface SeedChapter {
-  title: string;
-  order: number;
-  lessons: SeedLesson[];
-}
-
-interface SeedCourse {
-  title: string;
-  description: string;
-  categorySlug: string;
-  thumbnailUrl: string;
-  price: number;
-  chapters: SeedChapter[];
-}
-
-const SEED_COURSES: SeedCourse[] = [
-  {
-    title: '5 Nền Tảng Cơ Bản Dành Cho Người Dùng AI',
-    description: 'Hiểu và sử dụng AI hiệu quả không chỉ là chạy theo công cụ. Khóa học này giúp bạn nắm vững 5 nền tảng cơ bản về AI để tăng năng suất làm việc.',
-    categorySlug: 'ai-ml',
-    thumbnailUrl: 'https://res.cloudinary.com/demo/image/upload/sample_ai_course.jpg',
-    price: 0,
-    chapters: [
-      {
-        title: 'Chương 1: Cách viết Prompt hiệu quả',
-        order: 1,
-        lessons: [
-          {
-            title: 'Bài 1: Tư duy đúng về Prompt và Framework TCREI',
-            order: 1,
-            videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-            content: 'Học viết prompt không phải là áp dụng dập khuôn mà là để hiểu cách mô hình AI hoạt động. Tìm hiểu Framework TCREI của Google bao gồm: Task, Roleplay, Context, Reference, và Evaluate & Iteration.',
-            isFree: true,
-          },
-        ],
-      },
-      {
-        title: 'Chương 2: Phân loại và ứng dụng công cụ AI',
-        order: 2,
-        lessons: [
-          {
-            title: 'Bài 2: 3 nhóm công cụ AI cơ bản',
-            order: 1,
-            videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-            content: 'Phân loại các công cụ AI: Nhóm suy luận tổng quát (ChatGPT, Claude, Gemini), Nhóm nghiên cứu chính xác (Perplexity, NotebookLM, Consensus), và Nhóm chuyên biệt (Midjourney, Eleven Labs).',
-            isFree: false,
-          },
-        ],
-      },
-      {
-        title: 'Chương 3: Automation, Open Source & Vibe Coding',
-        order: 3,
-        lessons: [
-          {
-            title: 'Bài 3: Tự động hóa và AI mã nguồn mở',
-            order: 1,
-            videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-            content: 'Sử dụng workflow tự động hóa (Make, n8n) kết hợp AI Agent. Hiểu về Open Source AI để bảo mật dữ liệu, tiết kiệm chi phí và khám phá khái niệm Vibe Coding giúp người không chuyên lập trình vẫn tạo ra ứng dụng.',
-            isFree: false,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    title: 'Xác Thực API Chuyên Sâu Cùng JWT',
-    description: 'Nắm vững tiêu chuẩn JSON Web Token (JWT) trong xác thực và truyền dữ liệu an toàn bên trong hệ thống API.',
-    categorySlug: 'web-backend',
-    thumbnailUrl: 'https://res.cloudinary.com/demo/image/upload/sample_jwt_course.jpg',
-    price: 250000,
-    chapters: [
-      {
-        title: 'Chương 1: Tổng quan về JSON Web Token',
-        order: 1,
-        lessons: [
-          {
-            title: 'Bài 1: JWT là gì và cách hoạt động?',
-            order: 1,
-            videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-            content: 'JWT là một tiêu chuẩn mã hóa dữ liệu giống như \'chìa khóa\' cấp cho người dùng sau khi đăng nhập để truy cập tài nguyên server mà không cần nhập lại mật khẩu.',
-            isFree: true,
-          },
-          {
-            title: 'Bài 2: Cấu trúc 3 phần của JWT',
-            order: 2,
-            videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-            content: 'Tìm hiểu về Header, Payload (chứa dữ liệu người dùng) và Signature (đảm bảo token không bị giả mạo).',
-            isFree: false,
-          },
-        ],
-      },
-      {
-        title: 'Chương 2: Đánh giá và thực tiễn triển khai',
-        order: 2,
-        lessons: [
-          {
-            title: 'Bài 3: Ưu, nhược điểm và khi nào nên dùng JWT',
-            order: 1,
-            videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-            content: 'Ưu điểm của JWT là stateless (không cần lưu session trên server), dễ tích hợp đa nền tảng. Nhược điểm là khó thu hồi, cần kết hợp cơ chế refresh token và blacklist.',
-            isFree: false,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    title: 'Tự Động Hóa Với n8n: Xây Dựng Đội Quân 6 AI Agents',
-    description: 'Hướng dẫn thực hành xây dựng đội quân trợ lý thông minh trên n8n, giúp tự động hóa hơn 200 tasks mỗi ngày từ email, lịch hẹn đến tìm kiếm content.',
-    categorySlug: 'automation',
-    thumbnailUrl: 'https://res.cloudinary.com/demo/image/upload/sample_n8n_course.jpg',
-    price: 500000,
-    chapters: [
-      {
-        title: 'Chương 1: Thiết lập hệ thống cốt lõi',
-        order: 1,
-        lessons: [
-          {
-            title: 'Bài 1: Giới thiệu AI Swarm & Telegram Trigger',
-            order: 1,
-            videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-            content: 'Khái niệm AI Swarm (chuyên môn hóa từng AI Agent). Cách cài đặt bộ não điều khiển với GPT-4o-mini và khởi tạo giao tiếp thông qua Telegram Bot.',
-            isFree: true,
-          },
-        ],
-      },
-      {
-        title: 'Chương 2: Xây dựng các AI Agent chuyên môn',
-        order: 2,
-        lessons: [
-          {
-            title: 'Bài 2: Email, Calendar & Contact Agent',
-            order: 1,
-            videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-            content: 'Cấu hình Email Agent phụ trách thư tín, Calendar Agent quản lý sự kiện và Contact Agent lưu trữ cơ sở dữ liệu danh bạ bằng Airtable.',
-            isFree: false,
-          },
-          {
-            title: 'Bài 3: Web Agent & YouTube Agent',
-            order: 2,
-            videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-            content: 'Thiết lập Web Agent (dùng Tavily, Perplexity) để tra cứu thông tin chuyên sâu và YouTube Agent (dùng Apify) để phân tích trending video.',
-            isFree: false,
-          },
-        ],
-      },
-    ],
-  },
+const COURSES_DATA = [
+  // 3 KHÓA TRẢ PHÍ
+  { title: 'ReactJS Pro Mastery', cat: 'web-frontend', price: 500000 },
+  { title: 'NodeJS Microservices Architecture', cat: 'web-backend', price: 1000000 },
+  { title: 'Xây dựng trợ lý AI với GPT-4 & n8n', cat: 'ai-ml', price: 800000 },
+  // 7 KHÓA MIỄN PHÍ
+  { title: 'HTML & CSS Cơ Bản', cat: 'web-frontend', price: 0 },
+  { title: 'JavaScript Dành Cho Người Mới', cat: 'web-frontend', price: 0 },
+  { title: 'Nhập Môn Lập Trình Python', cat: 'web-backend', price: 0 },
+  { title: 'Git & GitHub Fundamentals', cat: 'devops', price: 0 },
+  { title: 'Nhập môn SQL và Database', cat: 'web-backend', price: 0 },
+  { title: 'React Native Basics', cat: 'mobile', price: 0 },
+  { title: 'Kỹ Năng Viết CV & Phỏng Vấn IT', cat: 'soft-skills', price: 0 },
 ];
 
-async function seedCourses(userIdMap: Map<string, string>, categoryIdMap: Map<string, string>) {
+async function seedCoursesAndPrivateGroups(userIdMap: Map<string, string>, categoryIdMap: Map<string, string>) {
   console.log('══════════════════════════════════════════════════');
-  console.log('  📚 BƯỚC 4: TẠO KHÓA HỌC MẪU');
+  console.log('  📚 BƯỚC 4: TẠO 10 KHÓA HỌC & PRIVATE GROUPS');
   console.log('══════════════════════════════════════════════════\n');
 
-  // Uu tien dung instructor ID, sau do admin, cuoi cung la system
-  const instructorId =
-    userIdMap.get('INSTRUCTOR') ||
-    userIdMap.get('ADMIN') ||
-    'system-instructor-00000000';
+  const instructorId = userIdMap.get('INSTRUCTOR');
+  if (!instructorId) throw new Error("Missing INSTRUCTOR ID");
 
-  console.log(`  📝 Tác giả (Instructor ID): ${instructorId}\n`);
+  for (const item of COURSES_DATA) {
+    const slug = generateSlug(item.title);
+    const categoryId = categoryIdMap.get(item.cat);
 
-  for (const courseData of SEED_COURSES) {
-    const slug = generateSlug(courseData.title);
+    // Random số bài học từ 2-5 cho 1 chương duy nhất
+    const lessonCount = Math.floor(Math.random() * 4) + 2; 
 
     try {
-      const totalLessons = courseData.chapters.reduce(
-        (acc, ch) => acc + ch.lessons.length,
-        0,
-      );
-
-      const categoryId = categoryIdMap.get(courseData.categorySlug);
-
+      // 1. Tạo Khóa Học
       const course = await coursePrisma.course.create({
         data: {
-          title: courseData.title,
+          title: item.title,
           slug,
-          description: courseData.description,
-          thumbnail: courseData.thumbnailUrl,
-          price: courseData.price,
+          description: `Mô tả ngắn cho khóa học ${item.title}. Khóa học này cung cấp kiến thức nền tảng và nâng cao...`,
+          thumbnail: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+          price: item.price,
           level: 'BEGINNER',
           status: 'PUBLISHED',
-          categoryId: categoryId,
+          categoryId,
           instructorId,
-          totalLessons,
-          totalDuration: totalLessons * 600,
+          totalLessons: lessonCount,
+          totalDuration: lessonCount * 600,
         },
       });
 
-      const priceLabel = courseData.price === 0
-        ? '🆓 Miễn phí'
-        : `💰 ${courseData.price.toLocaleString('vi-VN')}đ`;
-      console.log(`  ✅ "${course.title}" (${priceLabel})`);
+      // 2. Tạo Chapter & Lessons
+      const chapter = await coursePrisma.chapter.create({
+        data: {
+          title: 'Chương 1: Bắt đầu',
+          order: 1,
+          isPublished: true,
+          courseId: course.id,
+        },
+      });
 
-      for (const chapterData of courseData.chapters) {
-        const chapter = await coursePrisma.chapter.create({
+      for (let i = 1; i <= lessonCount; i++) {
+        await coursePrisma.lesson.create({
           data: {
-            title: chapterData.title,
-            order: chapterData.order,
+            title: `Bài ${i}: Nội dung cơ bản ${i}`,
+            order: i,
+            videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            sourceType: 'YOUTUBE',
+            content: 'Nội dung chi tiết bài học...',
+            duration: 600,
             isPublished: true,
-            courseId: course.id,
+            isFree: i === 1, // Bài đầu tiên luôn free
+            chapterId: chapter.id,
           },
         });
-
-        console.log(`    📁 ${chapterData.title}`);
-
-        for (const lessonData of chapterData.lessons) {
-          const sourceType = lessonData.videoUrl.includes('youtube.com') || lessonData.videoUrl.includes('youtu.be')
-            ? 'YOUTUBE'
-            : 'UPLOAD';
-
-          await coursePrisma.lesson.create({
-            data: {
-              title: lessonData.title,
-              order: lessonData.order,
-              videoUrl: lessonData.videoUrl,
-              sourceType,
-              content: lessonData.content,
-              duration: 600,
-              isPublished: true,
-              isFree: lessonData.isFree,
-              chapterId: chapter.id,
-            },
-          });
-
-          const freeLabel = lessonData.isFree ? '🆓' : '🔒';
-          console.log(`      ${freeLabel} ${lessonData.title}`);
-        }
       }
 
-      console.log('');
+      // 3. Tạo Private Community Group
+      const groupSlug = `community-${slug}-${course.id.slice(0, 8)}`;
+      const group = await coursePrisma.communityGroup.create({
+        data: {
+          type: 'COURSE_PRIVATE',
+          name: `Thảo luận: ${item.title}`,
+          slug: groupSlug,
+          description: `Nhóm kín dành riêng cho học viên khóa ${item.title}`,
+          courseId: course.id,
+          ownerId: instructorId,
+          memberCount: 1, // Instructor
+        }
+      });
+
+      // Thêm Instructor vào nhóm Private
+      await coursePrisma.communityMember.create({
+        data: {
+          groupId: group.id,
+          userId: instructorId,
+        }
+      });
+
+      const priceLabel = item.price === 0 ? 'Miễn phí' : `${item.price / 1000}k`;
+      console.log(`  ✅ Khóa học: ${item.title} (${priceLabel}) — ${lessonCount} bài học`);
+      console.log(`     └─ Nhóm Private: ${group.name}`);
+
     } catch (error) {
-      console.error(`  ❌ Lỗi tạo "${courseData.title}":`, error);
+      console.error(`  ❌ Lỗi tạo khóa học "${item.title}":`, error);
     }
   }
+  console.log('');
+}
+
+// ─── Seed Public Community & Posts ────────────────────────────────────────────
+
+async function seedPublicCommunityAndPosts(userIdMap: Map<string, string>) {
+  console.log('══════════════════════════════════════════════════');
+  console.log('  🌐 BƯỚC 5: TẠO PUBLIC COMMUNITY & BÀI VIẾT');
+  console.log('══════════════════════════════════════════════════\n');
+
+  const adminId = userIdMap.get('ADMIN');
+  const student1Id = userIdMap.get('STUDENT_1');
+  const student2Id = userIdMap.get('STUDENT_2');
+  const instructorId = userIdMap.get('INSTRUCTOR');
+
+  if (!adminId || !student1Id || !student2Id || !instructorId) {
+    throw new Error("Missing Users for Community Seeding");
+  }
+
+  try {
+    // 1. Tạo Public Group (Owner: Admin)
+    const publicGroup = await coursePrisma.communityGroup.create({
+      data: {
+        type: 'PUBLIC',
+        name: 'Cộng đồng Học Lập Trình Chung',
+        slug: 'cong-dong-hoc-lap-trinh-chung',
+        description: 'Nơi giao lưu, hỏi đáp và chia sẻ kinh nghiệm học tập cho tất cả mọi người.',
+        ownerId: adminId,
+        memberCount: 4, // Admin, GV, HV 1, HV 2
+      }
+    });
+
+    // 2. Add members
+    await coursePrisma.communityMember.createMany({
+      data: [
+        { groupId: publicGroup.id, userId: adminId },
+        { groupId: publicGroup.id, userId: instructorId },
+        { groupId: publicGroup.id, userId: student1Id },
+        { groupId: publicGroup.id, userId: student2Id },
+      ]
+    });
+
+    // 3. Tạo bài Post 1 (Student 1)
+    const post1 = await coursePrisma.communityPost.create({
+      data: {
+        groupId: publicGroup.id,
+        authorId: student1Id,
+        content: 'Chào mọi người, mình mới bắt đầu học lập trình web. Mọi người cho mình hỏi nên bắt đầu từ HTML CSS hay học thẳng JS luôn ạ?',
+      }
+    });
+
+    // 4. Tạo Reply cho Post 1 (Student 2)
+    await coursePrisma.communityPost.create({
+      data: {
+        groupId: publicGroup.id,
+        authorId: student2Id,
+        parentId: post1.id, // Trả lời bài post 1
+        content: 'Bạn nên nắm vững HTML và CSS trước để quen với cách trình duyệt hiển thị nhé. Xong rồi qua JS sẽ dễ hình dung DOM hơn.',
+      }
+    });
+
+    // 5. Tạo bài Post 2 (Student 2)
+    await coursePrisma.communityPost.create({
+      data: {
+        groupId: publicGroup.id,
+        authorId: student2Id,
+        content: 'Có ai đang học khóa "Xây dựng trợ lý AI với GPT-4 & n8n" của cô Trần Thị Giảng Viên không? Cho mình xin review với ạ!',
+      }
+    });
+
+    // Update Post Count
+    await coursePrisma.communityGroup.update({
+      where: { id: publicGroup.id },
+      data: { postCount: 3 }
+    });
+
+    console.log(`  ✅ Đã tạo Public Group: "${publicGroup.name}"`);
+    console.log(`  ✅ Đã tạo 2 bài viết và 1 phản hồi từ Học viên.`);
+    
+  } catch (error) {
+    console.error(`  ❌ Lỗi tạo Public Community:`, error);
+  }
+  console.log('');
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -509,8 +470,11 @@ async function main() {
     // Bước 3: Tạo danh mục
     const categoryIdMap = await seedCategories();
 
-    // Bước 4: Tạo khóa học
-    await seedCourses(userIdMap, categoryIdMap);
+    // Bước 4: Tạo khóa học (10 khóa: 7 free, 3 paid) + Nhóm Private
+    await seedCoursesAndPrivateGroups(userIdMap, categoryIdMap);
+
+    // Bước 5: Tạo Public Community + Bài viết mẫu
+    await seedPublicCommunityAndPosts(userIdMap);
 
     console.log('══════════════════════════════════════════════════');
     console.log('  ✨ HOÀN TẤT TẤT CẢ SEED DATA!');

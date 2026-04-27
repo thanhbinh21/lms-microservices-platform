@@ -20,6 +20,7 @@ interface CurriculumSidebarProps {
   completedLessons: number;
   totalLessons: number;
   progressPercent: number;
+  discussionGroupId?: string | null;
 }
 
 export function CurriculumSidebar({
@@ -29,6 +30,7 @@ export function CurriculumSidebar({
   completedLessons,
   totalLessons,
   progressPercent,
+  discussionGroupId,
 }: CurriculumSidebarProps) {
   const params = useParams();
   const currentLessonId = params.lessonId as string | undefined;
@@ -71,6 +73,17 @@ export function CurriculumSidebar({
           />
         </div>
       </div>
+
+      {discussionGroupId ? (
+        <div className="border-b border-white/[0.08] px-4 py-3">
+          <Link
+            href={`/community/${discussionGroupId}`}
+            className="block rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-center text-xs font-bold text-primary transition hover:bg-primary/20"
+          >
+            Thao luan
+          </Link>
+        </div>
+      ) : null}
 
       {/* Chapter list */}
       <div className="flex-1 overflow-y-auto scrollbar-thin">

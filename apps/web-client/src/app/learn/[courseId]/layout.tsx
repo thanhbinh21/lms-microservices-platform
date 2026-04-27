@@ -8,6 +8,7 @@ import { useAppSelector } from '@/lib/redux/hooks';
 import { Button } from '@/components/ui/button';
 import { CurriculumSidebar } from '@/components/learning/curriculum-sidebar';
 import { getLearnDataAction, enrollFreeAction, type LearnDataDto } from '@/app/actions/learning';
+import { getMyCommunityGroupsAction } from '@/app/actions/community';
 import { cn } from '@/lib/utils';
 
 export default function LearnLayout({ children }: { children: React.ReactNode }) {
@@ -21,16 +22,32 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
   const [enrolling, setEnrolling] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [discussionGroupId, setDiscussionGroupId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const res = await getLearnDataAction(courseId);
-    if (res.success && res.data) {
-      setData(res.data);
+
+    const [learnDataResult, groupsResult] = await Promise.all([
+      getLearnDataAction(courseId),
+      getMyCommunityGroupsAction(),
+    ]);
+
+    if (learnDataResult.success && learnDataResult.data) {
+      setData(learnDataResult.data);
     } else {
-      setError(res.message || 'Không thể tải dữ liệu khóa học');
+      setError(learnDataResult.message || 'Không thể tải dữ liệu khóa học');
     }
+
+    if (groupsResult.success && groupsResult.data) {
+      const matchedGroup = groupsResult.data.joinedGroups.find(
+        (group) => group.courseId === courseId,
+      );
+      setDiscussionGroupId(matchedGroup?.id || null);
+    } else {
+      setDiscussionGroupId(null);
+    }
+
     setLoading(false);
   }, [courseId]);
 
@@ -133,6 +150,7 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
           completedLessons={data.completedLessons}
           totalLessons={data.totalLessons}
           progressPercent={data.progressPercent}
+          discussionGroupId={discussionGroupId}
         />
       </aside>
 
@@ -154,6 +172,7 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
               completedLessons={data.completedLessons}
               totalLessons={data.totalLessons}
               progressPercent={data.progressPercent}
+              discussionGroupId={discussionGroupId}
             />
           </aside>
         </div>
@@ -185,6 +204,15 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
           <h1 className="line-clamp-1 flex-1 text-sm font-semibold text-slate-700">
             {data.course.title}
           </h1>
+
+          {discussionGroupId ? (
+            <Link
+              href={`/community/${discussionGroupId}`}
+              className="inline-flex items-center rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-bold text-primary transition hover:bg-primary/10"
+            >
+              Thao luan
+            </Link>
+          ) : null}
 
           {/* Mini progress */}
           <div className="hidden items-center gap-2 sm:flex">

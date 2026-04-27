@@ -97,7 +97,7 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:bg-transparent hover:text-primary">
+        <Button variant="ghost" size="icon" className="relative text-slate-500 hover:bg-slate-100 hover:text-primary transition-colors">
           <Bell className="size-5" />
           {unreadCount > 0 && (
             <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
@@ -106,18 +106,18 @@ export function NotificationBell() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <h4 className="font-semibold text-sm">Thông báo</h4>
+      <PopoverContent className="w-80 p-0 rounded-2xl shadow-xl border-slate-200" align="end" sideOffset={8}>
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-4 py-3 rounded-t-2xl">
+          <h4 className="font-bold text-sm text-slate-800">Thông báo</h4>
           {unreadCount > 0 && (
             <Button 
               variant="ghost" 
               size="sm" 
-              className="h-auto px-2 py-1 text-xs text-muted-foreground hover:text-primary"
+              className="h-auto px-2 py-1 text-xs font-semibold text-slate-500 hover:text-primary"
               onClick={markAllAsRead}
               disabled={loading}
             >
-              Đánh dấu tất cả đã đọc
+              Đánh dấu đã đọc tất cả
             </Button>
           )}
         </div>
@@ -140,43 +140,51 @@ export function NotificationBell() {
               Không có thông báo nào.
             </div>
           ) : (
-            <div className="flex flex-col">
+            <div className="flex flex-col py-1">
               {notifications.map((notification) => (
                 <div 
                   key={notification.id} 
-                  className={`flex cursor-pointer flex-col gap-1 border-b p-4 transition-colors hover:bg-muted/50 ${!notification.readAt ? 'bg-primary/5' : ''}`}
+                  className={`group flex cursor-pointer gap-3 px-4 py-3 transition-colors hover:bg-slate-50 ${!notification.readAt ? 'bg-primary/5' : ''}`}
                   onClick={() => handleNotificationClick(notification)}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className={`text-sm ${!notification.readAt ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-                      {notification.title}
-                    </p>
-                    {!notification.readAt && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-6 w-6 shrink-0 opacity-50 hover:opacity-100" 
-                        onClick={(e) => markAsRead(notification.id, e)}
-                        title="Đánh dấu đã đọc"
-                      >
-                        <Check className="size-3" />
-                      </Button>
+                  <div className="mt-1 flex-shrink-0">
+                    {!notification.readAt ? (
+                      <div className="size-2 rounded-full bg-primary" />
+                    ) : (
+                      <div className="size-2 rounded-full bg-slate-200" />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {notification.body}
-                  </p>
-                  <p className="mt-1 text-[10px] text-muted-foreground/70">
-                    {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true, locale: vi })}
-                  </p>
+                  <div className="flex flex-col flex-1 gap-0.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={`text-sm leading-tight ${!notification.readAt ? 'font-bold text-slate-800' : 'font-semibold text-slate-600'}`}>
+                        {notification.title}
+                      </p>
+                    </div>
+                    <p className="text-xs leading-relaxed text-slate-500 line-clamp-2 mt-0.5">
+                      {notification.body}
+                    </p>
+                    <p className="mt-1.5 text-[10px] font-medium text-slate-400">
+                      {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true, locale: vi })}
+                    </p>
+                  </div>
+                  {!notification.readAt && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="size-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-primary" 
+                      onClick={(e) => markAsRead(notification.id, e)}
+                      title="Đánh dấu đã đọc"
+                    >
+                      <Check className="size-3.5" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
-        <div className="border-t p-2">
-          {/* Tuong lai co the link den trang tat ca thong bao */}
-          <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setOpen(false)}>
+        <div className="border-t border-slate-100 p-2 bg-slate-50 rounded-b-2xl">
+          <Button variant="ghost" size="sm" className="w-full text-xs font-semibold text-slate-500" onClick={() => setOpen(false)}>
             Đóng
           </Button>
         </div>

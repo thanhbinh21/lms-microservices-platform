@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Clock3, PlayCircle, Lock } from 'lucide-react';
+import { Clock3, PlayCircle, Lock, Award, MessageSquare } from 'lucide-react';
 import { getPublicCourseDetailAction } from '@/app/actions/instructor';
 import { getCourseProgressAction } from '@/app/actions/student';
 
@@ -110,6 +110,18 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
             <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cập nhật</p>
               <p className="mt-1 font-bold text-slate-800">{updatedLabel}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-emerald-50/50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Chứng chỉ</p>
+              <p className="mt-1 font-bold text-emerald-700 flex items-center gap-1.5">
+                <Award className="size-4" /> Cấp chứng chỉ sau khi học xong
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-blue-50/50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Cộng đồng</p>
+              <p className="mt-1 font-bold text-blue-700 flex items-center gap-1.5">
+                <MessageSquare className="size-4" /> Nhóm thảo luận kín cho học viên
+              </p>
             </div>
           </CardContent>
         </Card>

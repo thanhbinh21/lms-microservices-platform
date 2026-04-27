@@ -41,6 +41,17 @@ services:
         paths:
           - /course
         strip_path: true
+      - name: community-route
+        paths:
+          - /community
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
     plugins:
       - name: rate-limiting
         config:

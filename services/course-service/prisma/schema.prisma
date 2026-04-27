@@ -38,6 +38,11 @@ enum FailedEventStatus {
   IGNORED
 }
 
+enum CommunityGroupType {
+  PUBLIC
+  COURSE_PRIVATE
+}
+
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 
@@ -77,6 +82,7 @@ model Course {
   enrollments Enrollment[]
   reviews     Review[]
   certificates Certificate[]
+  communityGroups CommunityGroup[]
 
   @@index([instructorId])
   @@index([status])
@@ -201,6 +207,68 @@ model Review {
   @@index([courseId])
   @@index([isFlagged])
   @@map("reviews")
+}
+
+model CommunityGroup {
+  id          String             @id @default(uuid())
+  type        CommunityGroupType @default(COURSE_PRIVATE)
+  courseId    String?            @map("course_id")
+  ownerId     String             @map("owner_id")
+  name        String
+  slug        String             @unique
+  description String?
+  memberCount Int                @default(0) @map("member_count")
+  postCount   Int                @default(0) @map("post_count")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  course   Course?           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  members  CommunityMember[]
+  posts    CommunityPost[]
+
+  // Moi khoa hoc chi co toi da 1 private group
+  @@unique([courseId], map: "community_groups_course_id_unique")
+  @@index([type])
+  @@index([ownerId])
+  @@index([createdAt(sort: Desc)])
+  @@map("community_groups")
+}
+
+model CommunityMember {
+  id        String   @id @default(uuid())
+  groupId   String   @map("group_id")
+  userId    String   @map("user_id")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  group CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@index([groupId])
+  @@map("community_members")
+}
+
+model CommunityPost {
+  id        String   @id @default(uuid())
+  groupId   String   @map("group_id")
+  authorId  String   @map("author_id")
+  parentId  String?  @map("parent_id")
+  content      String
+  imageUrl     String?  @map("image_url")
+  likeCount    Int      @default(0) @map("like_count")
+  likedByIds   String[] @default([]) @map("liked_by_ids")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  group   CommunityGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  parent  CommunityPost?  @relation("CommunityPostReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies CommunityPost[] @relation("CommunityPostReplies")
+
+  @@index([groupId, createdAt(sort: Desc)])
+  @@index([parentId])
+  @@index([authorId])
+  @@map("community_posts")
 }
 
 model FailedEvent {

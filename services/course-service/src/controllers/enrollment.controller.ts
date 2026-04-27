@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { randomUUID } from 'crypto';
 import type { ApiResponse } from '@lms/types';
+import { logger } from '@lms/logger';
+import { publishEnrollmentCreatedEvent } from '../lib/kafka-producer';
 
 export const enrollCourse = async (req: Request, res: Response): Promise<Response | void> => {
   const traceId = (req.headers['x-trace-id'] as string) || '';
@@ -62,19 +64,40 @@ export const enrollCourse = async (req: Request, res: Response): Promise<Respons
       return res.status(402).json(response);
     }
 
-    await prisma.$transaction([
-      prisma.enrollment.create({
+    const enrollment = await prisma.$transaction(async (tx) => {
+      const created = await tx.enrollment.create({
         data: {
           userId,
           courseId,
           orderId: `FREE-${randomUUID()}`,
         },
-      }),
-      prisma.course.update({
+      });
+
+      await tx.course.update({
         where: { id: courseId },
         data: { enrollmentCount: { increment: 1 } },
-      }),
-    ]);
+      });
+
+      return created;
+    });
+
+    try {
+      // Phat su kien chung de cac consumer (notification/community) dong bo auto-flow.
+      await publishEnrollmentCreatedEvent(
+        {
+          userId,
+          courseId,
+          orderId: enrollment.orderId,
+          enrolledAt: enrollment.enrolledAt,
+        },
+        traceId,
+      );
+    } catch (err) {
+      logger.warn(
+        { err, userId, courseId, traceId },
+        'Free enrollment success but failed to publish learning.enrollment.created',
+      );
+    }
 
     const response: ApiResponse<null> = {
       success: true, code: 201, message: 'Enrolled successfully', data: null, trace_id: traceId,
