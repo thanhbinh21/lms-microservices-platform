@@ -192,10 +192,10 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 ### Phase 9.13: DX Hardening ✅ COMPLETED
 - [x] **Phase 9.13:** DX Hardening — `pnpm run setup` bootstrap (install + docker:up + setup:db + seed), `.nvmrc` node version pin, Prisma orchestration vao turbo pipeline. ✅ Completed: Apr 27, 2026
 
-### Phase UI: UI/UX Refactor ⏳ PENDING
+### Phase UI: UI/UX Refactor ✅ COMPLETED
 - [x] **Phase UI-1:** SharedNavbar & Header Refactor — Gom Profile/Dashboard/Studio/Logout vao User Dropdown Menu, bo greeting text khoi navbar, di chuyen CTA "Dang ky GV" vao dropdown hoac banner, them NotificationBell vao mobile menu, responsive breakpoints chuan. ✅ Completed: Apr 27, 2026
-- [ ] **Phase UI-2:** Design System Consolidation — Tao them CSS utility classes cho cac pattern lap lai (`.glass-card`, `.gradient-hero`, semantic color vars). Chuan hoa border-radius (chi dung `rounded-lg/xl/2xl`), icon sizes (`size-4/5/6`). Di chuyen tat ca hardcoded stats (500+, 150k, 12.000) ra constants hoac fetch tu API.
-- [ ] **Phase UI-3:** Component Decomposition — Tach `dashboard/page.tsx` (653 dong) thanh OverviewTab/MyCoursesTab/CertificatesTab/CommunityTab. Tao reusable `CourseCard`, `StatCard`, `EmptyState`. Tach components >300 dong.
+- [x] **Phase UI-2:** Design System Consolidation — Tao them CSS utility classes cho cac pattern lap lai (`.glass-card`, `.gradient-hero`, semantic color vars). Chuan hoa border-radius (chi dung `rounded-lg/xl/2xl`), icon sizes (`size-4/5/6`). Di chuyen tat ca hardcoded stats (500+, 150k, 12.000) ra constants hoac fetch tu API. ✅ Completed: Apr 27, 2026
+- [x] **Phase UI-3:** Component Decomposition — Tach `dashboard/page.tsx` (653 dong) thanh OverviewTab/MyCoursesTab/CertificatesTab/CommunityTab. Tao reusable `CourseCard`, `StatCard`, `EmptyState`. Tach components >300 dong. ✅ Completed: Apr 27, 2026
 
 ### Phase C: Community Feature ⏳ PENDING
 - [ ] **Phase C-1:** Community Backend — Model CommunityGroup/CommunityMember/CommunityPost trong course_db. Auto-join via Kafka event `learning.enrollment.created`. API CRUD: listGroups, listPosts (cursor pagination), createPost/reply, joinGroup. Kong route `/community/*`.

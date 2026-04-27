@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import RegisterForm from '@/components/auth/RegisterForm';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
+import { SITE_STATS } from '@/config/site-stats';
 
 export default function RegisterPage() {
   return (
@@ -19,11 +20,12 @@ export default function RegisterPage() {
           </Link>
           
           <div className="space-y-4">
+            <h3 className="text-xl font-bold mb-1 text-primary">{SITE_STATS.totalCourses}+ khóa học</h3>
             <h1 className="text-5xl font-bold leading-tight drop-shadow-sm text-balance">
               Khởi Đầu Mới Cho <br /><span className="text-primary">Sự Nghiệp</span> Của Bạn
             </h1>
             <p className="text-lg text-muted-foreground font-medium leading-relaxed max-w-lg pb-4">
-              Tạo tài khoản học viên để truy cập 500+ khóa học chuẩn quốc tế, chứng chỉ doanh nghiệp và cộng đồng hỗ trợ 24/7.
+              Tạo tài khoản học viên để truy cập {SITE_STATS.totalCourses}+ khóa học chuẩn quốc tế, chứng chỉ doanh nghiệp và cộng đồng hỗ trợ 24/7.
             </p>
           </div>
 

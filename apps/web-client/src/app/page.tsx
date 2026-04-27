@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import Image from 'next/image';
+import { SITE_STATS } from '@/config/site-stats';
 import { Suspense } from 'react';
 import { ArrowRight, PlayCircle, ShieldCheck, Users, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -104,7 +106,7 @@ export default async function Home() {
                     NL
                   </span>
                 </div>
-                <p>Hơn 12.000 học viên đã bắt đầu hành trình cùng NexEdu</p>
+                <p>{SITE_STATS.totalStudentsLong} đã bắt đầu hành trình cùng NexEdu</p>
               </div>
             </ScrollReveal>
 
@@ -131,10 +133,10 @@ export default async function Home() {
         <section className="border-y border-primary/10 bg-white/70 px-4 py-12 backdrop-blur-md md:px-6 relative z-10 shadow-[0_4px_30px_rgba(0,0,0,0.02)]">
           <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-6 md:grid-cols-4">
             {[
-              { value: '500+', label: 'Khóa học' },
-              { value: '150k', label: 'Học viên' },
-              { value: '98%', label: 'Hài lòng' },
-              { value: '200+', label: 'Chuyên gia' },
+              { value: SITE_STATS.totalCourses, label: 'Khóa học' },
+              { value: SITE_STATS.totalStudentsNumber, label: 'Học viên' },
+              { value: SITE_STATS.successRate, label: 'Hài lòng' },
+              { value: SITE_STATS.expertInstructors, label: 'Chuyên gia' },
             ].map((item, idx) => (
               <ScrollReveal key={item.label} delay={idx * 100} className="text-center">
                 <p className="text-4xl font-bold text-primary drop-shadow-sm">{item.value}</p>
@@ -235,7 +237,7 @@ export default async function Home() {
 
         <ScrollReveal>
           <section className="px-4 py-20 md:px-6 relative z-10" id="ho-tro">
-            <div className="mx-auto grid w-full max-w-6xl gap-8 rounded-[3rem] border border-white/40 bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--primary)/0.85))] p-8 text-white shadow-2xl shadow-primary/30 md:grid-cols-2 md:p-16 overflow-hidden relative">
+            <div className="mx-auto grid w-full max-w-6xl gap-8 rounded-[3rem] border border-white/40 gradient-hero p-8 text-white shadow-2xl shadow-primary/30 md:grid-cols-2 md:p-16 overflow-hidden relative">
               <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay pointer-events-none" />
               <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
               <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-900/30 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/2 pointer-events-none" />
@@ -243,7 +245,7 @@ export default async function Home() {
               <div className="space-y-6 relative z-10">
                 <h2 className="text-4xl font-bold leading-tight drop-shadow-md">Sẵn Sàng Kiến Tạo<br/>Tương Lai Của Bạn?</h2>
                 <p className="text-base text-white/90 max-w-md">
-                  Tham gia cộng đồng hơn 150.000 học viên đang phát triển kỹ năng mỗi ngày tại NexEdu.
+                  Tham gia cộng đồng {SITE_STATS.totalStudentsFull} học viên đang phát triển kỹ năng mỗi ngày tại NexEdu.
                 </p>
                 <div className="flex flex-wrap gap-4 pt-6">
                   <HomeAuthActions context="cta" />

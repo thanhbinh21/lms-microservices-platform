@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import LoginForm from '@/components/auth/LoginForm';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
+import { SITE_STATS } from '@/config/site-stats';
 
 export default function LoginPage() {
   return (
