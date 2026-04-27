@@ -5,7 +5,7 @@ import { logger } from '@lms/logger';
 import { validatePaymentServiceEnv } from '@lms/env-validator';
 import type { ApiResponse } from '@lms/types';
 import { requireAuth } from './middleware/require-auth';
-import { createOrder, getOrder, getMyOrders } from './controllers/order.controller';
+import { createOrder, getOrder, getMyOrders, getRevenueAnalytics } from './controllers/order.controller';
 import { handleVNPayReturn, handleVNPayIPN } from './controllers/vnpay.controller';
 import prisma from './lib/prisma';
 import { disconnectProducer } from './lib/kafka-producer';
@@ -56,6 +56,7 @@ app.get('/api/vnpay-ipn', handleVNPayIPN);
 app.post('/api/vnpay-ipn', handleVNPayIPN);
 
 // ─── Authenticated endpoints ──────────────────────────────────────────────────
+app.post('/api/orders/analytics/revenue', requireAuth, getRevenueAnalytics);
 app.post('/api/orders', requireAuth, createOrder);
 app.get('/api/orders/my', requireAuth, getMyOrders);
 app.get('/api/orders/:id', requireAuth, getOrder);

@@ -177,10 +177,9 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 - [x] **Phase 17b:** Course Discovery API — listCourses endpoint voi search (title/description ILIKE), filter (category, level, minPrice/maxPrice, minRating), sort (newest/popular/rating/price_asc/price_desc), pagination, price aggregate, category sidebar data. ✅ Completed: Apr 18, 2026
 - [ ] **Phase 17c:** Frontend Search & Filter UI — `/courses` page voi search bar, filter sidebar (category/level/price range/rating), sort dropdown, responsive grid layout, URL sync (query params).
 
-### Phase 18-19: Advanced Features
-- [ ] **Phase 18:** Instructor Analytics Dashboard — Revenue charts, KPI cards, top courses table, enrollment trends (phu thuoc Phase 13-16 da hoan thanh).
-- [ ] **Phase 19:** **Admin Dashboard** — `apps/admin-dashboard` (Vite + React), user/course/order/review management, DLQ monitor, role governance view.
-  - Ghi chu: auth-service da co admin API (listUsers, getUser, updateUserRole, updateUserStatus, updateUserPassword, getStats) va course-service da co admin DLQ API. Admin dashboard chi can build UI consume cac API nay.
+### Phase 18-19: Analytics & Admin Dashboard ✅ COMPLETED
+- [x] **Phase 18:** Instructor Analytics Dashboard — Revenue charts, KPI cards, top courses table, enrollment trends. Hien tai chi co placeholder page voi du lieu = 0. Can backend analytics API (revenue aggregate tu payment-service, enrollment trends tu course-service). ✅ Completed: Apr 27, 2026
+- [x] **Phase 19:** Admin Dashboard (tích hợp trong web-client thay vì tách Vite app) — `(admin)/admin/` voi dashboard overview (user/course stats), users management, courses management, reviews management, system DLQ monitor (list/retry/resolve failed events). ✅ Completed: Apr 26, 2026
 
 ### Phase 20: Deployment & Production Hardening 🚀
 - [ ] **Phase 20:** Dockerize all services, docker-compose.prod.yml, CI/CD (GitHub Actions), Nginx + SSL, monitoring, backup strategy.
@@ -189,6 +188,25 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 - [x] **Phase 21:** Performance & Caching Optimization — Khắc phục Neon cold-start bằng `withRetry`, tích hợp Upstash Redis caching (cache-aside cho course/category), tối ưu Prisma query (composite indexes, selective fields), Next.js `unstable_cache` & `revalidateTag` cho Server Actions. ✅ Completed: Apr 22, 2026
 - [ ] **Phase 22:** Security Hardening — API rate limiting chuẩn hóa, input sanitization chống XSS, audit log cho admin actions, health check dashboard tổng hợp.
 - [ ] **Phase 23:** Testing & Quality Gate — Unit tests cho business logic core (enrollment, payment verify, Kafka handlers), integration tests cho payment flow E2E, API contract tests (Zod schema → validation), CI pipeline (lint + test truoc merge).
+
+### Phase 9.13: DX Hardening ✅ COMPLETED
+- [x] **Phase 9.13:** DX Hardening — `pnpm run setup` bootstrap (install + docker:up + setup:db + seed), `.nvmrc` node version pin, Prisma orchestration vao turbo pipeline. ✅ Completed: Apr 27, 2026
+
+### Phase UI: UI/UX Refactor ✅ COMPLETED
+- [x] **Phase UI-1:** SharedNavbar & Header Refactor — Gom Profile/Dashboard/Studio/Logout vao User Dropdown Menu, bo greeting text khoi navbar, di chuyen CTA "Dang ky GV" vao dropdown hoac banner, them NotificationBell vao mobile menu, responsive breakpoints chuan. ✅ Completed: Apr 27, 2026
+- [x] **Phase UI-2:** Design System Consolidation — Tao them CSS utility classes cho cac pattern lap lai (`.glass-card`, `.gradient-hero`, semantic color vars). Chuan hoa border-radius (chi dung `rounded-lg/xl/2xl`), icon sizes (`size-4/5/6`). Di chuyen tat ca hardcoded stats (500+, 150k, 12.000) ra constants hoac fetch tu API. ✅ Completed: Apr 27, 2026
+- [x] **Phase UI-3:** Component Decomposition — Tach `dashboard/page.tsx` (653 dong) thanh OverviewTab/MyCoursesTab/CertificatesTab/CommunityTab. Tao reusable `CourseCard`, `StatCard`, `EmptyState`. Tach components >300 dong. ✅ Completed: Apr 27, 2026
+
+### Phase C: Community Feature ⏳ PENDING
+- [ ] **Phase C-1:** Community Backend — Model CommunityGroup/CommunityMember/CommunityPost trong course_db. Auto-join via Kafka event `learning.enrollment.created`. API CRUD: listGroups, listPosts (cursor pagination), createPost/reply, joinGroup. Kong route `/community/*`.
+- [ ] **Phase C-2:** Community Frontend — `/dashboard/community` list nhom da tham gia, `/community/[groupId]` feed bai viet + form dang bai + reply, `/learn/[courseId]` sidebar tab "Thao luan" link toi community group. Thay the placeholder "Sap ra mat".
+
+### Phase AI: AI Features ⏳ PENDING (Setup)
+- [ ] **Phase AI-1:** AI Course Recommendation — Goi y khoa hoc dua tren learning history, enrollment patterns, rating. Dung Gemini API. Can: ai-service, Gemini API key, Kong route `/ai/*`.
+- [ ] **Phase AI-2:** AI Learning Assistant / Chatbot — Tro ly hoc tap AI cho student, hoi dap noi dung bai hoc, tom tat, giai thich. Can: ChatSession model, Gemini API, WebSocket hoac SSE.
+- [ ] **Phase AI-3:** AI Content Generation for Instructors — Ho tro instructor tao quiz, tom tat bai, outline khoa hoc. Can: Gemini API, instructor UI integration.
+- [ ] **Phase AI-4:** AI-Powered Semantic Search — Nang cap search tu ILIKE thanh semantic search (vector embeddings). Can: pgvector extension tren Neon, Gemini embedding model.
+- [ ] **Phase AI-5:** AI Auto-Grading & Feedback — Cham bai tu dong, feedback ca nhan hoa. Can: Quiz/Assignment model (chua co), Gemini API.
 
 ---
 

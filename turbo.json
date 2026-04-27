@@ -17,6 +17,10 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
+    },
+    "prisma:generate": {
+      "cache": true,
+      "outputs": ["node_modules/@prisma/client/**", "src/generated/client/**"]
     }
   }
 }

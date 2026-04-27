@@ -759,3 +759,14 @@ export async function getLessonPlaybackAction(lessonId: string, requireAuth = fa
     requireAuth,
   );
 }
+
+export async function getInstructorRevenueAction(courseIds: string[]) {
+  return callApi<{ totalRevenue: number }>(
+    `/payment/api/orders/analytics/revenue`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ courseIds }),
+    },
+    true,
+  );
+}

@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Clapperboard, LayoutDashboard, LogOut, Menu, X } from 'lucide-react';
+import { Clapperboard, LayoutDashboard, LogOut, Menu, X, GraduationCap } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { logoutAction } from '@/app/actions/auth';
 import { logout } from '@/lib/redux/authSlice';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { NotificationBell } from './notification-bell';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const navItems = [
   { label: 'Trang chủ', href: '/' },
@@ -75,52 +76,72 @@ export function SharedNavbar() {
 
         <div className="hidden md:flex items-center gap-4">
           {isAuthenticated ? (
-            <>
+            <div className="flex items-center gap-2">
               {canAccessDashboard && (
                 <Link href="/dashboard">
-                  <Button
-                    variant={pathname.startsWith('/dashboard') ? 'default' : 'ghost'}
-                    className="gap-2 font-semibold"
-                  >
-                    <LayoutDashboard className="size-4 shrink-0" />
+                  <Button variant="ghost" className="font-bold gap-2 hover:bg-primary/10">
+                    <LayoutDashboard className="size-4 text-muted-foreground" />
                     Dashboard
                   </Button>
                 </Link>
               )}
-              <Link
-                href="/profile"
-                className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white/50"
-              >
-                <span className="text-sm font-semibold text-foreground">Xin chào, {user!.name}</span>
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/80 bg-primary/10 text-sm font-bold text-primary shadow-sm">
-                  {user!.name?.charAt(0) || 'U'}
-                </span>
-              </Link>
+              
               {canAccessInstructorStudio && (
                 <Link href="/instructor">
-                  <Button variant="outline" className="gap-2 border-primary/30 font-bold">
-                    <Clapperboard className="size-4 shrink-0" />
+                  <Button variant="ghost" className="font-bold gap-2 hover:bg-primary/10">
+                    <Clapperboard className="size-4 text-muted-foreground" />
                     Studio
                   </Button>
                 </Link>
               )}
-              {canBecomeInstructor && (
-                <Link href="/become-instructor">
-                  <Button className="font-bold shadow-md shadow-primary/20">Đăng ký làm Giảng viên</Button>
-                </Link>
-              )}
+              
               <NotificationBell />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:bg-transparent hover:text-primary"
-                onClick={handleLogout}
-                aria-label="Đăng xuất"
-              >
-                <LogOut className="size-5 shrink-0" />
-              </Button>
-            </>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" className="relative flex items-center gap-2 rounded-full pl-2 pr-3 py-1 h-9 hover:bg-slate-100">
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-bold text-primary shadow-sm">
+                      {user!.name?.charAt(0) || 'U'}
+                    </span>
+                    <span className="text-sm font-semibold truncate max-w-[160px]">{user!.name}</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-60 p-2 rounded-xl">
+                  <div className="flex flex-col space-y-1">
+                    <div className="px-2 py-2.5 flex flex-col">
+                      <p className="text-sm font-medium leading-none">{user!.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1 truncate">{user!.email}</p>
+                    </div>
+                    <div className="h-px bg-slate-100 my-1" />
+                    
+                    <Link href="/profile">
+                      <Button variant="ghost" className="w-full justify-start font-medium px-2 h-9">Hồ sơ cá nhân</Button>
+                    </Link>
+                    
+                    {canBecomeInstructor && (
+                      <Link href="/become-instructor">
+                        <Button variant="ghost" className="w-full justify-start font-medium px-2 h-9 gap-2 text-primary hover:text-primary hover:bg-primary/10">
+                          <GraduationCap className="size-4" />
+                          Trở thành Giảng viên
+                        </Button>
+                      </Link>
+                    )}
+                    
+                    <div className="h-px bg-slate-100 my-1" />
+                    
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full justify-start font-medium px-2 h-9 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="size-4 mr-2" />
+                      Đăng xuất
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
           ) : (
             <>
               <Link href="/login">
@@ -133,16 +154,18 @@ export function SharedNavbar() {
           )}
         </div>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
-          aria-label="Mở menu điều hướng"
-          onClick={() => setMobileOpen((prev) => !prev)}
-        >
-          {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
-        </Button>
+        <div className="flex md:hidden items-center gap-2">
+          {isAuthenticated && <NotificationBell />}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Mở menu điều hướng"
+            onClick={() => setMobileOpen((prev) => !prev)}
+          >
+            {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          </Button>
+        </div>
       </div>
 
       {mobileOpen && (

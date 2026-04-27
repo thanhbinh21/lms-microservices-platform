@@ -121,7 +121,7 @@ export function NotificationBell() {
             </Button>
           )}
         </div>
-        <ScrollArea className="h-80 w-full sm:h-96">
+        <div className="max-h-80 w-full sm:max-h-96 overflow-y-auto">
           {initialLoading ? (
             <div className="flex flex-col gap-2 p-4">
               {[1, 2, 3, 4].map((i) => (
@@ -136,7 +136,7 @@ export function NotificationBell() {
               ))}
             </div>
           ) : notifications.length === 0 ? (
-            <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+            <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
               Không có thông báo nào.
             </div>
           ) : (
@@ -173,7 +173,7 @@ export function NotificationBell() {
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
         <div className="border-t p-2">
           {/* Tuong lai co the link den trang tat ca thong bao */}
           <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setOpen(false)}>

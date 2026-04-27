@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAppSelector } from '@/lib/redux/hooks';
@@ -15,12 +15,17 @@ import { useAppSelector } from '@/lib/redux/hooks';
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const normalizedRole = (user?.role || '').toUpperCase();
   const isBlockedRole = normalizedRole === 'INSTRUCTOR' || normalizedRole === 'ADMIN';
 
   useEffect(() => {
-    if (isLoading) return;
+    if (!isMounted || isLoading) return;
     if (!isAuthenticated) {
       router.replace('/login');
       return;
@@ -28,9 +33,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (isBlockedRole) {
       router.replace('/');
     }
-  }, [isAuthenticated, isLoading, isBlockedRole, router]);
+  }, [isMounted, isAuthenticated, isLoading, isBlockedRole, router]);
 
-  if (isLoading || !isAuthenticated || isBlockedRole) {
+  // Trong qua trinh SSR hoac chua mount client -> render loader de tranh Hydration Mismatch
+  if (!isMounted || isLoading || !isAuthenticated || isBlockedRole) {
     return (
       <div className="glass-page flex min-h-screen items-center justify-center">
         <Loader2 className="size-10 animate-spin text-primary" />
