@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -432,8 +433,29 @@ export default function CourseWizardPage() {
         return;
       }
 
-      setThumbnail(confirmed.data.url);
-      setStatus('success', 'Đã upload ảnh bìa. Hệ thống sẽ tự lưu ở bước này.');
+      const nextThumbnail = confirmed.data.url;
+      setThumbnail(nextThumbnail);
+
+      const parsedPrice = Number(price);
+      if (pricingMode === 'PAID' && (!Number.isFinite(parsedPrice) || parsedPrice <= 0)) {
+        setStatus('error', 'Khóa học trả phí yêu cầu giá hợp lệ trước khi lưu ảnh bìa.');
+        return;
+      }
+
+      const saved = await updateCourseAction(course.id, {
+        description: description.trim(),
+        thumbnail: nextThumbnail,
+        price: pricingMode === 'PAID' ? parsedPrice : 0,
+      });
+
+      if (!saved.success || !saved.data) {
+        setStatus('error', saved.message || 'Không lưu được ảnh bìa ngay sau upload.');
+        return;
+      }
+
+      setCourse(saved.data);
+      setLastSavedAt(new Date());
+      setStatus('success', 'Ảnh bìa đã được lưu ngay sau khi upload.');
     } finally {
       setIsUploadingThumbnail(false);
     }
@@ -921,7 +943,7 @@ export default function CourseWizardPage() {
               <label className="text-sm font-semibold">Ảnh bìa</label>
               <div className="flex aspect-video items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50">
                 {thumbnail ? (
-                  <img src={thumbnail} alt="thumbnail" className="h-full w-full object-cover" />
+                  <Image src={thumbnail} alt="thumbnail" width={1280} height={720} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex items-center text-sm font-semibold text-slate-500">
                     <ImageIcon className="mr-2 h-4 w-4" /> Chưa có ảnh bìa

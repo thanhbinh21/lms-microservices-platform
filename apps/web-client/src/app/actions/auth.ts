@@ -15,6 +15,7 @@ interface AuthResponse {
     email: string;
     name: string;
     username: string | null;
+    avatar?: string | null;
     role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
   };
   accessToken?: string;
@@ -39,6 +40,7 @@ interface BecomeEducatorApiResponse {
       email: string;
       name: string;
       username: string | null;
+      avatar?: string | null;
       role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
     };
     accessToken: string;
@@ -58,6 +60,7 @@ function normalizeUserFromApi(user: {
   email: string;
   name: string;
   username?: string | null;
+  avatar?: string | null;
   role?: string;
 }): NonNullable<AuthResponse['user']> {
   return {
@@ -65,6 +68,7 @@ function normalizeUserFromApi(user: {
     email: user.email,
     name: user.name,
     username: user.username ?? null,
+    avatar: user.avatar ?? null,
     role: normalizeRole(user.role ?? 'STUDENT'),
   };
 }
@@ -86,9 +90,10 @@ async function clearAuthCookies() {
   cookieStore.delete('refreshToken');
   cookieStore.delete('userName');
   cookieStore.delete('userUsername');
+  cookieStore.delete('userAvatar');
 }
 
-async function writeAuthCookies(params: { accessToken?: string; refreshToken?: string; userName?: string; userUsername?: string | null }) {
+async function writeAuthCookies(params: { accessToken?: string; refreshToken?: string; userName?: string; userUsername?: string | null; userAvatar?: string | null }) {
   const cookieStore = await cookies();
 
   if (params.accessToken) {
@@ -133,6 +138,20 @@ async function writeAuthCookies(params: { accessToken?: string; refreshToken?: s
       });
     } else {
       cookieStore.delete('userUsername');
+    }
+  }
+
+  if (params.userAvatar !== undefined) {
+    if (params.userAvatar) {
+      cookieStore.set('userAvatar', params.userAvatar, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60,
+        path: '/',
+      });
+    } else {
+      cookieStore.delete('userAvatar');
     }
   }
 }
@@ -270,6 +289,7 @@ export async function restoreSessionAction(): Promise<AuthResponse> {
     const currentRefreshToken = cookieStore.get('refreshToken')?.value;
     const savedUserName = cookieStore.get('userName')?.value;
     const savedUserUsername = cookieStore.get('userUsername')?.value;
+    const savedUserAvatar = cookieStore.get('userAvatar')?.value;
 
     if (!currentAccessToken && !currentRefreshToken) {
       return { success: false, code: 401, message: 'Khong tim thay phien dang nhap' };
@@ -331,6 +351,7 @@ export async function restoreSessionAction(): Promise<AuthResponse> {
         email: payload.email,
         name: userName,
         username: savedUserUsername || null,
+        avatar: savedUserAvatar || null,
         role: normalizeRole(payload.role),
       },
     };
@@ -341,6 +362,24 @@ export async function restoreSessionAction(): Promise<AuthResponse> {
       success: false,
       code: 500,
       message: 'Khong the khoi phuc phien dang nhap',
+    };
+  }
+}
+
+export async function updateProfileAvatarAction(avatarUrl: string | null) {
+  try {
+    await writeAuthCookies({ userAvatar: avatarUrl || null });
+    return {
+      success: true,
+      code: 200,
+      message: avatarUrl ? 'Cập nhật ảnh đại diện thành công' : 'Đã xóa ảnh đại diện',
+    };
+  } catch (error) {
+    console.error('Update profile avatar error:', error);
+    return {
+      success: false,
+      code: 500,
+      message: error instanceof Error ? error.message : 'Không thể cập nhật ảnh đại diện',
     };
   }
 }

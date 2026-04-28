@@ -10,15 +10,16 @@ import { Button } from '@/components/ui/button';
 
 interface NavLink {
   label: string;
+  description: string;
   href: string;
   icon: ComponentType<{ className?: string }>;
 }
 
 const navLinks: NavLink[] = [
-  { label: 'Tổng quan', href: '/instructor', icon: LayoutDashboard },
-  { label: 'Quản lý khóa học', href: '/instructor/courses', icon: BookOpen },
-  { label: 'Phân tích & Doanh thu', href: '/instructor/analytics', icon: BarChart },
-  { label: 'Thiết lập Kênh', href: '/instructor/settings', icon: Settings },
+  { label: 'Tổng quan', description: 'Xem nhanh trạng thái studio', href: '/instructor', icon: LayoutDashboard },
+  { label: 'Quản lý khóa học', description: 'Sửa nội dung, giáo trình và media', href: '/instructor/courses', icon: BookOpen },
+  { label: 'Phân tích & Doanh thu', description: 'Theo dõi tăng trưởng và hiệu suất', href: '/instructor/analytics', icon: BarChart },
+  { label: 'Thiết lập Kênh', description: 'Avatar, hiển thị và cấu hình cá nhân', href: '/instructor/settings', icon: Settings },
 ];
 
 function normalizePath(p: string) {
@@ -89,7 +90,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
       )}
 
       <aside
-        className={`glass-panel fixed left-0 top-0 z-40 h-screen w-72 border-r border-white/50 transition-transform duration-200 md:sticky md:w-64 md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`glass-panel fixed left-0 top-0 z-40 h-screen w-72 border-r border-white/50 transition-transform duration-200 md:sticky md:w-68 md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="p-6 pt-20 md:pt-6">
           <Link href="/" className="mb-8 flex items-center gap-2" onClick={() => setMobileOpen(false)}>
@@ -97,20 +98,30 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
             <span className="token-section-title">NexEdu Studio</span>
           </Link>
 
+          <div className="mb-4 rounded-2xl border border-white/60 bg-white/55 p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Bảng điều khiển</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">Mỗi tab là một khu vực quản lý riêng, không phải danh sách link rời rạc.</p>
+          </div>
+
           <div className="space-y-1">
             {navLinks.map((link) => {
               const active = isLinkActive(pathname, link.href);
               return (
                 <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)}>
                   <div
-                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-colors ${
+                    className={`flex items-start gap-3 rounded-2xl border px-3 py-3 text-sm font-semibold transition-all ${
                       active
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                        ? 'border-primary/20 bg-primary/10 text-primary shadow-sm'
+                        : 'border-white/40 bg-white/35 text-muted-foreground hover:border-primary/20 hover:bg-primary/10 hover:text-primary'
                     }`}
                   >
-                    <link.icon className="size-5" />
-                    {link.label}
+                    <span className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-primary/15' : 'bg-white/75'}`}>
+                      <link.icon className="size-5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">{link.label}</span>
+                      <span className="mt-1 block text-xs font-medium leading-relaxed text-muted-foreground">{link.description}</span>
+                    </span>
                   </div>
                 </Link>
               );

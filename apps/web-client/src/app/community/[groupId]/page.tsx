@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useAppSelector } from '@/lib/redux/hooks';
@@ -12,6 +13,7 @@ import {
   type CommunityPostDto,
   type CommunityPostsResult,
 } from '@/app/actions/community';
+import { confirmMediaUploadAction, requestMediaUploadAction } from '@/app/actions/instructor';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -132,9 +134,11 @@ export default function CommunityGroupPage() {
   const [composerValue, setComposerValue] = useState('');
   const [composerImageUrl, setComposerImageUrl] = useState('');
   const [posting, setPosting] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [replyingPostId, setReplyingPostId] = useState<string | null>(null);
   const [replySubmittingForPost, setReplySubmittingForPost] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchPosts = useCallback(
     async (cursor?: string | null) => {
@@ -174,6 +178,69 @@ export default function CommunityGroupPage() {
     setNextCursor(result.data.nextCursor);
     setLoading(false);
   }, [fetchPosts]);
+
+  const uploadWithPresigned = async (presignedUrl: string, file: File, uploadFields?: Record<string, string>) => {
+    if (uploadFields) {
+      const formData = new FormData();
+      Object.entries(uploadFields).forEach(([key, value]) => formData.append(key, value));
+      formData.append('file', file);
+
+      const response = await fetch(presignedUrl, {
+        method: 'POST',
+        body: formData,
+      });
+
+      return response.ok;
+    }
+
+    const response = await fetch(presignedUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    });
+
+    return response.ok;
+  };
+
+  const handleAttachmentUpload = async (file?: File | null) => {
+    if (!file) return;
+
+    setUploadingAttachment(true);
+    try {
+      const presigned = await requestMediaUploadAction({
+        filename: file.name,
+        mimeType: file.type || 'image/jpeg',
+        size: file.size,
+        type: 'IMAGE',
+      });
+
+      if (!presigned.success || !presigned.data) {
+        setError(presigned.message || 'Không tạo được phiên upload ảnh.');
+        return;
+      }
+
+      const uploaded = await uploadWithPresigned(
+        presigned.data.presignedUrl,
+        file,
+        presigned.data.uploadMethod === 'POST_FORM' ? presigned.data.uploadFields : undefined,
+      );
+
+      if (!uploaded) {
+        setError('Upload ảnh thất bại.');
+        return;
+      }
+
+      const confirmed = await confirmMediaUploadAction(presigned.data.mediaId);
+      if (!confirmed.success || !confirmed.data?.url) {
+        setError(confirmed.message || 'Không xác nhận được ảnh.');
+        return;
+      }
+
+      setComposerImageUrl(confirmed.data.url);
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
 
   useEffect(() => {
     if (authLoading) {
@@ -318,19 +385,27 @@ export default function CommunityGroupPage() {
             />
             {composerImageUrl && (
               <div className="mt-2 relative">
-                <img src={composerImageUrl} alt="Preview" className="max-h-60 rounded-xl object-cover" />
-                <button onClick={() => setComposerImageUrl('')} className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70">✕</button>
+                <Image src={composerImageUrl} alt="Xem trước ảnh đính kèm" width={1200} height={900} className="max-h-60 rounded-xl object-cover" />
+                <button onClick={() => setComposerImageUrl('')} className="absolute top-2 right-2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70">✕</button>
               </div>
             )}
             <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" className="text-slate-500 hover:bg-slate-100 rounded-full" onClick={() => {
-                  const url = prompt('Nhập đường dẫn hình ảnh (URL):');
-                  if (url) setComposerImageUrl(url);
-                }}>
+                <Button variant="ghost" size="sm" className="rounded-full text-slate-500 hover:bg-slate-100" onClick={() => attachmentInputRef.current?.click()} disabled={uploadingAttachment}>
                   <ImageIcon className="size-5 mr-2 text-emerald-500" />
-                  Ảnh/Video
+                  {uploadingAttachment ? 'Đang tải...' : 'Tải ảnh lên'}
                 </Button>
+                <input
+                  ref={attachmentInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    void handleAttachmentUpload(file);
+                    event.currentTarget.value = '';
+                  }}
+                />
               </div>
               <Button
                 className="gap-2 rounded-full font-bold px-6"
@@ -374,7 +449,7 @@ export default function CommunityGroupPage() {
 
               {post.imageUrl && (
                 <div className="mt-4 -mx-6 sm:mx-0">
-                  <img src={post.imageUrl} alt="Post attachment" className="w-full sm:rounded-2xl max-h-96 object-cover border border-slate-100" />
+                  <Image src={post.imageUrl} alt="Ảnh đính kèm bài viết" width={1200} height={900} className="w-full max-h-96 object-cover border border-slate-100 sm:rounded-2xl" />
                 </div>
               )}
 
@@ -422,7 +497,7 @@ export default function CommunityGroupPage() {
                       </div>
                       <p className="mt-1 whitespace-pre-wrap text-[14px] text-slate-800 leading-relaxed">{reply.content}</p>
                       {reply.imageUrl && (
-                        <img src={reply.imageUrl} alt="Reply attachment" className="mt-2 max-h-48 rounded-xl object-cover" />
+                        <Image src={reply.imageUrl} alt="Ảnh đính kèm phản hồi" width={800} height={600} className="mt-2 max-h-48 rounded-xl object-cover" />
                       )}
                     </div>
                   ))}

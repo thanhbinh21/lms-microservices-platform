@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -194,7 +195,7 @@ export default function InstructorCourseDetailPage() {
             {course.thumbnail ? (
               <div>
                 <p className="text-slate-500 font-semibold mb-2">Thumbnail</p>
-                <img src={course.thumbnail} alt="thumbnail" className="w-full max-h-85 rounded-xl object-cover border border-slate-200" />
+                <Image src={course.thumbnail} alt="thumbnail" width={1280} height={720} className="w-full max-h-85 rounded-xl object-cover border border-slate-200" />
               </div>
             ) : null}
           </CardContent>

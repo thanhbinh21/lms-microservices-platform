@@ -85,7 +85,7 @@ export default function InstructorStudioHomePage() {
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Tổng quan</h1>
           <p className="mt-1 max-w-2xl text-sm font-medium text-muted-foreground">
-            Trung tâm quản lý nội dung và kênh giảng dạy. Chọn mục bên dưới để tiếp tục.
+            Trung tâm quản lý nội dung và kênh giảng dạy. Mỗi khối bên dưới là một tab làm việc riêng để đi thẳng vào đúng khu vực.
           </p>
         </div>
         <Button asChild className="w-full shrink-0 rounded-xl font-bold shadow-md md:w-auto">
@@ -189,15 +189,22 @@ export default function InstructorStudioHomePage() {
         </Card>
       </div>
 
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Các tab điều hướng</p>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-3">
         {quickLinks.map((item) => (
           <Link key={item.href} href={item.href} className="group block">
-            <Card className="h-full rounded-2xl border-white/60 bg-white/50 backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg">
+            <Card className="h-full rounded-3xl border-white/60 bg-white/55 backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg">
               <CardHeader>
-                <div className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <div className="mb-2 flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/10">
                   <item.icon className="size-5" />
                 </div>
-                <CardTitle className="text-lg">{item.title}</CardTitle>
+                <div className="mb-2 inline-flex w-fit items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-600">
+                  Tab
+                </div>
+                <CardTitle className="text-xl">{item.title}</CardTitle>
                 <CardDescription className="text-sm font-medium leading-relaxed">{item.description}</CardDescription>
               </CardHeader>
               <CardContent>

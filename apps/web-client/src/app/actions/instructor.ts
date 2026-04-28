@@ -127,6 +127,15 @@ interface PresignedUploadDto {
   uploadFields?: Record<string, string>;
 }
 
+export interface MediaUploadRequestInput {
+  filename: string;
+  mimeType: string;
+  size: number;
+  type: 'VIDEO' | 'IMAGE' | 'DOCUMENT';
+  courseId?: string;
+  lessonId?: string;
+}
+
 export interface CourseCurriculumDto {
   id: string;
   title: string;
@@ -680,21 +689,14 @@ export async function requestLessonUploadAction(params: {
   courseId: string;
   lessonId: string;
 }) {
-  return callApi<PresignedUploadDto>(
-    `/media/api/upload/presigned`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        filename: params.filename,
-        mimeType: params.mimeType,
-        size: params.size,
-        type: 'VIDEO',
-        courseId: params.courseId,
-        lessonId: params.lessonId,
-      }),
-    },
-    true,
-  );
+  return requestMediaUploadAction({
+    filename: params.filename,
+    mimeType: params.mimeType,
+    size: params.size,
+    type: 'VIDEO',
+    courseId: params.courseId,
+    lessonId: params.lessonId,
+  });
 }
 
 export async function requestCourseThumbnailUploadAction(params: {
@@ -703,23 +705,46 @@ export async function requestCourseThumbnailUploadAction(params: {
   size: number;
   courseId: string;
 }) {
+  return requestMediaUploadAction({
+    filename: params.filename,
+    mimeType: params.mimeType,
+    size: params.size,
+    type: 'IMAGE',
+    courseId: params.courseId,
+  });
+}
+
+export async function requestMediaUploadAction(params: MediaUploadRequestInput) {
+  const payload: Record<string, string | number> = {
+    filename: params.filename,
+    mimeType: params.mimeType,
+    size: params.size,
+    type: params.type,
+  };
+
+  if (params.courseId) {
+    payload.courseId = params.courseId;
+  }
+
+  if (params.lessonId) {
+    payload.lessonId = params.lessonId;
+  }
+
   return callApi<PresignedUploadDto>(
     `/media/api/upload/presigned`,
     {
       method: 'POST',
-      body: JSON.stringify({
-        filename: params.filename,
-        mimeType: params.mimeType,
-        size: params.size,
-        type: 'IMAGE',
-        courseId: params.courseId,
-      }),
+      body: JSON.stringify(payload),
     },
     true,
   );
 }
 
 export async function confirmLessonUploadAction(mediaId: string) {
+  return confirmMediaUploadAction(mediaId);
+}
+
+export async function confirmMediaUploadAction(mediaId: string) {
   return callApi<MediaUploadDto>(
     `/media/api/upload/complete`,
     {
