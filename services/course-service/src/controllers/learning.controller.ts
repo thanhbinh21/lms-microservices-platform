@@ -59,43 +59,124 @@ async function issueCertificateIfEligible(params: {
     };
   }
 
-  const existed = await prisma.certificate.findUnique({
-    where: { userId_courseId: { userId, courseId } },
+  const templates = await prisma.courseCertificateTemplate.findMany({
+    where: { courseId },
     select: {
-      id: true,
-      certificateNumber: true,
-      issuedAt: true,
-      completedAt: true,
+      templateId: true,
+      template: {
+        select: {
+          id: true,
+          name: true,
+          previewUrl: true,
+        },
+      },
     },
   });
 
-  if (existed) {
+  if (templates.length === 0) {
+    const existed = await prisma.certificate.findFirst({
+      where: { userId, courseId, templateId: null },
+      select: {
+        id: true,
+        certificateNumber: true,
+        issuedAt: true,
+        completedAt: true,
+      },
+    });
+
+    if (existed) {
+      return {
+        issued: false,
+        certificates: [{ ...existed, template: null }],
+        completion,
+      };
+    }
+
+    const created = await prisma.certificate.create({
+      data: {
+        userId,
+        courseId,
+        enrollmentId,
+        certificateNumber: createCertificateNumber(),
+        completedAt: new Date(),
+        templateId: null,
+      },
+      select: {
+        id: true,
+        certificateNumber: true,
+        issuedAt: true,
+        completedAt: true,
+      },
+    });
+
     return {
-      issued: false,
-      certificate: existed,
+      issued: true,
+      certificates: [{ ...created, template: null }],
       completion,
     };
   }
 
-  const created = await prisma.certificate.create({
-    data: {
-      userId,
-      courseId,
-      enrollmentId,
-      certificateNumber: createCertificateNumber(),
-      completedAt: new Date(),
-    },
-    select: {
-      id: true,
-      certificateNumber: true,
-      issuedAt: true,
-      completedAt: true,
-    },
-  });
+  const certificates: Array<{
+    id: string;
+    certificateNumber: string;
+    issuedAt: Date;
+    completedAt: Date;
+    template: { id: string; name: string; previewUrl: string | null } | null;
+  }> = [];
+  let issuedAny = false;
+
+  for (const template of templates) {
+    const existed = await prisma.certificate.findUnique({
+      where: {
+        userId_courseId_templateId: {
+          userId,
+          courseId,
+          templateId: template.templateId,
+        },
+      },
+      select: {
+        id: true,
+        certificateNumber: true,
+        issuedAt: true,
+        completedAt: true,
+      },
+    });
+
+    if (existed) {
+      certificates.push({
+        ...existed,
+        template: template.template,
+      });
+      continue;
+    }
+
+    const created = await prisma.certificate.create({
+      data: {
+        userId,
+        courseId,
+        enrollmentId,
+        certificateNumber: createCertificateNumber(),
+        completedAt: new Date(),
+        templateId: template.templateId,
+      },
+      select: {
+        id: true,
+        certificateNumber: true,
+        issuedAt: true,
+        completedAt: true,
+      },
+    });
+
+    issuedAny = true;
+    certificates.push({
+      ...created,
+      template: template.template,
+    });
+  }
 
   return {
-    issued: true,
-    certificate: created,
+    issued: issuedAny,
+    certificates,
     completion,
   };
 }
@@ -301,7 +382,15 @@ export const completeLesson = async (req: Request, res: Response): Promise<Respo
         certificateNumber: string;
         issuedAt: Date;
         completedAt: Date;
+        template?: { id: string; name: string; previewUrl: string | null } | null;
       } | null;
+      certificates: Array<{
+        id: string;
+        certificateNumber: string;
+        issuedAt: Date;
+        completedAt: Date;
+        template: { id: string; name: string; previewUrl: string | null } | null;
+      }>;
     }> = {
       success: true,
       code: 200,
@@ -310,7 +399,8 @@ export const completeLesson = async (req: Request, res: Response): Promise<Respo
         ...progress,
         courseCompleted: certificateResult.completion.isCompleted,
         progressPercent: certificateResult.completion.progressPercent,
-        certificate: certificateResult.certificate,
+        certificate: certificateResult.certificates[0] ?? null,
+        certificates: certificateResult.certificates,
       },
       trace_id: traceId,
     };
@@ -350,6 +440,13 @@ export const getMyCertificates = async (req: Request, res: Response): Promise<Re
         certificateNumber: true,
         issuedAt: true,
         completedAt: true,
+        template: {
+          select: {
+            id: true,
+            name: true,
+            previewUrl: true,
+          },
+        },
         course: {
           select: {
             id: true,
@@ -367,6 +464,11 @@ export const getMyCertificates = async (req: Request, res: Response): Promise<Re
         certificateNumber: string;
         issuedAt: Date;
         completedAt: Date;
+        template: {
+          id: string;
+          name: string;
+          previewUrl: string | null;
+        } | null;
         course: {
           id: string;
           title: string;
@@ -383,6 +485,11 @@ export const getMyCertificates = async (req: Request, res: Response): Promise<Re
         certificateNumber: string;
         issuedAt: Date;
         completedAt: Date;
+        template: {
+          id: string;
+          name: string;
+          previewUrl: string | null;
+        } | null;
         course: {
           id: string;
           title: string;

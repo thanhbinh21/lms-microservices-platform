@@ -120,6 +120,9 @@ export default function CertificatesPage() {
                         <p className="mt-0.5 text-xs font-medium text-muted-foreground">
                           Hoan thanh: {new Date(item.completedAt).toLocaleDateString('vi-VN')}
                         </p>
+                        <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                          Mau chung chi: {item.template?.name || 'Mac dinh'}
+                        </p>
                         <p className="mt-0.5 text-[11px] font-semibold text-amber-700">
                           Ma chung chi: {item.certificateNumber}
                         </p>

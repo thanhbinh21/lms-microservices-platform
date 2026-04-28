@@ -73,6 +73,11 @@ export interface MyCertificateSummary {
   certificateNumber: string;
   issuedAt: string;
   completedAt: string;
+  template: {
+    id: string;
+    name: string;
+    previewUrl: string | null;
+  } | null;
   course: {
     id: string;
     title: string;
@@ -153,7 +158,23 @@ export async function completeLessonAction(lessonId: string) {
       certificateNumber: string;
       issuedAt: string;
       completedAt: string;
+      template?: {
+        id: string;
+        name: string;
+        previewUrl: string | null;
+      } | null;
     } | null;
+    certificates: Array<{
+      id: string;
+      certificateNumber: string;
+      issuedAt: string;
+      completedAt: string;
+      template: {
+        id: string;
+        name: string;
+        previewUrl: string | null;
+      } | null;
+    }>;
   }>(
     `/course/api/student/lessons/${lessonId}/complete`,
     { method: 'POST' },

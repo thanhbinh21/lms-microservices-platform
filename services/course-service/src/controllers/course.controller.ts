@@ -32,6 +32,16 @@ const publishCourseSchema = z.object({
   thumbnail: z.string().url().optional(),
 });
 
+const certificateTemplateSchema = z.object({
+  name: z.string().trim().min(2, 'Ten chung chi toi thieu 2 ky tu').max(120),
+  description: z.string().trim().max(500).optional(),
+  previewUrl: z.string().url('Preview URL khong hop le').optional(),
+});
+
+const updateCourseTemplatesSchema = z.object({
+  templateIds: z.array(z.string().uuid('TemplateId khong hop le')).default([]),
+});
+
 const reviewBodySchema = z.object({
   rating: z.number().int().min(1, 'Rating toi thieu 1 sao').max(5, 'Rating toi da 5 sao'),
   comment: z.string().trim().max(1000, 'Comment toi da 1000 ky tu').optional(),
@@ -795,7 +805,12 @@ export async function getInstructorCourseById(req: Request, res: Response) {
   try {
     const course = await prisma.course.findUnique({
       where: { id: courseId, instructorId },
-      include: { _count: { select: { chapters: true, enrollments: true } } },
+      include: {
+        _count: { select: { chapters: true, enrollments: true } },
+        communityGroups: {
+          select: { id: true, name: true, slug: true, courseId: true },
+        },
+      },
     });
 
     if (!course) {
@@ -812,6 +827,340 @@ export async function getInstructorCourseById(req: Request, res: Response) {
     return res.status(200).json(response);
   } catch (err) {
     return handlePrismaError(err, res, traceId, 'getInstructorCourseById');
+  }
+}
+
+/**
+ * GET /api/instructor/certificate-templates
+ */
+export async function listInstructorCertificateTemplates(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+
+  try {
+    const templates = await prisma.certificateTemplate.findMany({
+      where: { instructorId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const response: ApiResponse<unknown> = {
+      success: true,
+      code: 200,
+      message: 'Certificate templates fetched',
+      data: templates,
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'listInstructorCertificateTemplates');
+  }
+}
+
+/**
+ * POST /api/instructor/certificate-templates
+ */
+export async function createInstructorCertificateTemplate(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+
+  try {
+    const payload = certificateTemplateSchema.parse(req.body);
+    const created = await prisma.certificateTemplate.create({
+      data: {
+        instructorId,
+        name: payload.name,
+        description: payload.description,
+        previewUrl: payload.previewUrl,
+      },
+    });
+
+    const response: ApiResponse<unknown> = {
+      success: true,
+      code: 201,
+      message: 'Certificate template created',
+      data: created,
+      trace_id: traceId,
+    };
+    return res.status(201).json(response);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const bad: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: err.errors[0]?.message || 'Du lieu khong hop le',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(bad);
+    }
+    return handlePrismaError(err, res, traceId, 'createInstructorCertificateTemplate');
+  }
+}
+
+/**
+ * PUT /api/instructor/certificate-templates/:id
+ */
+export async function updateInstructorCertificateTemplate(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = (res.locals.userRole as string) || '';
+  const templateId = req.params.id;
+
+  try {
+    const payload = certificateTemplateSchema.partial().parse(req.body);
+    const template = await prisma.certificateTemplate.findUnique({ where: { id: templateId } });
+    if (!template) {
+      const notFound: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Khong tim thay template',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    if (template.instructorId !== instructorId && userRole.toLowerCase() !== 'admin') {
+      const forbidden: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: 'Khong co quyen cap nhat template',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
+    }
+
+    const updated = await prisma.certificateTemplate.update({
+      where: { id: template.id },
+      data: {
+        name: payload.name ?? template.name,
+        description: payload.description ?? template.description,
+        previewUrl: payload.previewUrl ?? template.previewUrl,
+      },
+    });
+
+    const response: ApiResponse<unknown> = {
+      success: true,
+      code: 200,
+      message: 'Certificate template updated',
+      data: updated,
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const bad: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: err.errors[0]?.message || 'Du lieu khong hop le',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(bad);
+    }
+    return handlePrismaError(err, res, traceId, 'updateInstructorCertificateTemplate');
+  }
+}
+
+/**
+ * DELETE /api/instructor/certificate-templates/:id
+ */
+export async function deleteInstructorCertificateTemplate(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = (res.locals.userRole as string) || '';
+  const templateId = req.params.id;
+
+  try {
+    const template = await prisma.certificateTemplate.findUnique({ where: { id: templateId } });
+    if (!template) {
+      const notFound: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Khong tim thay template',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    if (template.instructorId !== instructorId && userRole.toLowerCase() !== 'admin') {
+      const forbidden: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: 'Khong co quyen xoa template',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
+    }
+
+    const usageCount = await prisma.courseCertificateTemplate.count({ where: { templateId } });
+    if (usageCount > 0) {
+      const conflict: ApiResponse<null> = {
+        success: false,
+        code: 409,
+        message: 'Template dang duoc gan vao khoa hoc',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(409).json(conflict);
+    }
+
+    await prisma.certificateTemplate.delete({ where: { id: template.id } });
+    const response: ApiResponse<null> = {
+      success: true,
+      code: 200,
+      message: 'Template da duoc xoa',
+      data: null,
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'deleteInstructorCertificateTemplate');
+  }
+}
+
+/**
+ * GET /api/instructor/courses/:id/certificate-templates
+ */
+export async function getCourseCertificateTemplates(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = (res.locals.userRole as string) || '';
+  const courseId = req.params.id;
+
+  try {
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) {
+      const notFound: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Khong tim thay khoa hoc',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    if (course.instructorId !== instructorId && userRole.toLowerCase() !== 'admin') {
+      const forbidden: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: 'Khong co quyen',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
+    }
+
+    const links = await prisma.courseCertificateTemplate.findMany({
+      where: { courseId },
+      select: { templateId: true },
+    });
+
+    const response: ApiResponse<string[]> = {
+      success: true,
+      code: 200,
+      message: 'Course certificate templates fetched',
+      data: links.map((item) => item.templateId),
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'getCourseCertificateTemplates');
+  }
+}
+
+/**
+ * PUT /api/instructor/courses/:id/certificate-templates
+ */
+export async function updateCourseCertificateTemplates(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const userRole = (res.locals.userRole as string) || '';
+  const courseId = req.params.id;
+
+  try {
+    const payload = updateCourseTemplatesSchema.parse(req.body);
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) {
+      const notFound: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Khong tim thay khoa hoc',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    if (course.instructorId !== instructorId && userRole.toLowerCase() !== 'admin') {
+      const forbidden: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: 'Khong co quyen',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
+    }
+
+    if (payload.templateIds.length > 0) {
+      const ownedTemplates = await prisma.certificateTemplate.findMany({
+        where: {
+          id: { in: payload.templateIds },
+          ...(userRole.toLowerCase() === 'admin' ? {} : { instructorId }),
+        },
+        select: { id: true },
+      });
+
+      if (ownedTemplates.length !== payload.templateIds.length) {
+        const bad: ApiResponse<null> = {
+          success: false,
+          code: 400,
+          message: 'Template khong hop le hoac khong thuoc so huu',
+          data: null,
+          trace_id: traceId,
+        };
+        return res.status(400).json(bad);
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.courseCertificateTemplate.deleteMany({ where: { courseId } });
+
+      if (payload.templateIds.length > 0) {
+        await tx.courseCertificateTemplate.createMany({
+          data: payload.templateIds.map((templateId) => ({
+            courseId,
+            templateId,
+          })),
+        });
+      }
+    });
+
+    const response: ApiResponse<string[]> = {
+      success: true,
+      code: 200,
+      message: 'Course certificate templates updated',
+      data: payload.templateIds,
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const bad: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: err.errors[0]?.message || 'Du lieu khong hop le',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(bad);
+    }
+    return handlePrismaError(err, res, traceId, 'updateCourseCertificateTemplates');
   }
 }
 

@@ -78,10 +78,15 @@ export function ProfileSettings() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar || '');
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setAvatarUrl(user?.avatar || '');
   }, [user?.avatar]);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -218,7 +223,13 @@ export function ProfileSettings() {
     return [base[0], adminEntry, ...base.slice(1)];
   }, [isAdmin]);
 
-  if (!user) return null;
+  if (!isMounted || !user) {
+    return (
+      <div className="glass-page flex min-h-screen items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="glass-page relative min-h-screen overflow-hidden pb-12 text-foreground">

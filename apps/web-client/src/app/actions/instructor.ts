@@ -87,6 +87,12 @@ export interface CourseDto {
     chapters: number;
     enrollments: number;
   };
+  communityGroups?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    courseId?: string | null;
+  }>;
 }
 
 export interface ChapterDto {
@@ -154,6 +160,34 @@ export interface CourseCategoryDto {
   id: string;
   name: string;
   slug: string;
+}
+
+export interface InstructorCommunityGroupDto {
+  id: string;
+  type: 'PUBLIC' | 'COURSE_PRIVATE';
+  courseId: string | null;
+  ownerId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  memberCount: number;
+  postCount: number;
+  createdAt: string;
+  updatedAt: string;
+  course?: {
+    id: string;
+    title: string;
+    slug: string;
+  } | null;
+}
+
+export interface CertificateTemplateDto {
+  id: string;
+  name: string;
+  description?: string | null;
+  previewUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PublishGuardDto {
@@ -547,6 +581,134 @@ export async function publishCourseAction(courseId: string, thumbnail?: string) 
 
 export async function getCourseCategoriesAction() {
   return callApi<CourseCategoryDto[]>(`/course/api/categories`, { method: 'GET' });
+}
+
+export async function createCourseCategoryAction(payload: { name: string; slug?: string; order?: number }) {
+  const result = await callApi<CourseCategoryDto>(
+    `/course/api/instructor/categories`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+
+  revalidateTag('categories', 'max');
+  return { success: result.success, message: result.message, data: result.data };
+}
+
+export async function getInstructorCommunityGroupsAction() {
+  return callApi<InstructorCommunityGroupDto[]>(
+    `/course/api/instructor/community/groups`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function createInstructorCommunityGroupAction(payload: {
+  name: string;
+  slug?: string;
+  description?: string;
+}) {
+  return callApi<InstructorCommunityGroupDto>(
+    `/course/api/instructor/community/groups`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+}
+
+export async function updateInstructorCommunityGroupAction(groupId: string, payload: {
+  name?: string;
+  slug?: string;
+  description?: string;
+}) {
+  return callApi<InstructorCommunityGroupDto>(
+    `/course/api/instructor/community/groups/${groupId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+}
+
+export async function assignCommunityGroupToCourseAction(groupId: string, courseId: string | null) {
+  return callApi<InstructorCommunityGroupDto>(
+    `/course/api/instructor/community/groups/${groupId}/assign`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ courseId }),
+    },
+    true,
+  );
+}
+
+export async function getInstructorCertificateTemplatesAction() {
+  return callApi<CertificateTemplateDto[]>(
+    `/course/api/instructor/certificate-templates`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function createInstructorCertificateTemplateAction(payload: {
+  name: string;
+  description?: string;
+  previewUrl?: string;
+}) {
+  return callApi<CertificateTemplateDto>(
+    `/course/api/instructor/certificate-templates`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+}
+
+export async function updateInstructorCertificateTemplateAction(templateId: string, payload: {
+  name?: string;
+  description?: string;
+  previewUrl?: string;
+}) {
+  return callApi<CertificateTemplateDto>(
+    `/course/api/instructor/certificate-templates/${templateId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+}
+
+export async function deleteInstructorCertificateTemplateAction(templateId: string) {
+  return callApi<null>(
+    `/course/api/instructor/certificate-templates/${templateId}`,
+    { method: 'DELETE' },
+    true,
+  );
+}
+
+export async function getCourseCertificateTemplatesAction(courseId: string) {
+  return callApi<string[]>(
+    `/course/api/instructor/courses/${courseId}/certificate-templates`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function updateCourseCertificateTemplatesAction(courseId: string, templateIds: string[]) {
+  return callApi<string[]>(
+    `/course/api/instructor/courses/${courseId}/certificate-templates`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ templateIds }),
+    },
+    true,
+  );
 }
 
 export async function getCoursePublishGuardAction(courseId: string) {

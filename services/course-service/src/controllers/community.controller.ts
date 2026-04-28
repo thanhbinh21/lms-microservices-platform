@@ -37,6 +37,42 @@ const createPublicGroupSchema = z.object({
   description: z.string().trim().max(500).optional(),
 });
 
+const instructorGroupSchema = z.object({
+  name: z.string().trim().min(2, 'Tên nhóm tối thiểu 2 ký tự').max(100),
+  slug: z.string().trim().min(2).max(100).regex(/^[a-z0-9-]+$/, 'Slug chỉ chứa chữ thường, số và dấu gạch ngang').optional(),
+  description: z.string().trim().max(500).optional(),
+});
+
+function normalizeGroupSlug(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+async function generateUniqueGroupSlug(name: string): Promise<string> {
+  const base = normalizeGroupSlug(name);
+  const existing = await prisma.communityGroup.findMany({
+    where: { slug: { startsWith: base } },
+    select: { slug: true },
+  });
+
+  const slugSet = new Set(existing.map((item) => item.slug));
+  if (!slugSet.has(base)) {
+    return base;
+  }
+
+  let counter = 1;
+  while (slugSet.has(`${base}-${counter}`)) {
+    counter += 1;
+  }
+
+  return `${base}-${counter}`;
+}
+
 function encodeCursor(input: { createdAt: Date; id: string }): string {
   return Buffer.from(`${input.createdAt.toISOString()}::${input.id}`, 'utf-8').toString('base64url');
 }
@@ -190,6 +226,320 @@ export async function listCommunityGroups(req: Request, res: Response): Promise<
     return res.status(200).json(response);
   } catch (err) {
     return handlePrismaError(err, res, traceId, 'listCommunityGroups');
+  }
+}
+
+/**
+ * GET /api/instructor/community/groups
+ * Lay danh sach group do giang vien quan ly
+ */
+export async function listInstructorCommunityGroups(req: Request, res: Response): Promise<Response | void> {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const userId = res.locals.userId as string;
+
+  try {
+    const groups = await prisma.communityGroup.findMany({
+      where: { ownerId: userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        type: true,
+        courseId: true,
+        ownerId: true,
+        name: true,
+        slug: true,
+        description: true,
+        memberCount: true,
+        postCount: true,
+        createdAt: true,
+        updatedAt: true,
+        course: {
+          select: { id: true, title: true, slug: true },
+        },
+      },
+    });
+
+    const response: ApiResponse<typeof groups> = {
+      success: true,
+      code: 200,
+      message: 'Danh sách group giảng viên',
+      data: groups,
+      trace_id: traceId,
+    };
+
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'listInstructorCommunityGroups');
+  }
+}
+
+/**
+ * POST /api/instructor/community/groups
+ * Tao group rieng cho giang vien
+ */
+export async function createInstructorCommunityGroup(req: Request, res: Response): Promise<Response | void> {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const userId = res.locals.userId as string;
+
+  try {
+    const validated = instructorGroupSchema.parse(req.body);
+    const slugInput = validated.slug?.trim();
+    const normalizedSlug = slugInput ? normalizeGroupSlug(slugInput) : '';
+
+    if (normalizedSlug) {
+      const existed = await prisma.communityGroup.findUnique({ where: { slug: normalizedSlug } });
+      if (existed) {
+        const conflict: ApiResponse<null> = {
+          success: false,
+          code: 409,
+          message: 'Slug da ton tai',
+          data: null,
+          trace_id: traceId,
+        };
+        return res.status(409).json(conflict);
+      }
+    }
+
+    const group = await prisma.communityGroup.create({
+      data: {
+        type: 'COURSE_PRIVATE',
+        ownerId: userId,
+        name: validated.name,
+        slug: normalizedSlug || (await generateUniqueGroupSlug(validated.name)),
+        description: validated.description,
+      },
+    });
+
+    const response: ApiResponse<unknown> = {
+      success: true,
+      code: 201,
+      message: 'Tạo group thành công',
+      data: group,
+      trace_id: traceId,
+    };
+
+    return res.status(201).json(response);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const bad: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: err.errors[0]?.message || 'Du lieu khong hop le',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(bad);
+    }
+    return handlePrismaError(err, res, traceId, 'createInstructorCommunityGroup');
+  }
+}
+
+/**
+ * PUT /api/instructor/community/groups/:groupId
+ * Cap nhat thong tin group (owner/admin)
+ */
+export async function updateInstructorCommunityGroup(req: Request, res: Response): Promise<Response | void> {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const userId = res.locals.userId as string;
+  const userRole = (res.locals.userRole as string) || '';
+
+  const parsedParams = groupParamsSchema.safeParse(req.params);
+  if (!parsedParams.success) {
+    const response: ApiResponse<null> = {
+      success: false,
+      code: 400,
+      message: parsedParams.error.issues[0]?.message || 'Tham số không hợp lệ',
+      data: null,
+      trace_id: traceId,
+    };
+    return res.status(400).json(response);
+  }
+
+  try {
+    const validated = instructorGroupSchema.partial().parse(req.body);
+    const group = await prisma.communityGroup.findUnique({ where: { id: parsedParams.data.groupId } });
+    if (!group) {
+      const notFound: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Khong tim thay group',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    if (group.ownerId !== userId && userRole.toLowerCase() !== 'admin') {
+      const forbidden: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: 'Khong co quyen cap nhat group',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
+    }
+
+    const slugInput = validated.slug?.trim();
+    const normalizedSlug = slugInput ? normalizeGroupSlug(slugInput) : undefined;
+    if (normalizedSlug && normalizedSlug !== group.slug) {
+      const existed = await prisma.communityGroup.findUnique({ where: { slug: normalizedSlug } });
+      if (existed) {
+        const conflict: ApiResponse<null> = {
+          success: false,
+          code: 409,
+          message: 'Slug da ton tai',
+          data: null,
+          trace_id: traceId,
+        };
+        return res.status(409).json(conflict);
+      }
+    }
+
+    const updated = await prisma.communityGroup.update({
+      where: { id: group.id },
+      data: {
+        name: validated.name ?? group.name,
+        slug: normalizedSlug ?? group.slug,
+        description: validated.description ?? group.description,
+      },
+    });
+
+    const response: ApiResponse<unknown> = {
+      success: true,
+      code: 200,
+      message: 'Cap nhat group thanh cong',
+      data: updated,
+      trace_id: traceId,
+    };
+
+    return res.status(200).json(response);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const bad: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: err.errors[0]?.message || 'Du lieu khong hop le',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(bad);
+    }
+    return handlePrismaError(err, res, traceId, 'updateInstructorCommunityGroup');
+  }
+}
+
+/**
+ * PUT /api/instructor/community/groups/:groupId/assign
+ * Gan/bo gan group vao khoa hoc
+ */
+export async function assignCommunityGroupToCourse(req: Request, res: Response): Promise<Response | void> {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const userId = res.locals.userId as string;
+  const userRole = (res.locals.userRole as string) || '';
+
+  const parsedParams = groupParamsSchema.safeParse(req.params);
+  if (!parsedParams.success) {
+    const response: ApiResponse<null> = {
+      success: false,
+      code: 400,
+      message: parsedParams.error.issues[0]?.message || 'Tham số không hợp lệ',
+      data: null,
+      trace_id: traceId,
+    };
+    return res.status(400).json(response);
+  }
+
+  const payloadSchema = z.object({
+    courseId: z.string().uuid('courseId không hợp lệ').nullable(),
+  });
+
+  try {
+    const payload = payloadSchema.parse(req.body);
+
+    const group = await prisma.communityGroup.findUnique({ where: { id: parsedParams.data.groupId } });
+    if (!group) {
+      const notFound: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Khong tim thay group',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(notFound);
+    }
+
+    if (group.ownerId !== userId && userRole.toLowerCase() !== 'admin') {
+      const forbidden: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: 'Khong co quyen cap nhat group',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(403).json(forbidden);
+    }
+
+    if (payload.courseId) {
+      const course = await prisma.course.findUnique({ where: { id: payload.courseId } });
+      if (!course) {
+        const notFound: ApiResponse<null> = {
+          success: false,
+          code: 404,
+          message: 'Khong tim thay khoa hoc',
+          data: null,
+          trace_id: traceId,
+        };
+        return res.status(404).json(notFound);
+      }
+
+      if (course.instructorId !== userId && userRole.toLowerCase() !== 'admin') {
+        const forbidden: ApiResponse<null> = {
+          success: false,
+          code: 403,
+          message: 'Khong co quyen gan group vao khoa hoc',
+          data: null,
+          trace_id: traceId,
+        };
+        return res.status(403).json(forbidden);
+      }
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (payload.courseId) {
+        await tx.communityGroup.updateMany({
+          where: { courseId: payload.courseId },
+          data: { courseId: null },
+        });
+      }
+
+      return tx.communityGroup.update({
+        where: { id: group.id },
+        data: { courseId: payload.courseId },
+      });
+    });
+
+    const response: ApiResponse<unknown> = {
+      success: true,
+      code: 200,
+      message: payload.courseId ? 'Da gan group vao khoa hoc' : 'Da bo gan group',
+      data: updated,
+      trace_id: traceId,
+    };
+
+    return res.status(200).json(response);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const bad: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: err.errors[0]?.message || 'Du lieu khong hop le',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(bad);
+    }
+    return handlePrismaError(err, res, traceId, 'assignCommunityGroupToCourse');
   }
 }
 

@@ -82,6 +82,7 @@ model Course {
   enrollments Enrollment[]
   reviews     Review[]
   certificates Certificate[]
+  certificateTemplates CourseCertificateTemplate[]
   communityGroups CommunityGroup[]
 
   @@index([instructorId])
@@ -177,6 +178,7 @@ model Certificate {
   userId            String   @map("user_id")
   courseId          String   @map("course_id")
   enrollmentId      String   @map("enrollment_id")
+  templateId        String?  @map("template_id")
   issuedAt          DateTime @default(now()) @map("issued_at")
   completedAt       DateTime @map("completed_at")
   createdAt         DateTime @default(now()) @map("created_at")
@@ -184,11 +186,43 @@ model Certificate {
 
   course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
   enrollment  Enrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  template    CertificateTemplate? @relation(fields: [templateId], references: [id])
 
-  @@unique([userId, courseId])
+  @@unique([userId, courseId, templateId])
   @@index([userId, issuedAt(sort: Desc)])
   @@index([courseId])
+  @@index([templateId])
   @@map("certificates")
+}
+
+model CertificateTemplate {
+  id          String   @id @default(uuid())
+  instructorId String  @map("instructor_id")
+  name        String
+  description String?  @map("description")
+  previewUrl  String?  @map("preview_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  courseLinks CourseCertificateTemplate[]
+  certificates Certificate[]
+
+  @@index([instructorId])
+  @@map("certificate_templates")
+}
+
+model CourseCertificateTemplate {
+  id         String   @id @default(uuid())
+  courseId   String   @map("course_id")
+  templateId String   @map("template_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  template CertificateTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, templateId])
+  @@index([templateId])
+  @@map("course_certificate_templates")
 }
 
 model Review {

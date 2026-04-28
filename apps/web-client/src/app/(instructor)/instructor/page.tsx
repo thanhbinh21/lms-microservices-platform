@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, BarChart3, Settings, ArrowRight, Sparkles, CheckCircle2, CircleAlert } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { BookOpen, BarChart3, Settings, ArrowRight, Sparkles, CheckCircle2, CircleAlert, Users, Award } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusMessage } from '@/components/ui/status-message';
@@ -14,6 +15,18 @@ const quickLinks = [
     description: 'Tạo mới, chỉnh sửa và xuất bản khóa học của bạn.',
     href: '/instructor/courses',
     icon: BookOpen,
+  },
+  {
+    title: 'Nhóm cộng đồng',
+    description: 'Quản lý nhóm cộng đồng cho học viên tham gia thảo luận.',
+    href: '/instructor/communities',
+    icon: Users,
+  },
+  {
+    title: 'Mẫu chứng chỉ',
+    description: 'Tạo và quản lý mẫu chứng chỉ cho học viên hoàn thành khóa học.',
+    href: '/instructor/certificates',
+    icon: Award,
   },
   {
     title: 'Phân tích & Doanh thu',
@@ -30,6 +43,7 @@ const quickLinks = [
 ];
 
 export default function InstructorStudioHomePage() {
+  const router = useRouter();
   const [courses, setCourses] = useState<CourseDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -48,7 +62,7 @@ export default function InstructorStudioHomePage() {
       setLoading(false);
     };
 
-    fetchCourses();
+    void fetchCourses();
   }, []);
 
   const overviewStats = useMemo(() => {
@@ -57,12 +71,7 @@ export default function InstructorStudioHomePage() {
     const draft = courses.filter((course) => (course.status || 'DRAFT') === 'DRAFT').length;
     const totalEnrollments = courses.reduce((acc, course) => acc + (course._count?.enrollments || 0), 0);
 
-    return {
-      total,
-      published,
-      draft,
-      totalEnrollments,
-    };
+    return { total, published, draft, totalEnrollments };
   }, [courses]);
 
   const recentCourses = useMemo(
@@ -144,7 +153,7 @@ export default function InstructorStudioHomePage() {
             )}
 
             {recentCourses.map((course) => (
-              <Link key={course.id} href={`/instructor/courses/${course.id}/detail`} className="block">
+              <Link key={course.id} href={`/instructor/courses/${course.id}?step=1`} className="block">
                 <div className="rounded-xl border border-slate-200 bg-white/70 p-4 transition-colors hover:border-primary/40">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-bold text-slate-800">{course.title}</p>
@@ -193,7 +202,7 @@ export default function InstructorStudioHomePage() {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Các tab điều hướng</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {quickLinks.map((item) => (
           <Link key={item.href} href={item.href} className="group block">
             <Card className="h-full rounded-3xl border-white/60 bg-white/55 backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg">
