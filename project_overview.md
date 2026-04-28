@@ -203,11 +203,11 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 - [x] **Phase C-3:** Community Refactor — Phân tách nhóm Public (Admin quản lý) và Private (Instructor). Bổ sung trường `username` auto-gen từ email để làm định danh duy nhất. Cập nhật display name bằng real data qua Internal API `/internal/users/batch`. Cập nhật giao diện tiếng Việt có dấu. ✅ Completed: 2026-04-28 (done - 2026-04-28 - by BINH) (Apr 28, 2026: community post/reply upload image truc tiep qua Cloudinary thay cho URL prompt)
 
 ### Phase AI: AI Features ⏳ PENDING (Setup)
-- [ ] **Phase AI-1:** AI Course Recommendation — Goi y khoa hoc dua tren learning history, enrollment patterns, rating. Dung Gemini API. Can: ai-service, Gemini API key, Kong route `/ai/*`.
-- [ ] **Phase AI-2:** AI Learning Assistant / Chatbot — Tro ly hoc tap AI cho student, hoi dap noi dung bai hoc, tom tat, giai thich. Can: ChatSession model, Gemini API, WebSocket hoac SSE.
-- [ ] **Phase AI-3:** AI Content Generation for Instructors — Ho tro instructor tao quiz, tom tat bai, outline khoa hoc. Can: Gemini API, instructor UI integration.
+- [ ] **Phase AI-1:** AI Chatbot Production — AI Service (Express :3007), Prisma + ai_db schema, Kong route `/ai/*`, Redis rate limiter (30 msg/user/giờ), Redis cache (course: 5 phút, chat: 15 phút), Gemini Pro client, SSE streaming. Conversation memory: lưu toàn bộ messages + semantic summary (tự động tạo sau 10 messages). Chat API: conversation CRUD, message SSE, cursor pagination, input validation (prompt injection), output PII redaction. Frontend: ChatWidget floating + ChatPanel + useChat hook. Context loader: load full curriculum structure từ Course Service. ~6 ngày.
+- [ ] **Phase AI-2:** AI Quiz Generator (System + Instructor) — Pre-generate quiz bằng AI khi instructor tạo lesson, cached vĩnh viễn, student làm quiz không gọi AI. Quiz CRUD: generate, publish, attempt, score.
+- [ ] **Phase AI-3:** AI Course Outline + Post Suggestions (Instructor) — Course Outline Generator: prompt engineering, cached 24h. Post Suggestions: AI cải thiện bài post cộng đồng (tiêu đề, hashtag, format).
 - [ ] **Phase AI-4:** AI-Powered Semantic Search — Nang cap search tu ILIKE thanh semantic search (vector embeddings). Can: pgvector extension tren Neon, Gemini embedding model.
-- [ ] **Phase AI-5:** AI Auto-Grading & Feedback — Cham bai tu dong, feedback ca nhan hoa. Can: Quiz/Assignment model (chua co), Gemini API.
+- [ ] **Phase AI-5:** AI Video Transcript — Whisper transcription pipeline (mp4 → audio → transcript → embed → pgvector). Optional, chi lam khi can chi tiet tu video bai giang.
 
 ---
 

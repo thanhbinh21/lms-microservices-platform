@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import {
-  Award, Plus, Pencil, Trash2, X, Loader2, CheckCircle2, Image as ImageIcon,
-  Eye, EyeOff, ExternalLink,
+  Award, Plus, Pencil, Trash2, X, Loader2, CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -142,57 +142,51 @@ export default function InstructorCertificatesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
-      <div className="border-b border-slate-200 bg-white/80 backdrop-blur-md shadow-sm">
-        <div className="mx-auto max-w-6xl px-8 py-6">
-          <div className="mb-1 flex items-end justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
-                <Award className="size-5" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">Mẫu chứng chỉ</h1>
-                <p className="text-sm text-muted-foreground font-medium">
-                  Tạo và quản lý mẫu chứng chỉ mà học viên nhận được khi hoàn thành khóa học.
-                </p>
-              </div>
-            </div>
-            <Button onClick={openCreateModal} className="rounded-xl font-bold gap-2 shadow-md px-6">
-              <Plus className="size-4" />
-              Tạo mẫu mới
-            </Button>
+    <div className="p-6 md:p-8">
+      {/* Page header */}
+      <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
+            <Sparkles className="size-3.5" />
+            NexEdu Studio
           </div>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Chứng chỉ</h1>
+          <p className="mt-1 text-sm font-medium text-muted-foreground">
+            Tạo và quản lý mẫu chứng chỉ cho học viên hoàn thành khóa học.
+          </p>
         </div>
+        <Button onClick={openCreateModal} className="rounded-xl font-bold shadow-md md:w-auto w-full">
+          <Plus className="mr-2 size-4" />
+          Tạo mẫu mới
+        </Button>
       </div>
 
-      {/* Content */}
-      <div className="mx-auto max-w-6xl px-8 py-6 space-y-4">
-        {statusMessage && (
-          <div><StatusMessage type={statusType} message={statusMessage} /></div>
-        )}
+      {statusMessage && (
+        <div className="mb-6"><StatusMessage type={statusType} message={statusMessage} /></div>
+      )}
 
+      {/* Content */}
+      <div className="space-y-4">
         {templates.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-16 text-center shadow-sm">
-            <Award className="mx-auto mb-4 size-14 text-slate-300" />
-            <h3 className="text-xl font-bold">Chưa có mẫu chứng chỉ nào</h3>
-            <p className="text-muted-foreground mt-2 mb-6 font-medium">
+          <div className="rounded-3xl border border-dashed border-border bg-white/30 py-16 text-center">
+            <Award className="mx-auto mb-4 size-12 text-muted-foreground/40" />
+            <h3 className="text-lg font-bold">Chưa có mẫu chứng chỉ nào</h3>
+            <p className="text-muted-foreground mt-2 mb-6 text-sm font-medium">
               Tạo mẫu chứng chỉ đầu tiên và gắn vào khóa học để học viên nhận được khi hoàn thành.
             </p>
-            <Button onClick={openCreateModal} className="rounded-xl font-bold gap-2 shadow-md px-6">
-              <Plus className="size-4" />
+            <Button onClick={openCreateModal} className="rounded-xl font-bold shadow-md">
+              <Plus className="mr-2 size-4" />
               Tạo mẫu chứng chỉ đầu tiên
             </Button>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {templates.map((template) => (
-              <Card key={template.id} className="rounded-2xl border-white/60 bg-white/70 shadow-sm overflow-hidden">
-                {/* Certificate preview */}
-                <div className="relative bg-gradient-to-br from-amber-50 to-amber-100 p-6 border-b border-amber-200">
-                  <div className="rounded-xl border-2 border-amber-300 bg-white p-4 shadow-sm">
+              <Card key={template.id} className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md shadow-sm overflow-hidden">
+                <div className="relative bg-gradient-to-br from-amber-50 to-amber-100/50 p-6 border-b border-amber-200/50">
+                  <div className="rounded-xl border-2 border-amber-300/60 bg-white p-4 shadow-sm">
                     <div className="mb-2 flex items-center justify-between">
-                      <Award className="size-6 text-amber-600" />
+                      <Award className="size-5 text-amber-600" />
                       <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Chứng nhận</span>
                     </div>
                     <div className="h-px bg-gradient-to-r from-transparent via-amber-300 to-transparent my-2" />
@@ -207,13 +201,12 @@ export default function InstructorCertificatesPage() {
 
                 <CardContent className="p-5 space-y-3">
                   <div>
-                    <h3 className="font-bold text-slate-800">{template.name}</h3>
+                    <h3 className="font-bold text-sm text-foreground">{template.name}</h3>
                     {template.description && (
-                      <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{template.description}</p>
+                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{template.description}</p>
                     )}
                   </div>
 
-                  {/* Actions */}
                   <div className="flex gap-2 pt-1">
                     <Button variant="outline" className="flex-1 rounded-xl font-semibold gap-1.5 h-9 text-xs" onClick={() => openEditModal(template)}>
                       <Pencil className="size-3.5" /> Sửa
@@ -227,9 +220,9 @@ export default function InstructorCertificatesPage() {
                         <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId('')} className="rounded-xl font-semibold h-9 text-xs">Hủy</Button>
                       </>
                     ) : (
-                      <Button variant="outline" className="flex-1 rounded-xl font-semibold gap-1.5 h-9 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                      <Button variant="outline" className="rounded-xl font-semibold gap-1.5 h-9 text-xs text-red-600 border-red-200 hover:bg-red-50"
                         onClick={() => setConfirmDeleteId(template.id)}>
-                        <Trash2 className="size-3.5" /> Xóa
+                        <Trash2 className="size-3.5" />
                       </Button>
                     )}
                   </div>

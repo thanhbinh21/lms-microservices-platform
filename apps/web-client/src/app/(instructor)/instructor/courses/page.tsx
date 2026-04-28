@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { PlusCircle, MoreHorizontal, FileEdit, Eye, BookOpen, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { PlusCircle, MoreHorizontal, FileEdit, Eye } from 'lucide-react';
-import { List, BookOpen } from 'lucide-react';
 import { getInstructorCoursesAction, type CourseDto } from '@/app/actions/instructor';
 
 interface InstructorCourseView {
@@ -48,86 +47,95 @@ export default function InstructorCoursesPage() {
   }, []);
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-6 md:p-8">
+      {/* Page header */}
+      <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Khóa học của tôi</h1>
-          <p className="text-muted-foreground mt-1 text-sm font-medium">Quản lý nội dung, bài giảng và xuất bản khóa học.</p>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
+            <Sparkles className="size-3.5" />
+            NexEdu Studio
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Khóa học</h1>
+          <p className="mt-1 text-sm font-medium text-muted-foreground">
+            Tạo, chỉnh sửa và xuất bản khóa học của bạn.
+          </p>
         </div>
-        <Button 
-          onClick={() => router.push('/instructor/courses/create')} 
-          className="rounded-xl shadow-md font-bold px-6"
-        >
-          <PlusCircle className="mr-2 h-5 w-5" />
+        <Button onClick={() => router.push('/instructor/courses/create')} className="rounded-xl font-bold shadow-md md:w-auto w-full">
+          <PlusCircle className="mr-2 size-4" />
           Tạo khóa học mới
         </Button>
       </div>
 
-      <div className="grid gap-4">
+      {/* Course list */}
+      <div className="space-y-3">
         {loading && (
-          <div className="text-center py-16 text-muted-foreground">Đang tải danh sách khóa học...</div>
+          <div className="rounded-2xl border border-dashed border-border bg-white/30 py-16 text-center">
+            <p className="text-sm text-muted-foreground">Đang tải danh sách khóa học...</p>
+          </div>
         )}
 
-        {!loading && courses.map(course => (
+        {!loading && courses.length === 0 && (
+          <div className="rounded-3xl border border-dashed border-border bg-white/30 py-16 text-center">
+            <BookOpen className="mx-auto mb-4 size-10 text-muted-foreground/40" />
+            <h3 className="text-lg font-bold">Chưa có khóa học nào</h3>
+            <p className="text-muted-foreground mt-1 mb-6 text-sm font-medium">
+              Bắt đầu hành trình giảng dạy bằng cách tạo khóa học đầu tiên.
+            </p>
+            <Button onClick={() => router.push('/instructor/courses/create')} className="rounded-xl font-bold shadow-md">
+              <PlusCircle className="mr-2 size-4" />
+              Tạo khóa học mới
+            </Button>
+          </div>
+        )}
+
+        {!loading && courses.map((course) => (
           <Card
             key={course.id}
-            className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => router.push(`/instructor/courses/${course.id}/detail`)}
+            className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md shadow-sm transition-shadow hover:shadow-md hover:bg-white/70"
           >
-            <CardContent className="p-6 flex items-center justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center gap-3">
-                  <h3 className="font-bold text-lg">{course.title}</h3>
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                    course.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'
+            <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-bold text-base truncate">{course.title}</h3>
+                  <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold shrink-0 ${
+                    course.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
                   }`}>
                     {course.status}
                   </span>
                 </div>
-                <div className="flex gap-6 text-sm text-muted-foreground font-medium pt-1">
+                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground font-medium">
                   <span>Giá: {course.price.toLocaleString('vi-VN')} đ</span>
                   <span>Học viên: {course.enrollments}</span>
                   <span>Cập nhật: {course.updatedAt}</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
-                <Button variant="outline" size="sm" className="rounded-lg shadow-sm font-semibold" onClick={(event) => {
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Button variant="outline" size="sm" className="rounded-xl font-semibold text-xs h-8" onClick={(event) => {
                   event.stopPropagation();
                   router.push(`/instructor/courses/${course.id}/detail`);
                 }}>
-                  <Eye className="w-4 h-4 mr-2" /> Chi tiết
+                  <Eye className="mr-1.5 size-3.5" /> Chi tiết
                 </Button>
-                <Button variant="outline" size="sm" className="rounded-lg shadow-sm font-semibold" onClick={(event) => {
+                <Button variant="outline" size="sm" className="rounded-xl font-semibold text-xs h-8" onClick={(event) => {
                   event.stopPropagation();
                   router.push(`/instructor/courses/${course.id}?step=1`);
                 }}>
-                  <FileEdit className="w-4 h-4 mr-2" /> Cấu hình
+                  <FileEdit className="mr-1.5 size-3.5" /> Cấu hình
                 </Button>
-                <Button variant="outline" size="sm" className="rounded-lg shadow-sm font-semibold" onClick={(event) => {
+                <Button variant="outline" size="sm" className="rounded-xl font-semibold text-xs h-8" onClick={(event) => {
                   event.stopPropagation();
                   router.push(`/instructor/courses/${course.id}?step=3`);
                 }}>
-                  <List className="w-4 h-4 mr-2" /> Chương trình
+                  Chương trình
                 </Button>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={(event) => event.stopPropagation()}>
-                  <MoreHorizontal className="w-5 h-5" />
+                <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground" onClick={(event) => event.stopPropagation()}>
+                  <MoreHorizontal className="size-4" />
                 </Button>
               </div>
             </CardContent>
           </Card>
         ))}
-
-        {!loading && courses.length === 0 && (
-          <div className="text-center py-20 bg-white/40 rounded-3xl border border-dashed border-border">
-            <BookOpen className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-bold">Chưa có khóa học nào</h3>
-            <p className="text-muted-foreground text-sm font-medium mt-1 mb-6">Bắt đầu hành trình giảng dạy của bạn bằng cách tạo khóa học đầu tiên.</p>
-            <Button onClick={() => router.push('/instructor/courses/create')} className="rounded-xl shadow-md font-bold px-6">
-              <PlusCircle className="mr-2 w-5 h-5" /> Tạo khóa học mới
-            </Button>
-          </div>
-        )}
       </div>
     </div>
   );
