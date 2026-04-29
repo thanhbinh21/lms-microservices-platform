@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 const navItems = [
   { label: 'Trang chủ', href: '/' },
   { label: 'Khóa học', href: '/courses' },
+  { label: 'Giảng viên', href: '/instructors' },
   { label: 'Cộng đồng', href: '/community' },
   { label: 'Hỗ trợ', href: '/#ho-tro' },
 ];

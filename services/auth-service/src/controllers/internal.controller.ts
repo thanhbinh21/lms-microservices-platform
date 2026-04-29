@@ -32,6 +32,7 @@ export const getInternalUser = async (req: Request, res: Response): Promise<Resp
         email: true,
         name: true,
         username: true,
+        role: true,
       },
     });
 
@@ -80,13 +81,14 @@ export const getInternalUsersBatch = async (req: Request, res: Response): Promis
         id: true,
         name: true,
         username: true,
+        role: true,
       },
     });
 
     // Map thanh object { [userId]: { name, username } } de consumer tra cuu nhanh
-    const usersMap: Record<string, { name: string; username: string | null }> = {};
+    const usersMap: Record<string, { name: string; username: string | null; role: string }> = {};
     for (const user of users) {
-      usersMap[user.id] = { name: user.name, username: user.username };
+      usersMap[user.id] = { name: user.name, username: user.username, role: user.role };
     }
 
     const response: ApiResponse<{ users: typeof usersMap }> = {

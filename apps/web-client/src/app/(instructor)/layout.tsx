@@ -7,7 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   LayoutDashboard, BookOpen, Users, Award,
-  BarChart3, Settings, ArrowLeft, Menu, X,
+  BarChart3, Settings, ArrowLeft, Menu, X, UserCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -24,7 +24,8 @@ const navLinks: NavLink[] = [
   { label: 'Cộng đồng', description: 'Nhóm thảo luận cho học viên', href: '/instructor/communities', icon: Users },
   { label: 'Chứng chỉ', description: 'Mẫu chứng chỉ hoàn thành', href: '/instructor/certificates', icon: Award },
   { label: 'Phân tích', description: 'Theo dõi doanh thu và tăng trưởng', href: '/instructor/analytics', icon: BarChart3 },
-  { label: 'Kênh', description: 'Thông tin kênh và cấu hình', href: '/instructor/settings', icon: Settings },
+  { label: 'Thanh toán', description: 'Doanh thu và nhận tiền', href: '/instructor/settings', icon: Settings },
+  { label: 'Kênh của tôi', description: 'Cấu hình hồ sơ công khai', href: '/instructor/profile', icon: UserCircle },
 ];
 
 function normalizePath(p: string) {

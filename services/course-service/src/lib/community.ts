@@ -3,7 +3,7 @@ import prisma from './prisma';
 import { logger } from '@lms/logger';
 
 // Cache ten nguoi dung de giam goi auth-service (TTL 5 phut)
-const userNameCache = new Map<string, { name: string; username: string | null; expiresAt: number }>();
+const userNameCache = new Map<string, { name: string; username: string | null; role: string; expiresAt: number }>();
 const USER_CACHE_TTL = 5 * 60 * 1000; // 5 phut
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3101';
@@ -74,15 +74,15 @@ function buildGroupSlug(courseSlug: string, courseId: string): string {
 // Goi auth-service de lay name + username theo batch userId
 export async function resolveUserNames(
   userIds: string[],
-): Promise<Map<string, { name: string; username: string | null }>> {
-  const result = new Map<string, { name: string; username: string | null }>();
+): Promise<Map<string, { name: string; username: string | null; role: string }>> {
+  const result = new Map<string, { name: string; username: string | null; role: string }>();
   const uncachedIds: string[] = [];
 
   const now = Date.now();
   for (const id of userIds) {
     const cached = userNameCache.get(id);
     if (cached && cached.expiresAt > now) {
-      result.set(id, { name: cached.name, username: cached.username });
+      result.set(id, { name: cached.name, username: cached.username, role: cached.role });
     } else {
       uncachedIds.push(id);
     }
@@ -102,12 +102,13 @@ export async function resolveUserNames(
 
     if (response.ok) {
       const json = (await response.json()) as any;
-      const usersMap = json?.data?.users as Record<string, { name: string; username: string | null }> | undefined;
+      const usersMap = json?.data?.users as Record<string, { name: string; username: string | null; role?: string }> | undefined;
 
       if (usersMap) {
         for (const [id, info] of Object.entries(usersMap)) {
-          result.set(id, info);
-          userNameCache.set(id, { ...info, expiresAt: now + USER_CACHE_TTL });
+          const role = info.role || 'STUDENT';
+          result.set(id, { name: info.name, username: info.username, role });
+          userNameCache.set(id, { ...info, role, expiresAt: now + USER_CACHE_TTL });
         }
       }
     }
@@ -121,13 +122,21 @@ export async function resolveUserNames(
 // Tra ve displayName cho 1 userId, uu tien name > username > fallback
 export function getDisplayName(
   userId: string,
-  nameMap: Map<string, { name: string; username: string | null }>,
+  nameMap: Map<string, { name: string; username: string | null; role: string }>,
 ): string {
   const info = nameMap.get(userId);
   if (info) {
     return info.name || info.username || `Người dùng #${userId.slice(0, 6)}`;
   }
   return `Người dùng #${userId.slice(0, 6)}`;
+}
+
+export function getUserRole(
+  userId: string,
+  nameMap: Map<string, { name: string; username: string | null; role: string }>,
+): string {
+  const info = nameMap.get(userId);
+  return info?.role || 'STUDENT';
 }
 
 // Upsert private community group cho 1 khoa hoc (enrollment-driven)

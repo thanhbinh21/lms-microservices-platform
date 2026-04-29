@@ -187,27 +187,6 @@ export default function InstructorChannelSettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Channel info */}
-        <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <UserCircle className="size-4 text-primary" />
-              <CardTitle className="text-sm font-bold">Thông tin kênh</CardTitle>
-            </div>
-            <CardDescription className="text-xs">Tên hiển thị và mô tả ngắn trên trang công khai.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground">Tên kênh</label>
-              <Input placeholder="VD: NexEdu — Lập trình Web" className="rounded-xl" disabled />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground">Giới thiệu kênh</label>
-              <textarea className="min-h-20 w-full rounded-xl border border-input bg-white p-3 text-sm" placeholder="Mô tả ngắn về nội dung bạn giảng dạy..." disabled />
-            </div>
-            <p className="text-xs text-muted-foreground">Chỉnh sửa thông tin kênh sẽ sớm được hỗ trợ.</p>
-          </CardContent>
-        </Card>
 
         {/* Notifications */}
         <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">

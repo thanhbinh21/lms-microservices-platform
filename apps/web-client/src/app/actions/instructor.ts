@@ -181,6 +181,55 @@ export interface InstructorCommunityGroupDto {
   } | null;
 }
 
+export interface InstructorProfileDto {
+  id: string;
+  instructorId: string;
+  slug: string;
+  displayName: string;
+  headline?: string | null;
+  bio?: string | null;
+  avatar?: string | null;
+  socialLinks: Record<string, string>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PublicInstructorCardDto {
+  id: string;
+  instructorId: string;
+  slug: string;
+  displayName: string;
+  headline?: string | null;
+  bio?: string | null;
+  avatar?: string | null;
+  socialLinks: Record<string, string>;
+  courseCount: number;
+  averageRating: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InstructorCourseSummaryDto {
+  id: string;
+  slug: string;
+  title: string;
+  description?: string | null;
+  thumbnail?: string | null;
+  price: number;
+  level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  averageRating: number;
+  ratingCount: number;
+  enrollmentCount: number;
+  createdAt: string;
+}
+
+export interface InstructorPublicProfileDto {
+  profile: InstructorProfileDto;
+  courseCount: number;
+  averageRating: number;
+  courses: InstructorCourseSummaryDto[];
+}
+
 export interface CertificateTemplateDto {
   id: string;
   name: string;
@@ -989,5 +1038,58 @@ export async function getInstructorEarningsAction() {
     `/payment/api/instructor/earnings`,
     { method: 'GET' },
     true,
+  );
+}
+
+// ─── Instructor Channel / Profile Actions ──────────────────────────────────
+
+export async function getMyInstructorProfileAction() {
+  return callApi<InstructorProfileDto>(
+    `/course/api/instructors/profile`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function updateMyInstructorProfileAction(payload: Partial<InstructorProfileDto>) {
+  const result = await callApi<InstructorProfileDto>(
+    `/course/api/instructors/profile`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+
+  revalidatePath('/instructor/profile');
+  return result;
+}
+
+export async function listInstructorsAction(page = 1, limit = 12, q?: string, sortBy?: string) {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+  if (q) params.append('q', q);
+  if (sortBy) params.append('sortBy', sortBy);
+
+  return callApi<{ items: PublicInstructorCardDto[]; total: number; page: number; limit: number }>(
+    `/course/api/instructors?${params.toString()}`,
+    { method: 'GET' },
+  );
+}
+
+export async function getInstructorBySlugAction(slug: string) {
+  return callApi<InstructorPublicProfileDto>(`/course/api/instructors/${slug}`, { method: 'GET' });
+}
+
+export async function listInstructorCoursesBySlugAction(slug: string, page = 1, limit = 12) {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+  return callApi<{ items: InstructorCourseSummaryDto[]; total: number; page: number; limit: number }>(
+    `/course/api/instructors/${slug}/courses?${params.toString()}`,
+    { method: 'GET' },
   );
 }

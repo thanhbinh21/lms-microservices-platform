@@ -9,6 +9,7 @@ import {
   ensureCommunityMembershipByGroup,
   resolveUserNames,
   getDisplayName,
+  getUserRole,
 } from '../lib/community';
 
 const groupParamsSchema = z.object({
@@ -821,6 +822,14 @@ export async function listCommunityPosts(req: Request, res: Response): Promise<R
       }
     }
     const nameMap = await resolveUserNames([...allAuthorIds]);
+    const instructorIds = [...allAuthorIds].filter((id) => getUserRole(id, nameMap).toUpperCase() === 'INSTRUCTOR');
+    const instructorProfiles = instructorIds.length > 0
+      ? await prisma.instructorProfile.findMany({
+          where: { instructorId: { in: instructorIds } },
+          select: { instructorId: true, slug: true },
+        })
+      : [];
+    const instructorSlugMap = new Map(instructorProfiles.map((profile) => [profile.instructorId, profile.slug]));
 
     const response: ApiResponse<{
       group: ReturnType<typeof mapGroupSummary>;
@@ -862,6 +871,8 @@ export async function listCommunityPosts(req: Request, res: Response): Promise<R
           author: {
             id: post.authorId,
             displayName: getDisplayName(post.authorId, nameMap),
+            role: getUserRole(post.authorId, nameMap),
+            instructorSlug: instructorSlugMap.get(post.authorId) || null,
           },
           replies: post.replies.map((reply) => ({
             id: reply.id,
@@ -874,6 +885,8 @@ export async function listCommunityPosts(req: Request, res: Response): Promise<R
             author: {
               id: reply.authorId,
               displayName: getDisplayName(reply.authorId, nameMap),
+              role: getUserRole(reply.authorId, nameMap),
+              instructorSlug: instructorSlugMap.get(reply.authorId) || null,
             },
           })),
         })),
@@ -975,6 +988,13 @@ export async function createCommunityPost(req: Request, res: Response): Promise<
 
     // Resolve ten tac gia
     const nameMap = await resolveUserNames([post.authorId]);
+    const role = getUserRole(post.authorId, nameMap);
+    const instructorSlug = role.toUpperCase() === 'INSTRUCTOR'
+      ? (await prisma.instructorProfile.findUnique({
+          where: { instructorId: post.authorId },
+          select: { slug: true },
+        }))?.slug || null
+      : null;
 
     const response: ApiResponse<{
       id: string;
@@ -999,6 +1019,8 @@ export async function createCommunityPost(req: Request, res: Response): Promise<
         author: {
           id: post.authorId,
           displayName: getDisplayName(post.authorId, nameMap),
+          role,
+          instructorSlug,
         },
       },
       trace_id: traceId,
@@ -1129,6 +1151,13 @@ export async function replyCommunityPost(req: Request, res: Response): Promise<R
 
     // Resolve ten tac gia
     const nameMap = await resolveUserNames([reply.authorId]);
+    const role = getUserRole(reply.authorId, nameMap);
+    const instructorSlug = role.toUpperCase() === 'INSTRUCTOR'
+      ? (await prisma.instructorProfile.findUnique({
+          where: { instructorId: reply.authorId },
+          select: { slug: true },
+        }))?.slug || null
+      : null;
 
     const response: ApiResponse<{
       id: string;
@@ -1151,6 +1180,8 @@ export async function replyCommunityPost(req: Request, res: Response): Promise<R
         author: {
           id: reply.authorId,
           displayName: getDisplayName(reply.authorId, nameMap),
+          role,
+          instructorSlug,
         },
       },
       trace_id: traceId,

@@ -40,6 +40,8 @@ export interface CommunityReplyDto {
   author: {
     id: string;
     displayName: string;
+    role?: string;
+    instructorSlug?: string | null;
   };
 }
 
@@ -54,6 +56,8 @@ export interface CommunityPostDto {
   author: {
     id: string;
     displayName: string;
+    role?: string;
+    instructorSlug?: string | null;
   };
   replies: CommunityReplyDto[];
 }

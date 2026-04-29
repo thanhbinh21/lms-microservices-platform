@@ -321,3 +321,20 @@ model FailedEvent {
   @@map("failed_events")
 }
 
+/// Hồ sơ công khai của giảng viên — tạo tự động khi user nâng cấp lên INSTRUCTOR.
+model InstructorProfile {
+  id           String   @id @default(uuid())
+  instructorId String   @unique @map("instructor_id")
+  slug         String   @unique
+  displayName  String   @map("display_name")
+  headline     String?  // Dòng giới thiệu ngắn (1-2 câu)
+  bio          String?  // Mô tả đầy đủ
+  avatar       String?  // URL ảnh đại diện
+  socialLinks  Json     @default("{}") @map("social_links") // { website, facebook, youtube, twitter, linkedin }
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([slug])
+  @@map("instructor_profiles")
+}
+

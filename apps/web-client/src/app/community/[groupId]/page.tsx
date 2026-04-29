@@ -17,7 +17,7 @@ import { confirmMediaUploadAction, requestMediaUploadAction } from '@/app/action
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Users, MessageSquare, Send, ArrowLeft, Globe, Lock, ThumbsUp, Image as ImageIcon } from 'lucide-react';
+import { Loader2, Users, MessageSquare, Send, ArrowLeft, Globe, Lock, ThumbsUp, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
 
 function formatDate(dateIso: string) {
   return new Date(dateIso).toLocaleString('vi-VN', {
@@ -27,6 +27,26 @@ function formatDate(dateIso: string) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function renderAuthorName(author: { displayName: string; role?: string; instructorSlug?: string | null }) {
+  const isInstructor = (author.role || '').toUpperCase() === 'INSTRUCTOR';
+  const label = (
+    <span className="inline-flex items-center gap-1">
+      <span>{author.displayName}</span>
+      {isInstructor && <CheckCircle2 className="size-3 text-blue-500" />}
+    </span>
+  );
+
+  if (isInstructor && author.instructorSlug) {
+    return (
+      <Link href={`/instructors/${author.instructorSlug}`} className="hover:text-primary">
+        {label}
+      </Link>
+    );
+  }
+
+  return label;
 }
 
 function GroupHeader({
@@ -436,7 +456,7 @@ export default function CommunityGroupPage() {
             <Card key={post.id} className="glass-panel rounded-2xl border-white/60 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-bold text-slate-800">{post.author.displayName}</p>
+                  <p className="text-sm font-bold text-slate-800">{renderAuthorName(post.author)}</p>
                   <p className="mt-0.5 text-xs font-medium text-muted-foreground">
                     {formatDate(post.createdAt)}
                   </p>
@@ -490,7 +510,7 @@ export default function CommunityGroupPage() {
                       className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-bold text-slate-700">{reply.author.displayName}</p>
+                        <p className="text-xs font-bold text-slate-700">{renderAuthorName(reply.author)}</p>
                         <p className="text-[11px] font-medium text-muted-foreground">
                           {formatDate(reply.createdAt)}
                         </p>

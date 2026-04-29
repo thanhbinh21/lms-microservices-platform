@@ -40,6 +40,13 @@ import {
   assignCommunityGroupToCourse,
 } from './controllers/community.controller';
 import {
+  listInstructors,
+  getInstructorBySlug,
+  listInstructorCoursesBySlug,
+  getMyInstructorProfile,
+  updateMyInstructorProfile,
+} from './controllers/instructor.controller';
+import {
   createChapter,
   updateChapter,
   deleteChapter,
@@ -116,7 +123,14 @@ app.post('/api/community/groups/:groupId/posts', requireAuth, createCommunityPos
 app.post('/api/community/groups/:groupId/posts/:postId/reply', requireAuth, replyCommunityPost);
 app.post('/api/community/groups/:groupId/posts/:postId/react', requireAuth, reactCommunityPost);
 
+// ─── Instructor Profile Routes ─────────────────────────────────────────────
+app.get('/api/instructors/profile', ...requireRole('instructor', 'admin'), getMyInstructorProfile);
+app.put('/api/instructors/profile', ...requireRole('instructor', 'admin'), updateMyInstructorProfile);
+
 // ─── Public Routes ────────────────────────────────────────────────────────────
+app.get('/api/instructors', listInstructors);
+app.get('/api/instructors/:slug/courses', listInstructorCoursesBySlug);
+app.get('/api/instructors/:slug', getInstructorBySlug);
 app.get('/api/categories', listCategories);
 app.get('/api/courses', listCourses);
 app.get('/api/courses/:courseId/reviews', listCourseReviews);

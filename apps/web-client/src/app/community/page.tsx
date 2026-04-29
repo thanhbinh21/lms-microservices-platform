@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppSelector } from '@/lib/redux/hooks';
@@ -19,7 +20,7 @@ import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Send, Globe, Users, ThumbsUp, MessageSquare, Image as ImageIcon } from 'lucide-react';
+import { Loader2, Send, Globe, Users, ThumbsUp, MessageSquare, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
 
 function formatDate(dateIso: string) {
   return new Date(dateIso).toLocaleString('vi-VN', {
@@ -29,6 +30,26 @@ function formatDate(dateIso: string) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function renderAuthorName(author: { displayName: string; role?: string; instructorSlug?: string | null }) {
+  const isInstructor = (author.role || '').toUpperCase() === 'INSTRUCTOR';
+  const label = (
+    <span className="inline-flex items-center gap-1">
+      <span>{author.displayName}</span>
+      {isInstructor && <CheckCircle2 className="size-3 text-blue-500" />}
+    </span>
+  );
+
+  if (isInstructor && author.instructorSlug) {
+    return (
+      <Link href={`/instructors/${author.instructorSlug}`} className="hover:text-primary">
+        {label}
+      </Link>
+    );
+  }
+
+  return label;
 }
 
 function ReplyComposer({
@@ -396,7 +417,7 @@ export default function CommunityPage() {
             <Card key={post.id} className="glass-panel rounded-3xl border-white/60 p-6 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-base font-bold text-slate-800">{post.author.displayName}</p>
+                  <p className="text-base font-bold text-slate-800">{renderAuthorName(post.author)}</p>
                   <p className="mt-1 text-xs font-medium text-muted-foreground">
                     {formatDate(post.createdAt)}
                   </p>
@@ -456,7 +477,7 @@ export default function CommunityPage() {
                       className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-bold text-slate-700">{reply.author.displayName}</p>
+                        <p className="text-sm font-bold text-slate-700">{renderAuthorName(reply.author)}</p>
                         <p className="text-xs font-medium text-muted-foreground">
                           {formatDate(reply.createdAt)}
                         </p>
