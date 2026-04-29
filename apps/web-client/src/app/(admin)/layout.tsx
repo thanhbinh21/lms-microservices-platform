@@ -11,6 +11,7 @@ import {
   BookOpen,
   Star,
   AlertTriangle,
+  GraduationCap,
   ArrowLeft,
   Menu,
   X,
@@ -28,6 +29,7 @@ const navLinks: NavLink[] = [
   { label: 'Quản lý người dùng', href: '/admin/users', icon: Users },
   { label: 'Quản lý khóa học', href: '/admin/courses', icon: BookOpen },
   { label: 'Quản lý đánh giá', href: '/admin/reviews', icon: Star },
+  { label: 'Đơn Giảng Viên', href: '/admin/instructor-requests', icon: GraduationCap },
   { label: 'Hệ thống DLQ', href: '/admin/system', icon: AlertTriangle },
 ];
 

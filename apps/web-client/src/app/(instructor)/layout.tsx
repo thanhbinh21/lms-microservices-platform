@@ -86,12 +86,17 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
       </div>
 
       {mobileOpen && (
-        <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setMobileOpen(false)} />
+        <div
+          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setMobileOpen(false)}
+        />
       )}
 
       {/* Sidebar */}
       <aside
         className={`glass-panel fixed left-0 top-0 z-40 h-screen w-72 border-r border-white/50 transition-transform duration-200 md:sticky md:w-68 md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        onKeyDown={(e) => e.key === 'Escape' && setMobileOpen(false)}
       >
         <div className="flex h-full flex-col overflow-y-auto p-6 pt-20 md:pt-6">
           <Link href="/" className="mb-6 flex items-center gap-2" onClick={() => setMobileOpen(false)}>
@@ -109,7 +114,8 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                 return (
                   <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)}>
                     <div
-                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-all ${
+                      aria-current={active ? 'page' : undefined}
+                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-all focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 ${
                         active
                           ? 'border-primary/20 bg-primary/10 text-primary shadow-sm'
                           : 'border-transparent bg-transparent text-muted-foreground hover:border-white/30 hover:bg-white/30 hover:text-foreground'

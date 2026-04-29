@@ -42,7 +42,15 @@ export default function InstructorStudioHomePage() {
   }, [courses]);
 
   const recentCourses = useMemo(
-    () => [...courses].sort((a, b) => Date.parse(b.updatedAt || b.createdAt) - Date.parse(a.updatedAt || a.createdAt)).slice(0, 4),
+    () =>
+      [...courses]
+        .filter((c) => c.updatedAt || c.createdAt)
+        .sort((a, b) => {
+          const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+          const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+          return dateB - dateA;
+        })
+        .slice(0, 4),
     [courses],
   );
 
@@ -144,7 +152,7 @@ export default function InstructorStudioHomePage() {
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Cập nhật: {new Date(course.updatedAt || course.createdAt).toLocaleDateString('vi-VN')} · {course._count?.enrollments || 0} học viên
+                    Cập nhật: {(course.updatedAt ? new Date(course.updatedAt) : course.createdAt ? new Date(course.createdAt) : null)?.toLocaleDateString('vi-VN') || '—'} · {course._count?.enrollments || 0} học viên
                   </p>
                 </div>
               </Link>

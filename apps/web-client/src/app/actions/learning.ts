@@ -1,6 +1,6 @@
 'use server';
 
-import { callApi } from '@/lib/api-client';
+import { callApi, type ApiResponse } from '@/lib/api-client';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -19,6 +19,8 @@ export interface LearnLessonDto {
   id: string;
   title: string;
   order: number;
+  content: string | null;
+  contentType: 'TEXT' | 'VIDEO' | 'YOUTUBE' | null;
   videoUrl: string | null;
   sourceType: 'UPLOAD' | 'YOUTUBE';
   duration: number;
@@ -193,6 +195,29 @@ export async function getMyCoursesAction() {
 export async function getMyCertificatesAction() {
   return callApi<MyCertificateSummary[]>(
     `/course/api/student/certificates`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export interface CertificateDetail {
+  id: string;
+  certificateNumber: string;
+  issuedAt: string;
+  completedAt: string;
+  template: { id: string; name: string; previewUrl: string | null } | null;
+  course: {
+    id: string;
+    title: string;
+    slug: string;
+    level: string;
+    instructorId: string;
+  };
+}
+
+export async function getCertificateByIdAction(certificateNumber: string): Promise<ApiResponse<CertificateDetail | null>> {
+  return callApi<CertificateDetail>(
+    `/course/api/student/certificates/by-number/${encodeURIComponent(certificateNumber)}`,
     { method: 'GET' },
     true,
   );

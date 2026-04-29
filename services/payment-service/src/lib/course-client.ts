@@ -13,6 +13,7 @@ export interface CourseLite {
   slug: string;
   price: number;
   status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  instructorId: string;
 }
 
 export async function fetchCourseById(
@@ -48,6 +49,7 @@ export async function fetchCourseById(
       slug: json.data.slug,
       price: Number(json.data.price || 0),
       status: json.data.status,
+      instructorId: json.data.instructorId,
     };
   } catch (err) {
     logger.error({ err, courseId }, 'Loi goi course-service noi bo');

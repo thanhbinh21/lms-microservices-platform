@@ -32,6 +32,12 @@ enum AuditKind {
   IPN
 }
 
+enum EarningStatus {
+  PENDING
+  AVAILABLE
+  WITHDRAWN
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 /// Don hang tao boi user khi mua khoa hoc.
@@ -40,6 +46,7 @@ model Order {
   id            String        @id @default(uuid())
   userId        String        @map("user_id")
   courseId      String        @map("course_id")
+  instructorId  String        @map("instructor_id")
   courseTitle   String?       @map("course_title")
   amount        Decimal       @db.Decimal(12, 2)
   currency      String        @default("VND")
@@ -85,4 +92,22 @@ model VNPayAudit {
   @@index([orderId])
   @@index([kind])
   @@map("vnpay_audits")
+}
+
+/// Thu nhap cua giang vien tu moi order thanh cong.
+/// Payment consumer tao record khi nhan payment.order.completed.
+model InstructorEarning {
+  id           String        @id @default(uuid())
+  orderId     String        @unique @map("order_id")
+  instructorId String        @map("instructor_id")
+  courseId    String        @map("course_id")
+  grossAmount Decimal        @db.Decimal(12, 2) @map("gross_amount")
+  platformFee Decimal        @db.Decimal(12, 2) @default(0.30) @map("platform_fee")
+  netAmount   Decimal       @db.Decimal(12, 2) @map("net_amount")
+  status      EarningStatus @default(PENDING)
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  @@index([instructorId])
+  @@index([courseId])
+  @@map("instructor_earnings")
 }

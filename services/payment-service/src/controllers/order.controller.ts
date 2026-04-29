@@ -153,6 +153,7 @@ export const createOrder = async (req: Request, res: Response): Promise<Response
       data: {
         userId,
         courseId: course.id,
+        instructorId: course.instructorId,
         courseTitle: course.title,
         amount: course.price,
         currency: config.currency,

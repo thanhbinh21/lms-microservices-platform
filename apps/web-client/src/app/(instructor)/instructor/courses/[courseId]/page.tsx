@@ -9,6 +9,7 @@ import {
   Plus, Pencil, Trash2, Users, Award, X, Loader2, AlertCircle, CheckCircle2,
   ExternalLink, BookOpen, Eye, EyeOff, Save,
 } from 'lucide-react';
+import { FocusTrap } from 'focus-trap-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -135,35 +136,42 @@ function CreateCategoryModal({ open, onClose, onSuccess }: CreateCategoryModalPr
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold">Tạo danh mục mới</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="size-5" />
-          </button>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">Tên danh mục</label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="VD: Lập trình Web, Marketing..."
-              onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }}
-              autoFocus
-            />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" role="presentation">
+      <FocusTrap>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-cat-title"
+          className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-6 shadow-2xl"
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <h3 id="modal-cat-title" className="text-lg font-bold">Tạo danh mục mới</h3>
+            <button onClick={onClose} aria-label="Đóng" className="text-muted-foreground hover:text-foreground transition-colors">
+              <X className="size-5" />
+            </button>
           </div>
-          {error && <StatusMessage type="error" message={error} />}
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">Hủy</Button>
-            <Button onClick={() => void handleCreate()} disabled={loading} className="rounded-xl font-bold">
-              {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-              Tạo danh mục
-            </Button>
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="cat-name" className="mb-1.5 block text-sm font-semibold">Tên danh mục</label>
+              <Input id="cat-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="VD: Lập trình Web, Marketing..."
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }}
+                autoFocus
+              />
+            </div>
+            {error && <StatusMessage type="error" message={error} />}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">Hủy</Button>
+              <Button onClick={() => void handleCreate()} disabled={loading} className="rounded-xl font-bold">
+                {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                Tạo danh mục
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </FocusTrap>
     </div>
   );
 }
@@ -210,33 +218,40 @@ function CreateGroupModal({ open, onClose, onSuccess }: CreateGroupModalProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold">Tạo nhóm cộng đồng mới</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="size-5" />
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" role="presentation">
+      <FocusTrap>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-group-title"
+          className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-6 shadow-2xl"
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <h3 id="modal-group-title" className="text-lg font-bold">Tạo nhóm cộng đồng mới</h3>
+            <button onClick={onClose} aria-label="Đóng" className="text-muted-foreground hover:text-foreground transition-colors">
+              <X className="size-5" />
+            </button>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="new-group-name" className="mb-1.5 block text-sm font-semibold">Tên nhóm</label>
+              <Input id="new-group-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Cộng đồng React VN" onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }} autoFocus />
+            </div>
+            <div>
+              <label htmlFor="new-group-desc" className="mb-1.5 block text-sm font-semibold">Mô tả (tùy chọn)</label>
+              <textarea id="new-group-desc" className="min-h-20 w-full rounded-md border border-slate-200 bg-white p-3 text-sm" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Mô tả ngắn về nhóm..." />
+            </div>
+            {error && <StatusMessage type="error" message={error} />}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">Hủy</Button>
+              <Button onClick={() => void handleCreate()} disabled={loading} className="rounded-xl font-bold">
+                {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                Tạo nhóm
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">Tên nhóm</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Cộng đồng React VN" onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }} autoFocus />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">Mô tả (tùy chọn)</label>
-            <textarea className="min-h-20 w-full rounded-md border border-slate-200 bg-white p-3 text-sm" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Mô tả ngắn về nhóm..." />
-          </div>
-          {error && <StatusMessage type="error" message={error} />}
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">Hủy</Button>
-            <Button onClick={() => void handleCreate()} disabled={loading} className="rounded-xl font-bold">
-              {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-              Tạo nhóm
-            </Button>
-          </div>
-        </div>
-      </div>
+      </FocusTrap>
     </div>
   );
 }
@@ -283,33 +298,40 @@ function CreateCertificateModal({ open, onClose, onSuccess }: CreateCertificateM
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold">Tạo mẫu chứng chỉ mới</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="size-5" />
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" role="presentation">
+      <FocusTrap>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-cert-title"
+          className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-6 shadow-2xl"
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <h3 id="modal-cert-title" className="text-lg font-bold">Tạo mẫu chứng chỉ mới</h3>
+            <button onClick={onClose} aria-label="Đóng" className="text-muted-foreground hover:text-foreground transition-colors">
+              <X className="size-5" />
+            </button>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="cert-tmpl-name" className="mb-1.5 block text-sm font-semibold">Tên mẫu chứng chỉ</label>
+              <Input id="cert-tmpl-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Chứng nhận hoàn thành khóa học" onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }} autoFocus />
+            </div>
+            <div>
+              <label htmlFor="cert-tmpl-desc" className="mb-1.5 block text-sm font-semibold">Mô tả (tùy chọn)</label>
+              <textarea id="cert-tmpl-desc" className="min-h-20 w-full rounded-md border border-slate-200 bg-white p-3 text-sm" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Mô tả về chứng chỉ này..." />
+            </div>
+            {error && <StatusMessage type="error" message={error} />}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">Hủy</Button>
+              <Button onClick={() => void handleCreate()} disabled={loading} className="rounded-xl font-bold">
+                {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                Tạo mẫu chứng chỉ
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">Tên mẫu chứng chỉ</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Chứng nhận hoàn thành khóa học" onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }} autoFocus />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold">Mô tả (tùy chọn)</label>
-            <textarea className="min-h-20 w-full rounded-md border border-slate-200 bg-white p-3 text-sm" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Mô tả về chứng chỉ này..." />
-          </div>
-          {error && <StatusMessage type="error" message={error} />}
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">Hủy</Button>
-            <Button onClick={() => void handleCreate()} disabled={loading} className="rounded-xl font-bold">
-              {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-              Tạo mẫu chứng chỉ
-            </Button>
-          </div>
-        </div>
-      </div>
+      </FocusTrap>
     </div>
   );
 }

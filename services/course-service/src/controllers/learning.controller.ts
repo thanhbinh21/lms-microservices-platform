@@ -280,6 +280,8 @@ export const getLearnData = async (req: Request, res: Response): Promise<Respons
           id: l.id,
           title: l.title,
           order: l.order,
+          content: l.content,
+          contentType: l.content ? 'TEXT' : l.videoUrl ? (l.sourceType === 'YOUTUBE' ? 'YOUTUBE' : 'VIDEO') : null,
           videoUrl: l.videoUrl,
           sourceType: l.sourceType,
           duration: l.duration,
@@ -399,8 +401,8 @@ export const completeLesson = async (req: Request, res: Response): Promise<Respo
         ...progress,
         courseCompleted: certificateResult.completion.isCompleted,
         progressPercent: certificateResult.completion.progressPercent,
-        certificate: certificateResult.certificates[0] ?? null,
-        certificates: certificateResult.certificates,
+        certificate: certificateResult.certificates?.[0] ?? null,
+        certificates: certificateResult.certificates ?? [],
       },
       trace_id: traceId,
     };
@@ -510,6 +512,71 @@ export const getMyCertificates = async (req: Request, res: Response): Promise<Re
       trace_id: traceId,
     };
     return res.status(500).json(response);
+  }
+};
+
+export const getCertificateById = async (req: Request, res: Response): Promise<Response | void> => {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const userId = res.locals.userId as string;
+  const { id, certificateNumber } = req.params;
+  const certNumber = certificateNumber || id;
+
+  try {
+    const cert = await prisma.certificate.findFirst({
+      where: { certificateNumber: certNumber },
+      include: {
+        template: { select: { id: true, name: true, previewUrl: true } },
+        course: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            level: true,
+            instructorId: true,
+          },
+        },
+      },
+    });
+
+    if (!cert) {
+      return res.status(404).json({ success: false, code: 404, message: 'Certificate not found', data: null, trace_id: traceId });
+    }
+
+    if (cert.userId !== userId) {
+      return res.status(403).json({ success: false, code: 403, message: 'Forbidden', data: null, trace_id: traceId });
+    }
+
+    const response: ApiResponse<{
+      id: string;
+      certificateNumber: string;
+      issuedAt: Date;
+      completedAt: Date;
+      template: { id: string; name: string; previewUrl: string | null } | null;
+      course: {
+        id: string;
+        title: string;
+        slug: string;
+        level: string;
+        instructorId: string;
+      };
+    }> = {
+      success: true,
+      code: 200,
+      message: 'Certificate fetched',
+      data: {
+        id: cert.id,
+        certificateNumber: cert.certificateNumber,
+        issuedAt: cert.issuedAt,
+        completedAt: cert.completedAt,
+        template: cert.template as any,
+        course: cert.course as any,
+      },
+      trace_id: traceId,
+    };
+
+    return res.status(200).json(response);
+  } catch (err) {
+    return res.status(500).json({ success: false, code: 500, message: 'Server error', data: null, trace_id: traceId });
   }
 };
 

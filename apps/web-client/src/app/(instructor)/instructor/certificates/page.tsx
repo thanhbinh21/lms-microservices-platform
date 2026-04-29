@@ -5,6 +5,7 @@ import {
   Award, Plus, Pencil, Trash2, X, Loader2, CheckCircle2,
   Sparkles,
 } from 'lucide-react';
+import { FocusTrap } from 'focus-trap-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -235,46 +236,54 @@ export default function InstructorCertificatesPage() {
 
       {/* Create/Edit Modal */}
       {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-6 shadow-2xl">
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-lg font-bold">
-                {modalMode === 'create' ? 'Tạo mẫu chứng chỉ mới' : 'Chỉnh sửa mẫu chứng chỉ'}
-              </h3>
-              <button onClick={closeModal} className="text-muted-foreground hover:text-foreground transition-colors rounded-lg p-1">
-                <X className="size-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold">Tên mẫu chứng chỉ</label>
-                <Input value={formName} onChange={(e) => setFormName(e.target.value)}
-                  placeholder="VD: Chứng nhận hoàn thành khóa học"
-                  className="h-12 rounded-xl text-base"
-                  onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }}
-                  autoFocus />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold">Mô tả (tùy chọn)</label>
-                <textarea className="min-h-20 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
-                  value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="Mô tả ngắn về chứng chỉ này..." />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" role="presentation">
+          <FocusTrap>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="modal-cert-title"
+              aria-describedby="modal-cert-desc"
+              className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-6 shadow-2xl"
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <h3 id="modal-cert-title" className="text-lg font-bold">
+                  {modalMode === 'create' ? 'Tạo mẫu chứng chỉ mới' : 'Chỉnh sửa mẫu chứng chỉ'}
+                </h3>
+                <button onClick={closeModal} aria-label="Đóng" className="text-muted-foreground hover:text-foreground transition-colors rounded-lg p-1">
+                  <X className="size-5" />
+                </button>
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <Button variant="outline" onClick={closeModal} className="rounded-xl font-bold">Hủy</Button>
-                <Button
-                  onClick={modalMode === 'create' ? () => void handleCreate() : () => void handleUpdate()}
-                  disabled={submitting}
-                  className="rounded-xl font-bold gap-2"
-                >
-                  {submitting ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                  {modalMode === 'create' ? 'Tạo mẫu' : 'Lưu thay đổi'}
-                </Button>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="cert-name" className="mb-1.5 block text-sm font-semibold">Tên mẫu chứng chỉ</label>
+                  <Input id="cert-name" value={formName} onChange={(e) => setFormName(e.target.value)}
+                    placeholder="VD: Chứng nhận hoàn thành khóa học"
+                    className="h-12 rounded-xl text-base"
+                    onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }}
+                    autoFocus />
+                </div>
+                <div>
+                  <label htmlFor="cert-desc" className="mb-1.5 block text-sm font-semibold">Mô tả (tùy chọn)</label>
+                  <textarea id="cert-desc" className="min-h-20 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+                    value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
+                    placeholder="Mô tả ngắn về chứng chỉ này..." />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button variant="outline" onClick={closeModal} className="rounded-xl font-bold">Hủy</Button>
+                  <Button
+                    onClick={modalMode === 'create' ? () => void handleCreate() : () => void handleUpdate()}
+                    disabled={submitting}
+                    className="rounded-xl font-bold gap-2"
+                  >
+                    {submitting ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                    {modalMode === 'create' ? 'Tạo mẫu' : 'Lưu thay đổi'}
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          </FocusTrap>
         </div>
       )}
     </div>

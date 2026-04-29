@@ -54,7 +54,7 @@ import {
 import { listCategories, createCategory } from './controllers/category.controller';
 import { enrollCourse, getMyEnrollments } from './controllers/enrollment.controller';
 import { getCourseProgress, updateLessonProgress } from './controllers/progress.controller';
-import { getLearnData, getEnrollmentStatus, completeLesson, getMyCourses, getMyCertificates } from './controllers/learning.controller';
+import { getLearnData, getEnrollmentStatus, completeLesson, getMyCourses, getMyCertificates, getCertificateById } from './controllers/learning.controller';
 import { getCourseByIdInternal } from './controllers/internal.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import adminRouter from './routes/admin.routes';
@@ -104,6 +104,8 @@ app.get('/api/student/courses/:courseId/enrollment-status', requireAuth, getEnro
 app.put('/api/student/lessons/:lessonId/progress', requireAuth, updateLessonProgress);
 app.post('/api/student/lessons/:lessonId/complete', requireAuth, completeLesson);
 app.get('/api/student/my-courses', requireAuth, getMyCourses);
+app.get('/api/student/certificates/by-number/:certificateNumber', requireAuth, getCertificateById);
+app.get('/api/student/certificates/:id', requireAuth, getCertificateById);
 app.get('/api/student/certificates', requireAuth, getMyCertificates);
 
 // ─── Community Routes ───────────────────────────────────────────────────────

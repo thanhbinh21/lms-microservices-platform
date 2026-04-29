@@ -1,15 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { TrendingUp, Users, BarChart3, Sparkles } from 'lucide-react';
+import { TrendingUp, Users, BarChart3, Sparkles, Wallet } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getInstructorCoursesAction, getInstructorRevenueAction } from '@/app/actions/instructor';
+import { getInstructorCoursesAction, getInstructorEarningsSummaryAction } from '@/app/actions/instructor';
 
 export default function InstructorAnalyticsPage() {
   const [stats, setStats] = useState({
-    views: 'Đang cập nhật',
-    enrollments: '0',
-    revenue: '0 đ',
+    views: '—',
+    enrollments: '—',
+    totalEarned: '—',
+    availableBalance: '—',
   });
   const [loading, setLoading] = useState(true);
 
@@ -22,22 +23,20 @@ export default function InstructorAnalyticsPage() {
       }
 
       const courses = coursesRes.data;
-      const courseIds = courses.map((c) => c.id);
-
       const totalEnrollments = courses.reduce((acc, c) => acc + (c._count?.enrollments || 0), 0);
 
-      let totalRevenue = 0;
-      if (courseIds.length > 0) {
-        const revRes = await getInstructorRevenueAction(courseIds);
-        if (revRes.success && revRes.data) {
-          totalRevenue = revRes.data.totalRevenue;
-        }
-      }
+      const earningsRes = await getInstructorEarningsSummaryAction();
+      const earnings = earningsRes.success && earningsRes.data ? earningsRes.data : null;
 
       setStats({
-        views: 'Đang cập nhật',
+        views: '—',
         enrollments: totalEnrollments.toLocaleString('vi-VN'),
-        revenue: totalRevenue.toLocaleString('vi-VN') + ' đ',
+        totalEarned: earnings
+          ? (earnings.totalEarned / 1).toLocaleString('vi-VN') + ' đ'
+          : '—',
+        availableBalance: earnings
+          ? (earnings.availableBalance / 1).toLocaleString('vi-VN') + ' đ'
+          : '—',
       });
       setLoading(false);
     }
@@ -63,7 +62,7 @@ export default function InstructorAnalyticsPage() {
         {[
           { label: 'Lượt xem (7 ngày)', value: loading ? '...' : stats.views, icon: TrendingUp },
           { label: 'Học viên', value: loading ? '...' : stats.enrollments, icon: Users },
-          { label: 'Doanh thu (thực nhận)', value: loading ? '...' : stats.revenue, icon: BarChart3 },
+          { label: 'Thu nhập khả dụng', value: loading ? '...' : stats.availableBalance, note: 'Sau khi trừ phí 30%', icon: Wallet },
         ].map((row) => (
           <Card key={row.label} className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -74,10 +73,28 @@ export default function InstructorAnalyticsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{row.value}</p>
+              {'note' in row && <p className="text-[11px] text-muted-foreground mt-0.5">{row.note}</p>}
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Total earnings card */}
+      <Card className="mb-6 rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-base">Tổng thu nhập</CardTitle>
+            <CardDescription className="text-xs">Tất cả giao dịch (sau phí platform)</CardDescription>
+          </div>
+          <div className="flex size-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+            <BarChart3 className="size-5" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-3xl font-bold">{loading ? '...' : stats.totalEarned}</p>
+          <p className="text-xs text-muted-foreground mt-1">Đã trừ phí platform 30% · NexEdu giữ lại 30%</p>
+        </CardContent>
+      </Card>
 
       {/* Chart placeholder */}
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">

@@ -7,6 +7,7 @@ import type { ApiResponse } from '@lms/types';
 import { requireAuth } from './middleware/require-auth';
 import { createOrder, getOrder, getMyOrders, getRevenueAnalytics } from './controllers/order.controller';
 import { handleVNPayReturn, handleVNPayIPN } from './controllers/vnpay.controller';
+import { getInstructorEarnings, getInstructorEarningsSummary } from './controllers/earnings.controller';
 import prisma from './lib/prisma';
 import { disconnectProducer } from './lib/kafka-producer';
 
@@ -60,6 +61,8 @@ app.post('/api/orders/analytics/revenue', requireAuth, getRevenueAnalytics);
 app.post('/api/orders', requireAuth, createOrder);
 app.get('/api/orders/my', requireAuth, getMyOrders);
 app.get('/api/orders/:id', requireAuth, getOrder);
+app.get('/api/instructor/earnings/summary', requireAuth, getInstructorEarningsSummary);
+app.get('/api/instructor/earnings', requireAuth, getInstructorEarnings);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {

@@ -957,3 +957,37 @@ export async function getInstructorRevenueAction(courseIds: string[]) {
     true,
   );
 }
+
+export interface InstructorEarningDto {
+  id: string;
+  orderId: string;
+  courseId: string;
+  grossAmount: number;
+  platformFee: number;
+  netAmount: number;
+  status: string;
+  createdAt: string;
+}
+
+export interface InstructorEarningsSummary {
+  totalEarned: number;
+  availableBalance: number;
+  withdrawnBalance: number;
+  totalOrders: number;
+}
+
+export async function getInstructorEarningsSummaryAction() {
+  return callApi<InstructorEarningsSummary>(
+    `/payment/api/instructor/earnings/summary`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function getInstructorEarningsAction() {
+  return callApi<InstructorEarningDto[]>(
+    `/payment/api/instructor/earnings`,
+    { method: 'GET' },
+    true,
+  );
+}

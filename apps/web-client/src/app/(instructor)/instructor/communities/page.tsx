@@ -5,6 +5,7 @@ import {
   Users, Plus, Pencil, Trash2, X, Loader2, CheckCircle2,
   BookOpen, Settings, ExternalLink, Sparkles,
 } from 'lucide-react';
+import { FocusTrap } from 'focus-trap-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -286,72 +287,79 @@ export default function InstructorCommunitiesPage() {
 
       {/* Modal */}
       {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-white/20 bg-white p-6 shadow-2xl">
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-lg font-bold">
-                {modalMode === 'create' ? 'Tạo nhóm cộng đồng mới' :
-                 modalMode === 'edit' ? 'Chỉnh sửa nhóm cộng đồng' :
-                 'Liên kết nhóm với khóa học'}
-              </h3>
-              <button onClick={closeModal} className="text-muted-foreground hover:text-foreground transition-colors rounded-lg p-1">
-                <X className="size-5" />
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" role="presentation">
+          <FocusTrap>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="modal-group-title"
+              className="w-full max-w-lg rounded-2xl border border-white/20 bg-white p-6 shadow-2xl"
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <h3 id="modal-group-title" className="text-lg font-bold">
+                  {modalMode === 'create' ? 'Tạo nhóm cộng đồng mới' :
+                   modalMode === 'edit' ? 'Chỉnh sửa nhóm cộng đồng' :
+                   'Liên kết nhóm với khóa học'}
+                </h3>
+                <button onClick={closeModal} aria-label="Đóng" className="text-muted-foreground hover:text-foreground transition-colors rounded-lg p-1">
+                  <X className="size-5" />
+                </button>
+              </div>
 
-            <div className="space-y-4">
-              {modalMode !== 'assign' && (
-                <>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-semibold">Tên nhóm</label>
-                    <Input value={formName} onChange={(e) => setFormName(e.target.value)}
-                      placeholder="VD: Cộng đồng React Việt Nam"
-                      className="h-12 rounded-xl text-base"
-                      onKeyDown={(e) => { if (e.key === 'Enter' && modalMode === 'create') void handleCreate(); }}
-                      autoFocus />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-semibold">Mô tả (tùy chọn)</label>
-                    <textarea className="min-h-24 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
-                      value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
-                      placeholder="Mô tả ngắn về nhóm cộng đồng..." />
-                  </div>
-                </>
-              )}
+              <div className="space-y-4">
+                {modalMode !== 'assign' && (
+                  <>
+                    <div>
+                      <label htmlFor="group-name" className="mb-1.5 block text-sm font-semibold">Tên nhóm</label>
+                      <Input id="group-name" value={formName} onChange={(e) => setFormName(e.target.value)}
+                        placeholder="VD: Cộng đồng React Việt Nam"
+                        className="h-12 rounded-xl text-base"
+                        onKeyDown={(e) => { if (e.key === 'Enter' && modalMode === 'create') void handleCreate(); }}
+                        autoFocus />
+                    </div>
+                    <div>
+                      <label htmlFor="group-desc" className="mb-1.5 block text-sm font-semibold">Mô tả (tùy chọn)</label>
+                      <textarea id="group-desc" className="min-h-24 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+                        value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
+                        placeholder="Mô tả ngắn về nhóm cộng đồng..." />
+                    </div>
+                  </>
+                )}
 
-              {modalMode === 'assign' && (
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold">Chọn khóa học</label>
-                  <select className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
-                    value={formCourseId} onChange={(e) => setFormCourseId(e.target.value)}>
-                    <option value="">Không liên kết khóa học nào</option>
-                    {courses.map((course) => (
-                      <option key={course.id} value={course.id}>{course.title}</option>
-                    ))}
-                  </select>
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Nhóm sẽ được gắn vào khóa học đã chọn. Học viên đăng ký khóa học sẽ tự động được thêm vào nhóm.
-                  </p>
+                {modalMode === 'assign' && (
+                  <div>
+                    <label htmlFor="assign-course" className="mb-1.5 block text-sm font-semibold">Chọn khóa học</label>
+                    <select id="assign-course" className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                      value={formCourseId} onChange={(e) => setFormCourseId(e.target.value)}>
+                      <option value="">Không liên kết khóa học nào</option>
+                      {courses.map((course) => (
+                        <option key={course.id} value={course.id}>{course.title}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Nhóm sẽ được gắn vào khóa học đã chọn. Học viên đăng ký khóa học sẽ tự động được thêm vào nhóm.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button variant="outline" onClick={closeModal} className="rounded-xl font-bold">Hủy</Button>
+                  <Button
+                    onClick={
+                      modalMode === 'create' ? () => void handleCreate() :
+                      modalMode === 'edit' ? () => void handleUpdate() :
+                      () => void handleAssign()
+                    }
+                    disabled={submitting}
+                    className="rounded-xl font-bold gap-2"
+                  >
+                    {submitting ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                    {modalMode === 'create' ? 'Tạo nhóm' : modalMode === 'edit' ? 'Lưu thay đổi' : 'Cập nhật liên kết'}
+                  </Button>
                 </div>
-              )}
-
-              <div className="flex justify-end gap-3 pt-2">
-                <Button variant="outline" onClick={closeModal} className="rounded-xl font-bold">Hủy</Button>
-                <Button
-                  onClick={
-                    modalMode === 'create' ? () => void handleCreate() :
-                    modalMode === 'edit' ? () => void handleUpdate() :
-                    () => void handleAssign()
-                  }
-                  disabled={submitting}
-                  className="rounded-xl font-bold gap-2"
-                >
-                  {submitting ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                  {modalMode === 'create' ? 'Tạo nhóm' : modalMode === 'edit' ? 'Lưu thay đổi' : 'Cập nhật liên kết'}
-                </Button>
               </div>
             </div>
-          </div>
+          </FocusTrap>
         </div>
       )}
     </div>
