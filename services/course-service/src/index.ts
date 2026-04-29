@@ -19,6 +19,12 @@ import {
   getCourseReviewStats,
   getMyCourseReview,
   upsertCourseReview,
+  listInstructorCertificateTemplates,
+  createInstructorCertificateTemplate,
+  updateInstructorCertificateTemplate,
+  deleteInstructorCertificateTemplate,
+  getCourseCertificateTemplates,
+  updateCourseCertificateTemplates,
 } from './controllers/course.controller';
 import {
   listCommunityGroups,
@@ -28,7 +34,18 @@ import {
   reactCommunityPost,
   joinCommunityGroup,
   createPublicCommunityGroup,
+  listInstructorCommunityGroups,
+  createInstructorCommunityGroup,
+  updateInstructorCommunityGroup,
+  assignCommunityGroupToCourse,
 } from './controllers/community.controller';
+import {
+  listInstructors,
+  getInstructorBySlug,
+  listInstructorCoursesBySlug,
+  getMyInstructorProfile,
+  updateMyInstructorProfile,
+} from './controllers/instructor.controller';
 import {
   createChapter,
   updateChapter,
@@ -44,7 +61,7 @@ import {
 import { listCategories, createCategory } from './controllers/category.controller';
 import { enrollCourse, getMyEnrollments } from './controllers/enrollment.controller';
 import { getCourseProgress, updateLessonProgress } from './controllers/progress.controller';
-import { getLearnData, getEnrollmentStatus, completeLesson, getMyCourses, getMyCertificates } from './controllers/learning.controller';
+import { getLearnData, getEnrollmentStatus, completeLesson, getMyCourses, getMyCertificates, getCertificateById } from './controllers/learning.controller';
 import { getCourseByIdInternal } from './controllers/internal.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import adminRouter from './routes/admin.routes';
@@ -94,6 +111,8 @@ app.get('/api/student/courses/:courseId/enrollment-status', requireAuth, getEnro
 app.put('/api/student/lessons/:lessonId/progress', requireAuth, updateLessonProgress);
 app.post('/api/student/lessons/:lessonId/complete', requireAuth, completeLesson);
 app.get('/api/student/my-courses', requireAuth, getMyCourses);
+app.get('/api/student/certificates/by-number/:certificateNumber', requireAuth, getCertificateById);
+app.get('/api/student/certificates/:id', requireAuth, getCertificateById);
 app.get('/api/student/certificates', requireAuth, getMyCertificates);
 
 // ─── Community Routes ───────────────────────────────────────────────────────
@@ -104,7 +123,14 @@ app.post('/api/community/groups/:groupId/posts', requireAuth, createCommunityPos
 app.post('/api/community/groups/:groupId/posts/:postId/reply', requireAuth, replyCommunityPost);
 app.post('/api/community/groups/:groupId/posts/:postId/react', requireAuth, reactCommunityPost);
 
+// ─── Instructor Profile Routes ─────────────────────────────────────────────
+app.get('/api/instructors/profile', ...requireRole('instructor', 'admin'), getMyInstructorProfile);
+app.put('/api/instructors/profile', ...requireRole('instructor', 'admin'), updateMyInstructorProfile);
+
 // ─── Public Routes ────────────────────────────────────────────────────────────
+app.get('/api/instructors', listInstructors);
+app.get('/api/instructors/:slug/courses', listInstructorCoursesBySlug);
+app.get('/api/instructors/:slug', getInstructorBySlug);
 app.get('/api/categories', listCategories);
 app.get('/api/courses', listCourses);
 app.get('/api/courses/:courseId/reviews', listCourseReviews);
@@ -123,6 +149,17 @@ app.use('/api/admin', ...requireRole('admin'), adminRouter);
 app.get('/api/instructor/courses', requireAuth, getInstructorCourses);
 app.get('/api/instructor/courses/:id', requireAuth, getInstructorCourseById);
 app.get('/api/instructor/courses/:id/publish-guard', ...requireRole('instructor', 'admin'), getCoursePublishGuard);
+app.get('/api/instructor/courses/:id/certificate-templates', ...requireRole('instructor', 'admin'), getCourseCertificateTemplates);
+app.put('/api/instructor/courses/:id/certificate-templates', ...requireRole('instructor', 'admin'), updateCourseCertificateTemplates);
+app.get('/api/instructor/certificate-templates', ...requireRole('instructor', 'admin'), listInstructorCertificateTemplates);
+app.post('/api/instructor/certificate-templates', ...requireRole('instructor', 'admin'), createInstructorCertificateTemplate);
+app.put('/api/instructor/certificate-templates/:id', ...requireRole('instructor', 'admin'), updateInstructorCertificateTemplate);
+app.delete('/api/instructor/certificate-templates/:id', ...requireRole('instructor', 'admin'), deleteInstructorCertificateTemplate);
+app.get('/api/instructor/community/groups', ...requireRole('instructor', 'admin'), listInstructorCommunityGroups);
+app.post('/api/instructor/community/groups', ...requireRole('instructor', 'admin'), createInstructorCommunityGroup);
+app.put('/api/instructor/community/groups/:groupId', ...requireRole('instructor', 'admin'), updateInstructorCommunityGroup);
+app.put('/api/instructor/community/groups/:groupId/assign', ...requireRole('instructor', 'admin'), assignCommunityGroupToCourse);
+app.post('/api/instructor/categories', ...requireRole('instructor', 'admin'), createCategory);
 app.get('/api/courses/:id/curriculum', ...requireRole('instructor', 'admin'), getCourseCurriculum);
 app.post('/api/courses', ...requireRole('instructor', 'admin'), createCourse);
 app.put('/api/courses/:id', ...requireRole('instructor', 'admin'), updateCourse);

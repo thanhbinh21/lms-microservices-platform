@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Award, Sparkles, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { LearnChapterDto } from '@/app/actions/learning';
+import { cn } from '@/lib/utils';
 
 interface LessonNavigationProps {
   courseId: string;
@@ -14,6 +15,7 @@ interface LessonNavigationProps {
   currentLessonCompleted?: boolean;
   courseCompleted?: boolean;
   certificateNumber?: string | null;
+  isSticky?: boolean;
 }
 
 function getAllLessons(chapters: LearnChapterDto[]) {
@@ -31,6 +33,7 @@ export function LessonNavigation({
   currentLessonCompleted = false,
   courseCompleted = false,
   certificateNumber = null,
+  isSticky = false,
 }: LessonNavigationProps) {
   const allLessons = getAllLessons(chapters);
   const currentIndex = allLessons.findIndex((l) => l.id === currentLessonId);
@@ -43,10 +46,10 @@ export function LessonNavigation({
   const isLastLesson = currentIndex === allLessons.length - 1;
 
   return (
-    <div className="space-y-4">
+    <div className={cn('space-y-4', isSticky && 'sticky bottom-0 z-20 bg-white/90 backdrop-blur-sm -mx-4 px-4 py-3 rounded-t-xl shadow-lg shadow-black/10')}>
       <div className="grid grid-cols-2 gap-4">
         {canAccessPrev ? (
-          <Link href={`/learn/${courseId}/lesson/${prev.id}`} className="min-w-0">
+          <Link href={`/learn/${courseId}/lesson/${prev.id}`} className="min-w-0" data-nav="prev">
             <Button
               variant="outline"
               className="w-full justify-start gap-2 rounded-xl border-white/50 bg-white/40 px-4 py-5 backdrop-blur-sm hover:bg-white/60"
@@ -60,7 +63,7 @@ export function LessonNavigation({
         )}
 
         {canAccessNext ? (
-          <Link href={`/learn/${courseId}/lesson/${next.id}`} className="min-w-0">
+          <Link href={`/learn/${courseId}/lesson/${next.id}`} className="min-w-0" data-nav="next">
             <Button className="w-full justify-end gap-2 rounded-xl px-4 py-5 shadow-md shadow-primary/20">
               <span className="truncate text-sm">{next.title}</span>
               <ChevronRight className="size-4 shrink-0" />
@@ -89,7 +92,7 @@ export function LessonNavigation({
 
           <div className="grid gap-2 sm:grid-cols-3">
             {courseCompleted ? (
-              <Link href="/dashboard/certificates">
+              <Link href={`/certificates/${certificateNumber}`}>
                 <Button
                   variant="outline"
                   className="w-full justify-center gap-2 border-emerald-300/80 bg-white"

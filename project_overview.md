@@ -110,7 +110,7 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 
 ### Phase 9: Optimization & Technical Debt ✅ COMPLETED (core)
 - [x] **Phase 9.1:** Backend Cleanup — Gỡ Node Gateway (chỉ dùng Kong), Prisma migrations (sourceType, category, lastLoginAt), fix N+1, graceful shutdown. ✅ Completed: Mar 31, 2026
-- [x] **Phase 9.2:** Frontend Cleanup — SharedNavbar/Footer, `/courses/[slug]` route, Phase 7.5 (edit/delete chapter/lesson), ErrorBoundary, loading.tsx, mobile menu, active sidebar. ✅ Completed: Mar 31, 2026 (Updated hotfix: thumbnail upload + curriculum UX/status messaging + sample data seed; Apr 21, 2026: wizard Viet hoa co dau, chapter auto numbering, lesson edit + paid-price gate, media/content per lesson, publish redirect public view)
+- [x] **Phase 9.2:** Frontend Cleanup — SharedNavbar/Footer, `/courses/[slug]` route, Phase 7.5 (edit/delete chapter/lesson), ErrorBoundary, loading.tsx, mobile menu, active sidebar. ✅ Completed: Mar 31, 2026 (Updated hotfix: thumbnail upload + curriculum UX/status messaging + sample data seed; Apr 21, 2026: wizard Viet hoa co dau, chapter auto numbering, lesson edit + paid-price gate, media/content per lesson, publish redirect public view; Apr 28, 2026: Cloudinary image upload cho community/profile, thumbnail course auto-save ngay sau upload, instructor studio tab navigation ro rang hon)
 - [x] **Phase 9.3:** DX Improvements (partial) — Root scripts prisma:generate:all, prisma:migrate:deploy:all, prisma:push:all, setup:db, dev:web/dev:web:lite. ✅ Completed: Apr 18, 2026
   - Pending items chuyen sang Phase 9.13: `pnpm run setup`, `.nvmrc`, turbo pipeline cho Prisma, cleanup test files.
 - [x] **Phase 9.4:** Auth Role Policy Refactor — Register luon tao role STUDENT (hardcode trong register.controller.ts), bo role input tu client, registerSchema chi nhan email/password/name. ✅ Completed: Apr 18, 2026
@@ -189,6 +189,32 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 - [ ] **Phase 22:** Security Hardening — API rate limiting chuẩn hóa, input sanitization chống XSS, audit log cho admin actions, health check dashboard tổng hợp.
 - [ ] **Phase 23:** Testing & Quality Gate — Unit tests cho business logic core (enrollment, payment verify, Kafka handlers), integration tests cho payment flow E2E, API contract tests (Zod schema → validation), CI pipeline (lint + test truoc merge).
 
+### Phase 24-29: Growth & Polish (New — 2026-04-29)
+
+Chi tiết: Xem `plan/roadmap_phase_24_29.md`
+
+- [ ] **Phase 24:** Instructor Channel System — Model `InstructorProfile` (displayName, headline, bio, avatar, slug, socialLinks), API CRUD profile, public instructor listing (`/instructors`) + public profile page (`/instructors/[slug]`), `/instructor/profile` page thay the placeholder settings. ~3-4 ngày.
+- [ ] **Phase 25:** Global Q&A System — Thay the course community groups bang global Q&A. Model Question/Answer (title, content, courseId, lessonId, isResolved, upvotes), API CRUD + upvote + accept-answer, frontend `/dashboard/qa` + `/qa/[id]`, migrate/archive existing community data. ~3-4 ngày.
+- [ ] **Phase 26:** Community Verify Badge — Cap nhat UI community/Q&A: them icon verify xanh (CheckCircle2) cho author co role INSTRUCTOR, link to instructor profile. Co the merge voi Phase 25. ~0.5 ngày.
+- [ ] **Phase 27:** Instructor Revenue Display — Model `InstructorEarning` (instructorId, courseId, amount, revenueShare, status), payment consumer tao earning khi order completed, API earnings breakdown, update instructor analytics + settings payment page hien thi doanh thu. Payout withdrawal sang phase sau. ~2-3 ngày.
+- [ ] **Phase 28:** Instructor UX Audit — Phan tich chuyen sac UX trang `/learn/[courseId]`, instructor dashboard, course management wizard. Output: bao cao chi tiet voi cac de xuat cai tien uu tien theo impact/effort. ~1-2 ngày.
+- [ ] **Phase 29:** Full Admin Dashboard — Bo sung: `/admin/payouts` (approve/reject payout), `/admin/revenue` (platform revenue analytics + chart), `/admin/audit-log` (audit trail cho admin actions), `/admin/notifications` (notification history), `/admin/categories` (CRUD danh muc), `/admin/settings` (system config). ~4-5 ngày.
+
+### Phase 30-34: UX Foundation & Polish (Audit 2026-04-29)
+
+Chi tiet: Xem `plan/roadmap_phase_30_34.md`
+
+- [x] **Phase 30:** Accessibility & Core UX Foundation — Fix P0 accessibility (modals: `role="dialog"` + `aria-modal` + focus trap; sidebar: `aria-current` + `:focus-visible` ring + Escape key; learn sidebar: mobile close flow; lesson TEXT content renderer; certificate PDF preview thay .txt; analytics: fix revenue label + date range selector; settings: implement real data hoac remove placeholder). Fix P0 crash: `Date.parse` null safety khi `updatedAt`/`createdAt` undefined. Fix P0 admin: them "Don Giang Vien" vao sidebar, fix `isFlagged` filter (boolean thay vi string), fix FLAGGED badge (amber thay vi red BANNED). ✅ Completed: Apr 29, 2026
+- [x] **Phase 31:** Settings + Revenue Foundation — Payment Service API (`GET /api/instructor/earnings` + `GET /api/instructor/earnings/summary`), instructor earning creation on payment completion, settings page "Kenh cua toi" functional with earnings display + bank account form + transaction history + withdrawal placeholder. ✅ Completed: Apr 29, 2026
+- [x] **Phase 32:** Student Learn Page Polish — Collapsible chapters + active lesson highlight + progress per lesson (already done), sticky lesson navigation on scroll, keyboard shortcuts (ArrowLeft/Right/?), video playback speed selector (0.5x-2x), confetti on first certificate completion. ✅ Completed: Apr 29, 2026
+- [ ] **Phase 33:** Course Detail + Public Pages Polish — Course API tra ve `instructor` object day du (name, bio, avatar, slug); hien thi instructor real name thay vi `Giang vien #abc123`; instructor avatar + bio + profile link; related courses section; reviews: fix typo heading + add pagination + add text search; login: them forgot password + remember me (done); landing page: dynamic featured course thay vi hardcoded. Footer pages: `/about`, `/help`, `/terms`, `/privacy`, `/careers` placeholders created. ~1-2 ngay.
+- [ ] **Phase 34:** Admin Completeness + Security Hardening
+  - Backend: Audit log model + API endpoint, payout management API, category management API, server-side admin auth verification.
+  - Frontend: `/admin/instructor-requests` standalone page (done), `/admin/categories` CRUD, `/admin/audit-log`, reviews search + isFlagged fix (done), courses bulk actions, footer links cleanup (done).
+  - Security: JWT verification in auth middleware (done — verifyToken already full), IDOR fix enrollment (done — uses x-user-id header), VNPay transaction ID verify tu DB (done), enrollment unique constraint (done — schema), Kafka event payload validation with Zod schemas (done), Redis keys TTL, request timeouts, graceful shutdown all services, CORS origin restriction (done — env-based).
+  - Remaining: Audit log model/API, payout API, category API, bulk actions, audit log page.
+  ~4-5 ngay.
+
 ### Phase 9.13: DX Hardening ✅ COMPLETED
 - [x] **Phase 9.13:** DX Hardening — `pnpm run setup` bootstrap (install + docker:up + setup:db + seed), `.nvmrc` node version pin, Prisma orchestration vao turbo pipeline. ✅ Completed: Apr 27, 2026
 
@@ -200,14 +226,14 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 ### Phase C: Community Feature ✅ COMPLETED
 - [x] **Phase C-1:** Community Backend — Model CommunityGroup/CommunityMember/CommunityPost trong course_db. Auto-join via Kafka event `learning.enrollment.created`. API CRUD: listGroups, listPosts (cursor pagination), createPost/reply, joinGroup. Kong route `/community/*`. ✅ Completed: Apr 27, 2026 (done - 2026-04-27 - by BINH)
 - [x] **Phase C-2:** Community Frontend — `/dashboard/community` list nhom da tham gia, `/community/[groupId]` feed bai viet + form dang bai + reply, `/learn/[courseId]` sidebar tab "Thao luan" link toi community group. Thay the placeholder "Sap ra mat". ✅ Completed: Apr 27, 2026 (done - 2026-04-27 - by BINH)
-- [x] **Phase C-3:** Community Refactor — Phân tách nhóm Public (Admin quản lý) và Private (Instructor). Bổ sung trường `username` auto-gen từ email để làm định danh duy nhất. Cập nhật display name bằng real data qua Internal API `/internal/users/batch`. Cập nhật giao diện tiếng Việt có dấu. ✅ Completed: 2026-04-28 (done - 2026-04-28 - by BINH)
+- [x] **Phase C-3:** Community Refactor — Phân tách nhóm Public (Admin quản lý) và Private (Instructor). Bổ sung trường `username` auto-gen từ email để làm định danh duy nhất. Cập nhật display name bằng real data qua Internal API `/internal/users/batch`. Cập nhật giao diện tiếng Việt có dấu. ✅ Completed: 2026-04-28 (done - 2026-04-28 - by BINH) (Apr 28, 2026: community post/reply upload image truc tiep qua Cloudinary thay cho URL prompt)
 
 ### Phase AI: AI Features ⏳ PENDING (Setup)
-- [ ] **Phase AI-1:** AI Course Recommendation — Goi y khoa hoc dua tren learning history, enrollment patterns, rating. Dung Gemini API. Can: ai-service, Gemini API key, Kong route `/ai/*`.
-- [ ] **Phase AI-2:** AI Learning Assistant / Chatbot — Tro ly hoc tap AI cho student, hoi dap noi dung bai hoc, tom tat, giai thich. Can: ChatSession model, Gemini API, WebSocket hoac SSE.
-- [ ] **Phase AI-3:** AI Content Generation for Instructors — Ho tro instructor tao quiz, tom tat bai, outline khoa hoc. Can: Gemini API, instructor UI integration.
+- [ ] **Phase AI-1:** AI Chatbot Production — AI Service (Express :3007), Prisma + ai_db schema, Kong route `/ai/*`, Redis rate limiter (30 msg/user/giờ), Redis cache (course: 5 phút, chat: 15 phút), Gemini Pro client, SSE streaming. Conversation memory: lưu toàn bộ messages + semantic summary (tự động tạo sau 10 messages). Chat API: conversation CRUD, message SSE, cursor pagination, input validation (prompt injection), output PII redaction. Frontend: ChatWidget floating + ChatPanel + useChat hook. Context loader: load full curriculum structure từ Course Service. ~6 ngày.
+- [ ] **Phase AI-2:** AI Quiz Generator (System + Instructor) — Pre-generate quiz bằng AI khi instructor tạo lesson, cached vĩnh viễn, student làm quiz không gọi AI. Quiz CRUD: generate, publish, attempt, score.
+- [ ] **Phase AI-3:** AI Course Outline + Post Suggestions (Instructor) — Course Outline Generator: prompt engineering, cached 24h. Post Suggestions: AI cải thiện bài post cộng đồng (tiêu đề, hashtag, format).
 - [ ] **Phase AI-4:** AI-Powered Semantic Search — Nang cap search tu ILIKE thanh semantic search (vector embeddings). Can: pgvector extension tren Neon, Gemini embedding model.
-- [ ] **Phase AI-5:** AI Auto-Grading & Feedback — Cham bai tu dong, feedback ca nhan hoa. Can: Quiz/Assignment model (chua co), Gemini API.
+- [ ] **Phase AI-5:** AI Video Transcript — Whisper transcription pipeline (mp4 → audio → transcript → embed → pgvector). Optional, chi lam khi can chi tiet tu video bai giang.
 
 ---
 
@@ -219,6 +245,9 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 *   **Data Aggregation:** Không dùng JOIN giữa các DB. Frontend sẽ gọi song song các API (Auth, Course) và gộp dữ liệu tại Server Actions.
 *   **Prisma Singleton:** Implemented Global Variable pattern trong `packages/db-prisma` để ngăn "too many connections" khi Next.js HMR reload code.
 *   **Neon Cold Start:** Database sẽ auto-pause sau 5 phút idle. Request đầu tiên sau khi ngủ sẽ chậm hơn (~2-3s).
+*   **Instructor Channel:** Mỗi instructor có 1 `InstructorProfile` (slug unique, displayName, headline, bio, avatar, socialLinks). Public listing at `/instructors`.
+*   **Revenue Share:** Instructor nhận 70% mỗi order thành công, platform giữ 30%. Số % này là system config (admin có thể thay đổi từ `/admin/settings`).
+*   **Q&A vs Community:** Hệ thống chuyển từ Community Groups (per-course, auto-join) sang Global Q&A (1 trang toàn hệ thống, Q&A có thể gắn courseId tùy chọn). Dữ liệu community cũ được soft-archive.
 
 ### Environment & Validation
 *   **T3 Env Pattern:** Package `env-validator` sử dụng Zod để validate `.env` ngay lúc runtime. App sẽ crash với error message rõ ràng nếu thiếu biến.

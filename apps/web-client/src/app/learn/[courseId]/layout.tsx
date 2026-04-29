@@ -156,12 +156,19 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
 
       {/* ── Mobile sidebar overlay ──────────────────────────────────────── */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-[300px] bg-[#0c1425] text-slate-200 shadow-2xl">
+        <div
+          className="fixed inset-0 z-50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setSidebarOpen(false)}
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <aside
+            className="absolute inset-y-0 left-0 w-[300px] bg-[#0c1425] text-slate-200 shadow-2xl"
+            onKeyDown={(e) => e.key === 'Escape' && setSidebarOpen(false)}
+          >
             <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
               <h2 className="line-clamp-1 text-sm font-bold text-white">{data.course.title}</h2>
-              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)} className="text-slate-400 hover:text-white hover:bg-white/10">
+              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)} aria-label="Đóng menu giáo trình" className="text-slate-400 hover:text-white hover:bg-white/10">
                 <X className="size-5" />
               </Button>
             </div>

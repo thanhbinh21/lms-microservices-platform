@@ -164,14 +164,16 @@ export async function getAdminCourseStats(): Promise<ApiResponse<any>> {
 export async function getAdminReviews(params: {
   page?: number;
   limit?: number;
-  isFlagged?: string;
+  isFlagged?: boolean;
   courseId?: string;
+  search?: string;
 }): Promise<ApiResponse<{ reviews: any[]; pagination: any }>> {
   const query = new URLSearchParams();
   if (params.page) query.set('page', String(params.page));
   if (params.limit) query.set('limit', String(params.limit));
-  if (params.isFlagged) query.set('isFlagged', params.isFlagged);
+  if (params.isFlagged !== undefined) query.set('isFlagged', String(params.isFlagged));
   if (params.courseId) query.set('courseId', params.courseId);
+  if (params.search) query.set('search', params.search);
 
   return callApi<{ reviews: any[]; pagination: any }>(
     `/course/api/admin/reviews?${query.toString()}`,

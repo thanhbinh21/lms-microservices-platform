@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,8 +22,9 @@ import {
   ClipboardList,
   Clapperboard,
 } from 'lucide-react';
-import { logoutAction } from '@/app/actions/auth';
-import { logout } from '@/lib/redux/authSlice';
+import { confirmMediaUploadAction, requestMediaUploadAction } from '@/app/actions/instructor';
+import { logoutAction, updateProfileAvatarAction } from '@/app/actions/auth';
+import { logout, setUser } from '@/lib/redux/authSlice';
 import { AdminInstructorRequestsPanel } from '@/components/admin/AdminInstructorRequestsPanel';
 import { SecurityPanel } from './panels/SecurityPanel';
 import { NotificationsPanel } from './panels/NotificationsPanel';
@@ -48,7 +49,7 @@ export function ProfileSettings() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const dispatch = useAppDispatch();
-  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { user, isAuthenticated, accessToken } = useAppSelector((state) => state.auth);
   const normalizedRole = (user?.role || '').toUpperCase();
   const isAdmin = normalizedRole === 'ADMIN';
   const canAccessInstructorStudio = normalizedRole === 'INSTRUCTOR';
@@ -74,6 +75,18 @@ export function ProfileSettings() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar || '');
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setAvatarUrl(user?.avatar || '');
+  }, [user?.avatar]);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -100,6 +113,84 @@ export function ProfileSettings() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     }, 1000);
+  };
+
+  const uploadWithPresigned = async (presignedUrl: string, file: File, uploadFields?: Record<string, string>) => {
+    if (uploadFields) {
+      const formData = new FormData();
+      Object.entries(uploadFields).forEach(([key, value]) => formData.append(key, value));
+      formData.append('file', file);
+
+      const response = await fetch(presignedUrl, {
+        method: 'POST',
+        body: formData,
+      });
+
+      return response.ok;
+    }
+
+    const response = await fetch(presignedUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    });
+
+    return response.ok;
+  };
+
+  const handleAvatarUpload = async (file?: File | null) => {
+    if (!file || !user || !accessToken) return;
+
+    setIsUploadingAvatar(true);
+
+    try {
+      const presigned = await requestMediaUploadAction({
+        filename: file.name,
+        mimeType: file.type || 'image/jpeg',
+        size: file.size,
+        type: 'IMAGE',
+      });
+
+      if (!presigned.success || !presigned.data) {
+        return;
+      }
+
+      const uploaded = await uploadWithPresigned(
+        presigned.data.presignedUrl,
+        file,
+        presigned.data.uploadMethod === 'POST_FORM' ? presigned.data.uploadFields : undefined,
+      );
+
+      if (!uploaded) {
+        return;
+      }
+
+      const confirmed = await confirmMediaUploadAction(presigned.data.mediaId);
+      if (!confirmed.success || !confirmed.data?.url) {
+        return;
+      }
+
+      const nextAvatar = confirmed.data.url;
+      setAvatarUrl(nextAvatar);
+      await updateProfileAvatarAction(nextAvatar);
+      dispatch(
+        setUser({
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            username: user.username,
+            avatar: nextAvatar,
+            role: user.role,
+          },
+          accessToken,
+        }),
+      );
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   const goToTab = (tab: TabId, opts?: { requestId?: string | null }) => {
@@ -132,7 +223,13 @@ export function ProfileSettings() {
     return [base[0], adminEntry, ...base.slice(1)];
   }, [isAdmin]);
 
-  if (!user) return null;
+  if (!isMounted || !user) {
+    return (
+      <div className="glass-page flex min-h-screen items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="glass-page relative min-h-screen overflow-hidden pb-12 text-foreground">
@@ -210,7 +307,7 @@ export function ProfileSettings() {
                 onBackToList={backToRequestList}
               />
             ) : activeTab === 'personal' ? (
-              <Card className="glass-panel relative overflow-hidden rounded-[2rem] border-white/60 shadow-xl">
+              <Card className="glass-panel relative overflow-hidden rounded-4xl border-white/60 shadow-xl">
                 <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-primary/5 blur-3xl" />
 
                 <CardHeader className="p-8 pb-4">
@@ -223,8 +320,12 @@ export function ProfileSettings() {
                 <CardContent className="space-y-8 p-8 pt-4">
                   <div className="flex items-center gap-6">
                     <div className="group relative cursor-pointer">
-                      <div className="relative flex size-28 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-gradient-to-br from-primary to-indigo-500 text-4xl font-bold text-white shadow-xl">
-                        {user.name?.charAt(0) || 'U'}
+                      <div className="relative flex size-28 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-linear-to-br from-primary to-indigo-500 text-4xl font-bold text-white shadow-xl">
+                        {avatarUrl ? (
+                          <Image src={avatarUrl} alt={user.name || 'Ảnh đại diện'} fill className="object-cover" />
+                        ) : (
+                          user.name?.charAt(0) || 'U'
+                        )}
                         <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
                           <Camera className="h-8 w-8 text-white drop-shadow-md" />
                         </div>
@@ -234,14 +335,28 @@ export function ProfileSettings() {
                       <p className="font-bold text-foreground">Ảnh đại diện</p>
                       <div className="flex gap-3">
                         <Button
+                          type="button"
                           variant="secondary"
                           className="rounded-xl border border-white bg-white/80 font-bold shadow-sm hover:bg-white"
+                          onClick={() => avatarInputRef.current?.click()}
+                          disabled={isUploadingAvatar}
                         >
-                          Tải ảnh lên
+                          {isUploadingAvatar ? 'Đang tải...' : 'Tải ảnh lên'}
                         </Button>
                         <Button variant="ghost" className="font-bold text-muted-foreground">
                           Xóa
                         </Button>
+                        <input
+                          ref={avatarInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            void handleAvatarUpload(file);
+                            event.currentTarget.value = '';
+                          }}
+                        />
                       </div>
                       <p className="text-xs font-medium text-muted-foreground">JPEG hoặc PNG không vượt quá 2MB.</p>
                     </div>
@@ -296,10 +411,10 @@ export function ProfileSettings() {
                   </div>
                 </CardContent>
 
-                <CardFooter className="mt-6 flex items-center justify-end gap-4 rounded-b-[2rem] border-t border-white/50 bg-white/10 p-8 pt-0">
+                <CardFooter className="mt-6 flex items-center justify-end gap-4 rounded-b-4xl border-t border-white/50 bg-white/10 p-8 pt-0">
                   {saved && (
                     <span className="animate-in fade-in zoom-in slide-in-from-right-4 flex items-center gap-1.5 text-sm font-bold text-emerald-600 duration-300">
-                      <CheckCircle2 className="h-5 w-5" /> Đã lưu thành công
+                      <CheckCircle2 className="h-5 w-5" /> Đã cập nhật ảnh đại diện
                     </span>
                   )}
                   <Button variant="ghost" className="mt-6 rounded-xl font-bold hover:bg-white/60">
@@ -320,7 +435,7 @@ export function ProfileSettings() {
             ) : activeTab === 'display' ? (
               <DisplayPanel />
             ) : (
-              <Card className="glass-panel rounded-[2rem] border-white/60 shadow-xl">
+              <Card className="glass-panel rounded-4xl border-white/60 shadow-xl">
                 <CardHeader className="p-8">
                   <CardTitle className="text-xl font-bold">
                     {sidebarItems.find((s) => s.id === activeTab)?.label ?? 'Cài đặt'}

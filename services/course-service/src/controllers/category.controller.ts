@@ -8,9 +8,38 @@ import { cacheGet, cacheInvalidate } from '@lms/cache';
 
 const createCategorySchema = z.object({
   name: z.string().min(2, 'Ten danh muc toi thieu 2 ky tu'),
-  slug: z.string().min(2).regex(/^[a-z0-9-]+$/, 'Slug chi chua chu thuong, so va dau gach ngang'),
+  slug: z.string().min(2).regex(/^[a-z0-9-]+$/, 'Slug chi chua chu thuong, so va dau gach ngang').optional(),
   order: z.number().int().min(0).default(0),
 });
+
+function normalizeSlug(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+async function generateUniqueCategorySlug(name: string): Promise<string> {
+  const base = normalizeSlug(name);
+  const existing = await prisma.category.findMany({
+    where: { slug: { startsWith: base } },
+    select: { slug: true },
+  });
+
+  const existingSet = new Set(existing.map((item) => item.slug));
+  if (!existingSet.has(base)) {
+    return base;
+  }
+
+  let counter = 1;
+  while (existingSet.has(`${base}-${counter}`)) {
+    counter += 1;
+  }
+  return `${base}-${counter}`;
+}
 
 /** GET /api/categories */
 export async function listCategories(req: Request, res: Response) {
@@ -52,10 +81,27 @@ export async function createCategory(req: Request, res: Response) {
   try {
     const validated = createCategorySchema.parse(req.body);
 
+    const slugInput = validated.slug?.trim();
+    const normalizedSlug = slugInput ? normalizeSlug(slugInput) : '';
+
+    if (normalizedSlug) {
+      const existedSlug = await prisma.category.findUnique({ where: { slug: normalizedSlug } });
+      if (existedSlug) {
+        const conflict: ApiResponse<null> = {
+          success: false,
+          code: 409,
+          message: 'Slug da ton tai',
+          data: null,
+          trace_id: traceId,
+        };
+        return res.status(409).json(conflict);
+      }
+    }
+
     const category = await prisma.category.create({
       data: {
         name: validated.name,
-        slug: validated.slug,
+        slug: normalizedSlug || (await generateUniqueCategorySlug(validated.name)),
         order: validated.order,
       },
     });

@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 const navItems = [
   { label: 'Trang chủ', href: '/' },
   { label: 'Khóa học', href: '/courses' },
+  { label: 'Giảng viên', href: '/instructors' },
   { label: 'Cộng đồng', href: '/community' },
   { label: 'Hỗ trợ', href: '/#ho-tro' },
 ];
@@ -101,10 +102,16 @@ export function SharedNavbar() {
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" className="relative flex items-center gap-2 rounded-full pl-2 pr-3 py-1 h-9 hover:bg-slate-100">
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-bold text-primary shadow-sm">
-                      {user!.name?.charAt(0) || 'U'}
-                    </span>
-                    <span className="text-sm font-semibold truncate max-w-[160px]">{user!.name}</span>
+                    {user?.avatar ? (
+                      <span className="flex size-7 shrink-0 overflow-hidden rounded-full border border-primary/20 bg-primary/10 shadow-sm">
+                        <Image src={user.avatar} alt={user.name || 'Ảnh đại diện'} width={28} height={28} className="size-full object-cover" />
+                      </span>
+                    ) : (
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-bold text-primary shadow-sm">
+                        {user!.name?.charAt(0) || 'U'}
+                      </span>
+                    )}
+                    <span className="text-sm font-semibold truncate max-w-40">{user!.name}</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-60 p-2 rounded-xl">

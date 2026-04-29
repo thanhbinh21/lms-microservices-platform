@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Flag, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatusBadge } from '@/components/admin/StatusBadge';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 import { getAdminReviews, flagAdminReview, deleteAdminReview } from '@/app/actions/admin';
 
@@ -40,7 +39,7 @@ export default function AdminReviewsPage() {
     const res = await getAdminReviews({
       page,
       limit: 10,
-      isFlagged: flagFilter || undefined,
+      isFlagged: flagFilter === 'true' ? true : flagFilter === 'false' ? false : undefined,
     });
     if (res.success && res.data) {
       setReviews(res.data.reviews);
@@ -139,7 +138,9 @@ export default function AdminReviewsPage() {
                       </td>
                       <td className="py-3 pr-4">
                         {r.isFlagged ? (
-                          <StatusBadge status="BANNED" />
+                          <span className="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700">
+                            Gắn cờ
+                          </span>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}

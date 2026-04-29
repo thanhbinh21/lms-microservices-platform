@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Award, Download, Loader2, Trophy } from 'lucide-react';
+import { Award, Loader2, Trophy } from 'lucide-react';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { DashboardTabs } from '@/components/dashboard/dashboard-tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,43 +11,14 @@ import { ScrollReveal } from '@/components/ui/scroll-reveal';
 import { useAppSelector } from '@/lib/redux/hooks';
 import { getMyCertificatesAction, type MyCertificateSummary } from '@/app/actions/learning';
 
-function downloadCertificateText(params: {
-  certificateNumber: string;
-  learnerName: string;
-  courseTitle: string;
-  completedAt: string;
-  issuedAt: string;
-}) {
-  const content = [
-    'LMS CERTIFICATE OF COMPLETION',
-    '',
-    `Certificate Number: ${params.certificateNumber}`,
-    `Learner: ${params.learnerName}`,
-    `Course: ${params.courseTitle}`,
-    `Completed At: ${new Date(params.completedAt).toLocaleDateString('vi-VN')}`,
-    `Issued At: ${new Date(params.issuedAt).toLocaleDateString('vi-VN')}`,
-  ].join('\n');
-
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = window.URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `certificate-${params.certificateNumber}.txt`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  window.URL.revokeObjectURL(url);
-}
-
 export default function CertificatesPage() {
-  const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAppSelector((state) => state.auth);
   const [items, setItems] = useState<MyCertificateSummary[] | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated) {
-      router.push('/login');
+      window.location.href = '/login';
       return;
     }
 
@@ -57,7 +27,7 @@ export default function CertificatesPage() {
       const data: MyCertificateSummary[] = res.success && res.data ? res.data : [];
       setItems(data);
     })();
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading]);
 
   return (
     <div className="glass-page relative min-h-screen text-foreground overflow-hidden pb-20">
@@ -120,6 +90,9 @@ export default function CertificatesPage() {
                         <p className="mt-0.5 text-xs font-medium text-muted-foreground">
                           Hoan thanh: {new Date(item.completedAt).toLocaleDateString('vi-VN')}
                         </p>
+                        <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+                          Mau chung chi: {item.template?.name || 'Mac dinh'}
+                        </p>
                         <p className="mt-0.5 text-[11px] font-semibold text-amber-700">
                           Ma chung chi: {item.certificateNumber}
                         </p>
@@ -127,22 +100,12 @@ export default function CertificatesPage() {
                     </div>
 
                     <div className="flex gap-2 pt-2 border-t border-amber-200/60">
-                      <Button
-                        variant="outline"
-                        className="flex-1 gap-2 rounded-xl font-bold border-amber-300/60"
-                        onClick={() =>
-                          downloadCertificateText({
-                            certificateNumber: item.certificateNumber,
-                            learnerName: user?.name || 'Hoc vien',
-                            courseTitle: item.course.title,
-                            completedAt: item.completedAt,
-                            issuedAt: item.issuedAt,
-                          })
-                        }
-                      >
-                        <Download className="size-4" />
-                        Tai chung chi
-                      </Button>
+                      <Link href={`/certificates/${encodeURIComponent(item.certificateNumber)}`} className="flex-1">
+                        <Button variant="outline" className="w-full gap-2 rounded-xl font-bold border-amber-300/60">
+                          <Award className="size-4" />
+                          Xem chung chi
+                        </Button>
+                      </Link>
                       <Link href={`/courses/${item.course.slug}`} className="flex-1">
                         <Button variant="ghost" className="w-full rounded-xl font-bold">
                           Xem khoa hoc

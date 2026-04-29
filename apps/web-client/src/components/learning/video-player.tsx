@@ -48,6 +48,7 @@ export function VideoPlayer({
   const [canComplete, setCanComplete] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [completionMessage, setCompletionMessage] = useState('');
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
   const syncProgress = useCallback(async () => {
     if (sourceType === 'YOUTUBE') return;
@@ -76,6 +77,14 @@ export function VideoPlayer({
     positionRef.current = lastPosition;
     setCompletionMessage('');
   }, [lessonId, initialCompleted, lastPosition, sourceType]);
+
+  // Apply playback speed to video element
+  useEffect(() => {
+    const el = videoRef.current;
+    if (el && sourceType !== 'YOUTUBE') {
+      el.playbackRate = playbackSpeed;
+    }
+  }, [playbackSpeed, sourceType]);
 
   const handleTimeUpdate = () => {
     const el = videoRef.current;
@@ -156,6 +165,25 @@ export function VideoPlayer({
             />
           )}
         </div>
+
+        {sourceType !== 'YOUTUBE' && (
+          <div className="absolute bottom-3 right-3 z-10">
+            <select
+              value={playbackSpeed}
+              onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
+              className="rounded-lg border border-white/30 bg-black/60 px-2 py-1 text-xs text-white backdrop-blur-sm focus:border-white/60 focus:outline-none"
+              title="Toc do phat"
+            >
+              <option value={0.5}>0.5x</option>
+              <option value={0.75}>0.75x</option>
+              <option value={1}>1x</option>
+              <option value={1.25}>1.25x</option>
+              <option value={1.5}>1.5x</option>
+              <option value={1.75}>1.75x</option>
+              <option value={2}>2x</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {!isCompleted && sourceType !== 'YOUTUBE' && duration > 0 && (

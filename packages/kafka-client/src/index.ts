@@ -1,5 +1,6 @@
 import { Kafka, Producer, Consumer, Partitioners, EachMessagePayload } from 'kafkajs';
 import { randomUUID } from 'crypto';
+import { z } from 'zod';
 
 // ─── Kafka client (shared) ────────────────────────────────────────────────────
 
@@ -54,6 +55,53 @@ export const TOPICS = {
 
 export type KafkaTopic = (typeof TOPICS)[keyof typeof TOPICS];
 
+// ─── Zod Schemas for Kafka Event Validation ───────────────────────────────────
+
+export const PaymentOrderCompletedSchema = z.object({
+  order_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  course_id: z.string().uuid(),
+  instructor_id: z.string(),
+  amount: z.number().positive(),
+  currency: z.string(),
+  payment_method: z.literal('vnpay'),
+  vnp_txn_ref: z.string(),
+  vnp_transaction_no: z.string(),
+  paid_at: z.string().datetime(),
+});
+
+export const EnrollmentCreatedSchema = z.object({
+  user_id: z.string().uuid(),
+  course_id: z.string().uuid(),
+  order_id: z.string(),
+  enrolled_at: z.string().datetime(),
+});
+
+export type ValidatedPaymentOrderCompleted = z.infer<typeof PaymentOrderCompletedSchema>;
+export type ValidatedEnrollmentCreated = z.infer<typeof EnrollmentCreatedSchema>;
+
+/**
+ * Validate Kafka event payload against Zod schema.
+ * Returns the parsed data on success, null on failure (and logs).
+ */
+export function validateKafkaEvent<T>(
+  schema: z.ZodSchema<T>,
+  data: unknown,
+  eventType: string,
+  logger: { warn: (args: object, msg: string) => void; error: (args: object, msg: string) => void },
+): T | null {
+  const result = schema.safeParse(data);
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+    logger.warn(
+      { eventType, issues, data },
+      `Kafka event ${eventType} failed Zod validation — rejecting`,
+    );
+    return null;
+  }
+  return result.data;
+}
+
 // ─── Typed Events ─────────────────────────────────────────────────────────────
 
 export interface KafkaEventEnvelope<T> {
@@ -68,6 +116,7 @@ export interface PaymentOrderCompletedEvent {
   order_id: string;
   user_id: string;
   course_id: string;
+  instructor_id: string;
   amount: number;
   currency: string;
   payment_method: 'vnpay';

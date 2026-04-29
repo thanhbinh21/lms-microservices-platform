@@ -8,6 +8,9 @@ import {
   type PaymentOrderCompletedEvent,
   type EnrollmentCreatedEvent,
   type KafkaTopic,
+  validateKafkaEvent,
+  PaymentOrderCompletedSchema,
+  EnrollmentCreatedSchema,
 } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
 import prisma from './prisma';
@@ -29,7 +32,15 @@ export async function startKafkaConsumers(): Promise<void> {
 
   // Handler chung cho ca main + retry topics.
   const handler = async (event: { data: PaymentOrderCompletedEvent; trace_id: string }) => {
-    const { order_id, user_id, course_id, paid_at } = event.data;
+    const validated = validateKafkaEvent(
+      PaymentOrderCompletedSchema,
+      event.data,
+      'payment.order.completed',
+      logger,
+    );
+    if (!validated) return; // Reject malformed events
+
+    const { order_id, user_id, course_id, paid_at } = validated;
 
     logger.info(
       { orderId: order_id, userId: user_id, courseId: course_id, traceId: event.trace_id },
@@ -107,7 +118,15 @@ export async function startKafkaConsumers(): Promise<void> {
     topic: TOPICS.ENROLLMENT_CREATED,
     groupId: 'course-service.community.autojoin',
     handler: async (event) => {
-      const { user_id, course_id } = event.data;
+      const validated = validateKafkaEvent(
+        EnrollmentCreatedSchema,
+        event.data,
+        'enrollment.created',
+        logger,
+      );
+      if (!validated) return; // Reject malformed events
+
+      const { user_id, course_id } = validated;
       const result = await ensureCommunityMembershipForCourse({
         userId: user_id,
         courseId: course_id,

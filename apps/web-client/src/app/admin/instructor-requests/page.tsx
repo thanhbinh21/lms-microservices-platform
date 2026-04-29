@@ -1,15 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { AdminInstructorRequestsPanel } from '@/components/admin/AdminInstructorRequestsPanel';
 
-/** Điều hướng sang Cài đặt tài khoản → tab Quản lý đơn GV */
-export default function AdminInstructorRequestsRedirectPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/profile?tab=instructor-requests');
-  }, [router]);
-
-  return null;
+export default function AdminInstructorRequestsPage() {
+  const params = useParams();
+  const requestId = params.id as string | null;
+  return <AdminInstructorRequestsPanel requestId={requestId} onOpenDetail={() => {}} onBackToList={() => {}} />;
 }

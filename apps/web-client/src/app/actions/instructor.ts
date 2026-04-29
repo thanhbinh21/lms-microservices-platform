@@ -87,6 +87,12 @@ export interface CourseDto {
     chapters: number;
     enrollments: number;
   };
+  communityGroups?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    courseId?: string | null;
+  }>;
 }
 
 export interface ChapterDto {
@@ -127,6 +133,15 @@ interface PresignedUploadDto {
   uploadFields?: Record<string, string>;
 }
 
+export interface MediaUploadRequestInput {
+  filename: string;
+  mimeType: string;
+  size: number;
+  type: 'VIDEO' | 'IMAGE' | 'DOCUMENT';
+  courseId?: string;
+  lessonId?: string;
+}
+
 export interface CourseCurriculumDto {
   id: string;
   title: string;
@@ -145,6 +160,83 @@ export interface CourseCategoryDto {
   id: string;
   name: string;
   slug: string;
+}
+
+export interface InstructorCommunityGroupDto {
+  id: string;
+  type: 'PUBLIC' | 'COURSE_PRIVATE';
+  courseId: string | null;
+  ownerId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  memberCount: number;
+  postCount: number;
+  createdAt: string;
+  updatedAt: string;
+  course?: {
+    id: string;
+    title: string;
+    slug: string;
+  } | null;
+}
+
+export interface InstructorProfileDto {
+  id: string;
+  instructorId: string;
+  slug: string;
+  displayName: string;
+  headline?: string | null;
+  bio?: string | null;
+  avatar?: string | null;
+  socialLinks: Record<string, string>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PublicInstructorCardDto {
+  id: string;
+  instructorId: string;
+  slug: string;
+  displayName: string;
+  headline?: string | null;
+  bio?: string | null;
+  avatar?: string | null;
+  socialLinks: Record<string, string>;
+  courseCount: number;
+  averageRating: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InstructorCourseSummaryDto {
+  id: string;
+  slug: string;
+  title: string;
+  description?: string | null;
+  thumbnail?: string | null;
+  price: number;
+  level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  averageRating: number;
+  ratingCount: number;
+  enrollmentCount: number;
+  createdAt: string;
+}
+
+export interface InstructorPublicProfileDto {
+  profile: InstructorProfileDto;
+  courseCount: number;
+  averageRating: number;
+  courses: InstructorCourseSummaryDto[];
+}
+
+export interface CertificateTemplateDto {
+  id: string;
+  name: string;
+  description?: string | null;
+  previewUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PublishGuardDto {
@@ -540,6 +632,134 @@ export async function getCourseCategoriesAction() {
   return callApi<CourseCategoryDto[]>(`/course/api/categories`, { method: 'GET' });
 }
 
+export async function createCourseCategoryAction(payload: { name: string; slug?: string; order?: number }) {
+  const result = await callApi<CourseCategoryDto>(
+    `/course/api/instructor/categories`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+
+  revalidateTag('categories', 'max');
+  return { success: result.success, message: result.message, data: result.data };
+}
+
+export async function getInstructorCommunityGroupsAction() {
+  return callApi<InstructorCommunityGroupDto[]>(
+    `/course/api/instructor/community/groups`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function createInstructorCommunityGroupAction(payload: {
+  name: string;
+  slug?: string;
+  description?: string;
+}) {
+  return callApi<InstructorCommunityGroupDto>(
+    `/course/api/instructor/community/groups`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+}
+
+export async function updateInstructorCommunityGroupAction(groupId: string, payload: {
+  name?: string;
+  slug?: string;
+  description?: string;
+}) {
+  return callApi<InstructorCommunityGroupDto>(
+    `/course/api/instructor/community/groups/${groupId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+}
+
+export async function assignCommunityGroupToCourseAction(groupId: string, courseId: string | null) {
+  return callApi<InstructorCommunityGroupDto>(
+    `/course/api/instructor/community/groups/${groupId}/assign`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ courseId }),
+    },
+    true,
+  );
+}
+
+export async function getInstructorCertificateTemplatesAction() {
+  return callApi<CertificateTemplateDto[]>(
+    `/course/api/instructor/certificate-templates`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function createInstructorCertificateTemplateAction(payload: {
+  name: string;
+  description?: string;
+  previewUrl?: string;
+}) {
+  return callApi<CertificateTemplateDto>(
+    `/course/api/instructor/certificate-templates`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+}
+
+export async function updateInstructorCertificateTemplateAction(templateId: string, payload: {
+  name?: string;
+  description?: string;
+  previewUrl?: string;
+}) {
+  return callApi<CertificateTemplateDto>(
+    `/course/api/instructor/certificate-templates/${templateId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+}
+
+export async function deleteInstructorCertificateTemplateAction(templateId: string) {
+  return callApi<null>(
+    `/course/api/instructor/certificate-templates/${templateId}`,
+    { method: 'DELETE' },
+    true,
+  );
+}
+
+export async function getCourseCertificateTemplatesAction(courseId: string) {
+  return callApi<string[]>(
+    `/course/api/instructor/courses/${courseId}/certificate-templates`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function updateCourseCertificateTemplatesAction(courseId: string, templateIds: string[]) {
+  return callApi<string[]>(
+    `/course/api/instructor/courses/${courseId}/certificate-templates`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ templateIds }),
+    },
+    true,
+  );
+}
+
 export async function getCoursePublishGuardAction(courseId: string) {
   return callApi<PublishGuardDto>(`/course/api/instructor/courses/${courseId}/publish-guard`, { method: 'GET' }, true);
 }
@@ -680,21 +900,14 @@ export async function requestLessonUploadAction(params: {
   courseId: string;
   lessonId: string;
 }) {
-  return callApi<PresignedUploadDto>(
-    `/media/api/upload/presigned`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        filename: params.filename,
-        mimeType: params.mimeType,
-        size: params.size,
-        type: 'VIDEO',
-        courseId: params.courseId,
-        lessonId: params.lessonId,
-      }),
-    },
-    true,
-  );
+  return requestMediaUploadAction({
+    filename: params.filename,
+    mimeType: params.mimeType,
+    size: params.size,
+    type: 'VIDEO',
+    courseId: params.courseId,
+    lessonId: params.lessonId,
+  });
 }
 
 export async function requestCourseThumbnailUploadAction(params: {
@@ -703,23 +916,46 @@ export async function requestCourseThumbnailUploadAction(params: {
   size: number;
   courseId: string;
 }) {
+  return requestMediaUploadAction({
+    filename: params.filename,
+    mimeType: params.mimeType,
+    size: params.size,
+    type: 'IMAGE',
+    courseId: params.courseId,
+  });
+}
+
+export async function requestMediaUploadAction(params: MediaUploadRequestInput) {
+  const payload: Record<string, string | number> = {
+    filename: params.filename,
+    mimeType: params.mimeType,
+    size: params.size,
+    type: params.type,
+  };
+
+  if (params.courseId) {
+    payload.courseId = params.courseId;
+  }
+
+  if (params.lessonId) {
+    payload.lessonId = params.lessonId;
+  }
+
   return callApi<PresignedUploadDto>(
     `/media/api/upload/presigned`,
     {
       method: 'POST',
-      body: JSON.stringify({
-        filename: params.filename,
-        mimeType: params.mimeType,
-        size: params.size,
-        type: 'IMAGE',
-        courseId: params.courseId,
-      }),
+      body: JSON.stringify(payload),
     },
     true,
   );
 }
 
 export async function confirmLessonUploadAction(mediaId: string) {
+  return confirmMediaUploadAction(mediaId);
+}
+
+export async function confirmMediaUploadAction(mediaId: string) {
   return callApi<MediaUploadDto>(
     `/media/api/upload/complete`,
     {
@@ -768,5 +1004,92 @@ export async function getInstructorRevenueAction(courseIds: string[]) {
       body: JSON.stringify({ courseIds }),
     },
     true,
+  );
+}
+
+export interface InstructorEarningDto {
+  id: string;
+  orderId: string;
+  courseId: string;
+  grossAmount: number;
+  platformFee: number;
+  netAmount: number;
+  status: string;
+  createdAt: string;
+}
+
+export interface InstructorEarningsSummary {
+  totalEarned: number;
+  availableBalance: number;
+  withdrawnBalance: number;
+  totalOrders: number;
+}
+
+export async function getInstructorEarningsSummaryAction() {
+  return callApi<InstructorEarningsSummary>(
+    `/payment/api/instructor/earnings/summary`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function getInstructorEarningsAction() {
+  return callApi<InstructorEarningDto[]>(
+    `/payment/api/instructor/earnings`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+// ─── Instructor Channel / Profile Actions ──────────────────────────────────
+
+export async function getMyInstructorProfileAction() {
+  return callApi<InstructorProfileDto>(
+    `/course/api/instructors/profile`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function updateMyInstructorProfileAction(payload: Partial<InstructorProfileDto>) {
+  const result = await callApi<InstructorProfileDto>(
+    `/course/api/instructors/profile`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+
+  revalidatePath('/instructor/profile');
+  return result;
+}
+
+export async function listInstructorsAction(page = 1, limit = 12, q?: string, sortBy?: string) {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+  if (q) params.append('q', q);
+  if (sortBy) params.append('sortBy', sortBy);
+
+  return callApi<{ items: PublicInstructorCardDto[]; total: number; page: number; limit: number }>(
+    `/course/api/instructors?${params.toString()}`,
+    { method: 'GET' },
+  );
+}
+
+export async function getInstructorBySlugAction(slug: string) {
+  return callApi<InstructorPublicProfileDto>(`/course/api/instructors/${slug}`, { method: 'GET' });
+}
+
+export async function listInstructorCoursesBySlugAction(slug: string, page = 1, limit = 12) {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+  return callApi<{ items: InstructorCourseSummaryDto[]; total: number; page: number; limit: number }>(
+    `/course/api/instructors/${slug}/courses?${params.toString()}`,
+    { method: 'GET' },
   );
 }
