@@ -36,7 +36,7 @@ export default async function InstructorProfilePublicPage({
   };
 
   return (
-    <div className="glass-page min-h-screen text-foreground pb-24 relative overflow-hidden">
+    <div className="glass-page min-h-screen text-foreground relative overflow-hidden">
       <div className="absolute top-0 right-[-10%] w-[50%] h-[50%] rounded-full bg-primary/5 blur-[150px] pointer-events-none" />
 
       <SharedNavbar />

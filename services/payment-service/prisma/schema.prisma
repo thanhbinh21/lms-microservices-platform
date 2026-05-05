@@ -3,7 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  output   = "../src/generated/prisma-v2"
 }
 
 datasource db {
@@ -36,6 +36,13 @@ enum EarningStatus {
   PENDING
   AVAILABLE
   WITHDRAWN
+}
+
+enum PayoutStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
 }
 
 // ─── Models ───────────────────────────────────────────────────────────────────
@@ -110,4 +117,22 @@ model InstructorEarning {
   @@index([instructorId])
   @@index([courseId])
   @@map("instructor_earnings")
+}
+
+/// Yeu cau rut tien cua giang vien cho admin duyet.
+model Payout {
+  id                 String       @id @default(uuid())
+  instructorId       String       @map("instructor_id")
+  amount             Decimal      @db.Decimal(12, 2)
+  bankAccountMasked  String       @map("bank_account_masked")
+  status             PayoutStatus @default(PENDING)
+  adminNote          String?      @map("admin_note")
+  processedAt        DateTime?    @map("processed_at")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  @@index([instructorId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("payouts")
 }

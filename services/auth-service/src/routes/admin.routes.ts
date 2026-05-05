@@ -7,6 +7,7 @@ import {
   updateUserPassword,
   getStats,
 } from '../controllers/admin.controller.js';
+import { listAuditLogs } from '../controllers/audit.controller.js';
 
 const router: ExpressRouter = Router();
 
@@ -16,5 +17,6 @@ router.patch('/users/:id/role', updateUserRole);
 router.patch('/users/:id/status', updateUserStatus);
 router.patch('/users/:id/password', updateUserPassword);
 router.get('/stats', getStats);
+router.get('/audit-logs', listAuditLogs);
 
 export default router;

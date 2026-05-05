@@ -6,6 +6,7 @@ import prisma from '../lib/prisma.js';
 import { generateTokenPair } from '../lib/jwt.js';
 import { setSession } from '../lib/redis.js';
 import { getEnv } from '../lib/env.js';
+import { writeAuditLog } from '../lib/audit.js';
 
 interface BecomeEducatorUser {
   id: string;
@@ -150,6 +151,17 @@ export async function becomeEducator(req: Request, res: Response) {
       },
       'Become educator role change audit',
     );
+
+    await writeAuditLog({
+      actorId,
+      actorRole: 'STUDENT',
+      action: 'BECOME_INSTRUCTOR',
+      resourceType: 'USER',
+      resourceId: actorId,
+      targetLabel: currentUser.email,
+      payload: { previousRole: currentUser.role, nextRole: 'INSTRUCTOR' },
+      traceId,
+    });
 
     const response: ApiResponse<BecomeEducatorResponseData> = {
       success: true,

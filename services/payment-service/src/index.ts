@@ -8,14 +8,17 @@ import { requireAuth } from './middleware/require-auth';
 import { createOrder, getOrder, getMyOrders, getRevenueAnalytics } from './controllers/order.controller';
 import { handleVNPayReturn, handleVNPayIPN } from './controllers/vnpay.controller';
 import { getInstructorEarnings, getInstructorEarningsSummary } from './controllers/earnings.controller';
+import { listPayouts, updatePayout } from './controllers/payout.controller';
 import prisma from './lib/prisma';
 import { disconnectProducer } from './lib/kafka-producer';
+import { createRequireAdmin } from '@lms/types';
 
 // Validate env ngay luc khoi dong.
 validatePaymentServiceEnv();
 
 const app = express();
 const PORT = process.env.PORT || 3003;
+const requireAdmin = createRequireAdmin();
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(helmet());
@@ -63,6 +66,8 @@ app.get('/api/orders/my', requireAuth, getMyOrders);
 app.get('/api/orders/:id', requireAuth, getOrder);
 app.get('/api/instructor/earnings/summary', requireAuth, getInstructorEarningsSummary);
 app.get('/api/instructor/earnings', requireAuth, getInstructorEarnings);
+app.get('/api/admin/payouts', requireAdmin, listPayouts);
+app.patch('/api/admin/payouts/:id', requireAdmin, updatePayout);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {

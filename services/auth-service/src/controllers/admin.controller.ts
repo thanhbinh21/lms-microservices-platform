@@ -5,6 +5,7 @@ import { logger } from '@lms/logger';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma.js';
 import { deleteSession } from '../lib/redis.js';
+import { writeAuditLog } from '../lib/audit.js';
 
 const USER_SELECT = {
   id: true,
@@ -200,6 +201,16 @@ export async function updateUserRole(req: Request, res: Response) {
     });
 
     logger.info({ userId: id, newRole: role.toUpperCase(), adminId: res.locals.userId }, 'User role updated');
+    await writeAuditLog({
+      actorId: res.locals.userId,
+      actorRole: 'ADMIN',
+      action: 'USER_ROLE_UPDATED',
+      resourceType: 'USER',
+      resourceId: id,
+      targetLabel: updated.email,
+      payload: { previousRole: existing.role, nextRole: role.toUpperCase() },
+      traceId,
+    });
 
     const response: ApiResponse<typeof updated> = {
       success: true,
@@ -289,6 +300,16 @@ export async function updateUserStatus(req: Request, res: Response) {
     }
 
     logger.info({ userId: id, newStatus: status.toUpperCase(), adminId: res.locals.userId }, 'User status updated');
+    await writeAuditLog({
+      actorId: res.locals.userId,
+      actorRole: 'ADMIN',
+      action: 'USER_STATUS_UPDATED',
+      resourceType: 'USER',
+      resourceId: id,
+      targetLabel: updated.email,
+      payload: { previousStatus: existing.status, nextStatus: status.toUpperCase() },
+      traceId,
+    });
 
     const response: ApiResponse<typeof updated> = {
       success: true,
@@ -356,6 +377,16 @@ export async function updateUserPassword(req: Request, res: Response) {
       { userId: id, adminId: res.locals.userId },
       'User password updated by admin',
     );
+    await writeAuditLog({
+      actorId: res.locals.userId,
+      actorRole: 'ADMIN',
+      action: 'USER_PASSWORD_RESET',
+      resourceType: 'USER',
+      resourceId: id,
+      targetLabel: existing.id,
+      payload: { passwordReset: true },
+      traceId,
+    });
 
     const response: ApiResponse<{ id: string }> = {
       success: true,

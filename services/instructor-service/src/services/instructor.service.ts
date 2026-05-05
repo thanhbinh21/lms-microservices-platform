@@ -54,6 +54,7 @@ async function uploadMediaIfProvided(fieldValue: string | undefined, token: stri
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        timeout: 10_000,
       },
     );
 
@@ -174,6 +175,7 @@ export async function approveRequest(id: string, actor: AuthUserContext): Promis
         'x-user-id': actor.userId,
         'x-user-role': actor.role,
       },
+      timeout: 10_000,
     },
   );
 

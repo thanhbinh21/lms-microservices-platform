@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import type { Prisma } from '../generated/prisma/index.js';
+import type { Prisma } from '../generated/prisma-v2/index.js';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
@@ -1005,6 +1005,8 @@ export async function createCommunityPost(req: Request, res: Response): Promise<
       author: {
         id: string;
         displayName: string;
+        role: string;
+        instructorSlug: string | null;
       };
     }> = {
       success: true,
@@ -1167,6 +1169,8 @@ export async function replyCommunityPost(req: Request, res: Response): Promise<R
       author: {
         id: string;
         displayName: string;
+        role: string;
+        instructorSlug: string | null;
       };
     }> = {
       success: true,

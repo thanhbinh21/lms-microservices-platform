@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { Prisma } from '../generated/prisma';
+import { Prisma } from '../generated/prisma-v2';
 import { logger } from '@lms/logger';
 import type { ApiResponse } from '@lms/types';
 
@@ -69,7 +69,10 @@ export function handlePrismaError(
   const serverError: ApiResponse<null> = {
     success: false,
     code: 500,
-    message: 'Internal server error',
+    message:
+      process.env.NODE_ENV === 'production'
+        ? 'Internal server error'
+        : `${context}: ${(err as Error)?.message || 'Unknown error'}`,
     data: null,
     trace_id: traceId,
   };

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import type { Prisma } from '../generated/prisma/index.js';
+import type { Prisma } from '../generated/prisma-v2/index.js';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';

@@ -295,23 +295,23 @@
 
 **Priority: P1** | **Effort: 4-5 ngày**
 
-### 34.1 — Backend: Audit Log ⏳ PENDING
+### 34.1 — Backend: Audit Log ✅ COMPLETED
 
 **Tasks:**
-- [ ] Model `AuditLog` (actorId, actorRole, action, targetType, targetId, metadata JSONB, ipAddress, traceId, createdAt)
-- [ ] API: `POST /admin/audit-logs` (create), `GET /admin/audit-logs` (list with filters: actor, action, dateRange, targetType)
-- [ ] Hook: every admin action calls audit log
+- [x] Model `AuditLog` (actorId, actorRole, action, targetType, targetId, metadata JSONB, ipAddress, traceId, createdAt)
+- [x] API: `POST /admin/audit-logs` (create), `GET /admin/audit-logs` (list with filters: actor, action, dateRange, targetType)
+- [x] Hook: every admin action calls audit log
 
-### 34.2 — Backend: Payout Management ⏳ PENDING
-
-**Tasks:**
-- [ ] Model `Payout` (instructorId, amount, bankAccount masked, status, processedAt)
-- [ ] API: `GET /admin/payouts`, `PATCH /admin/payouts/:id` (approve/reject)
-
-### 34.3 — Backend: Category Management ⏳ PENDING
+### 34.2 — Backend: Payout Management ✅ COMPLETED
 
 **Tasks:**
-- [ ] API: `POST /admin/categories`, `PATCH /admin/categories/:id`, `DELETE /admin/categories/:id`
+- [x] Model `Payout` (instructorId, amount, bankAccount masked, status, processedAt)
+- [x] API: `GET /admin/payouts`, `PATCH /admin/payouts/:id` (approve/reject)
+
+### 34.3 — Backend: Category Management ✅ COMPLETED
+
+**Tasks:**
+- [x] API: `POST /admin/categories`, `PATCH /admin/categories/:id`, `DELETE /admin/categories/:id`
 
 ### 34.4 — Backend: Server-Side Admin Auth ✅ DONE
 
@@ -408,32 +408,32 @@
 
 **Status:** ✅ Done — Apr 29, 2026
 
-### 34.13 — Frontend: Admin Instructor Requests Page ⏳ PENDING
+### 34.13 — Frontend: Admin Instructor Requests Page ✅ COMPLETED
 
-**File:** Tạo mới `apps/web-client/src/app/(admin)/admin/instructor-requests/page.tsx`
-
-**Tasks:**
-1. Standalone page dùng `AdminInstructorRequestsPanel` component
-2. Không redirect về profile nữa
-3. Thêm link trong admin sidebar navLinks
-
-### 34.14 — Frontend: Admin Categories CRUD ⏳ PENDING
-
-**File:** Tạo mới `apps/web-client/src/app/(admin)/admin/categories/page.tsx`
+**File:** `apps/web-client/src/app/admin/instructor-requests/page.tsx`
 
 **Tasks:**
-1. List categories với courseCount
-2. Create/edit/delete category (name, slug, order)
-3. Admin action: `createCategory`, `updateCategory`, `deleteCategory`
+- [x] Standalone page dùng `AdminInstructorRequestsPanel` component
+- [x] Không redirect về profile nữa
+- [x] Thêm link trong admin sidebar navLinks
 
-### 34.15 — Frontend: Admin Audit Log Page ⏳ PENDING
+### 34.14 — Frontend: Admin Categories CRUD ✅ COMPLETED
 
-**File:** Tạo mới `apps/web-client/src/app/(admin)/admin/audit-log/page.tsx`
+**File:** `apps/web-client/src/app/(admin)/admin/categories/page.tsx`
 
 **Tasks:**
-1. Table: actor, action, target, timestamp, traceId
-2. Filters: actor search, action type, date range
-3. Pagination
+- [x] List categories với courseCount
+- [x] Create/edit/delete category (name, slug, order)
+- [x] Admin action: `createCategory`, `updateCategory`, `deleteCategory`
+
+### 34.15 — Frontend: Admin Audit Log Page ✅ COMPLETED
+
+**File:** `apps/web-client/src/app/(admin)/admin/audit-log/page.tsx`
+
+**Tasks:**
+- [x] Table: actor, action, target, timestamp, traceId
+- [x] Filters: actor search, action type, date range
+- [x] Pagination
 
 ### 34.16 — Frontend: Admin Reviews Search ✅ DONE
 
@@ -532,15 +532,15 @@ Sau khi Phase 24 hoàn thành:
 - [x] VNPay transaction verified
 - [x] Enrollment unique constraint in DB
 - [x] Kafka payloads validated with Zod
-- [ ] Redis TTL on all keys
-- [ ] All services have request timeouts
+- [x] Redis TTL on all keys
+- [x] All services have request timeouts
 - [x] CORS origin restricted
-- [ ] Audit log model/API
-- [ ] Payout API
-- [ ] Category API
-- [ ] Admin instructor requests standalone page
-- [ ] Admin categories CRUD
-- [ ] Admin audit log page
-- [ ] Admin bulk actions
+- [x] Audit log model/API
+- [x] Payout API
+- [x] Category API
+- [x] Admin instructor requests standalone page
+- [x] Admin categories CRUD
+- [x] Admin audit log page
+- [x] Admin bulk actions
 - [x] Admin reviews search
 - [x] Footer links không còn href="#"

@@ -266,6 +266,13 @@ export function ProfileSettings() {
               Quản lý thông tin thanh toán, bảo mật và tùy chọn cá nhân hóa.
               {isAdmin && ' Admin có thể duyệt đơn đăng ký giảng viên trong tab Quản lý đơn GV.'}
             </p>
+            {isAdmin && (
+              <div className="mt-4">
+                <Button variant="secondary" className="font-semibold shadow-sm" onClick={() => router.push('/admin')}>
+                  Đi tới Dashboard Admin
+                </Button>
+              </div>
+            )}
           </div>
         </ScrollReveal>
 

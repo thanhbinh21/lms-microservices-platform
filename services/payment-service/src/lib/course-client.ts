@@ -1,4 +1,5 @@
 import { logger } from '@lms/logger';
+import { fetchWithTimeout } from './http';
 
 /**
  * Goi Course Service (noi bo, KHONG qua Kong Gateway) de verify price.
@@ -25,7 +26,7 @@ export async function fetchCourseById(
     // De don gian + giu contract chat, ta goi internal endpoint moi: /internal/courses/:id
     // Neu chua co, fallback dung /api/courses/:slug sau.
     const url = `${COURSE_SERVICE_URL}/internal/courses/${encodeURIComponent(courseId)}`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

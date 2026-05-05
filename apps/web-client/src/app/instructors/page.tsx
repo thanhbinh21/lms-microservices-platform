@@ -18,7 +18,7 @@ export default async function InstructorsPage({
   const items = result.success && result.data ? result.data.items : [];
   
   return (
-    <div className="glass-page min-h-screen text-foreground pb-24 relative overflow-hidden">
+    <div className="glass-page min-h-screen text-foreground relative overflow-hidden">
       <div className="absolute top-[-5%] right-[-5%] w-[40%] h-[40%] rounded-full bg-primary/10 blur-[150px] pointer-events-none" />
       <div className="absolute top-[30%] left-[-10%] w-[35%] h-[40%] rounded-full bg-blue-300/15 blur-[120px] pointer-events-none" />
 
