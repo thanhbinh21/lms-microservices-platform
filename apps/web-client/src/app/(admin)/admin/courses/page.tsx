@@ -16,6 +16,8 @@ export default function AdminCoursesPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -25,6 +27,22 @@ export default function AdminCoursesPage() {
     variant: 'danger' | 'default';
     confirmLabel?: string;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, variant: 'default' });
+
+  const clearSelection = () => setSelectedCourseIds([]);
+
+  const toggleCourseSelection = (courseId: string) => {
+    setSelectedCourseIds((prev) =>
+      prev.includes(courseId) ? prev.filter((id) => id !== courseId) : [...prev, courseId],
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedCourseIds.length === courses.length) {
+      clearSelection();
+      return;
+    }
+    setSelectedCourseIds(courses.map((course) => course.id));
+  };
 
   const fetchCourses = useCallback(async () => {
     setLoading(true);
@@ -48,6 +66,10 @@ export default function AdminCoursesPage() {
   useEffect(() => {
     setPage(1);
   }, [search, statusFilter]);
+
+  useEffect(() => {
+    clearSelection();
+  }, [page, search, statusFilter]);
 
   const handleStatusChange = (
     courseId: string,
@@ -85,6 +107,30 @@ export default function AdminCoursesPage() {
     });
   };
 
+  const handleBulkAction = (nextStatus: 'PUBLISHED' | 'ARCHIVED', actionLabel: string) => {
+    if (selectedCourseIds.length === 0) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: nextStatus === 'PUBLISHED' ? 'Duyệt nhiều khóa học' : 'Lưu trữ nhiều khóa học',
+      message: `Bạn có chắc muốn ${actionLabel} ${selectedCourseIds.length} khóa học đã chọn?`,
+      variant: nextStatus === 'ARCHIVED' ? 'danger' : 'default',
+      confirmLabel: nextStatus === 'ARCHIVED' ? 'Lưu trữ' : 'Duyệt',
+      onConfirm: async () => {
+        setBulkLoading(true);
+        try {
+          await Promise.all(
+            selectedCourseIds.map((courseId) => updateAdminCourseStatus(courseId, nextStatus)),
+          );
+          clearSelection();
+          await fetchCourses();
+        } finally {
+          setBulkLoading(false);
+        }
+      },
+    });
+  };
+
   const formatPrice = (price: number | null | undefined) => {
     if (!price || price === 0) return 'Miễn phí';
     return price.toLocaleString('vi-VN') + ' ₫';
@@ -101,7 +147,35 @@ export default function AdminCoursesPage() {
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
-          <CardTitle className="text-lg">Danh sách khóa học</CardTitle>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <CardTitle className="text-lg">Danh sách khóa học</CardTitle>
+            {selectedCourseIds.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted-foreground">Đã chọn {selectedCourseIds.length}</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs"
+                  disabled={bulkLoading}
+                  onClick={() => handleBulkAction('PUBLISHED', 'duyệt')}
+                >
+                  Duyệt đã chọn
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="text-xs"
+                  disabled={bulkLoading}
+                  onClick={() => handleBulkAction('ARCHIVED', 'lưu trữ')}
+                >
+                  Lưu trữ đã chọn
+                </Button>
+                <Button size="sm" variant="ghost" className="text-xs" onClick={clearSelection}>
+                  Bỏ chọn
+                </Button>
+              </div>
+            )}
+          </div>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -138,6 +212,14 @@ export default function AdminCoursesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <th className="pb-3 pr-4">
+                      <input
+                        type="checkbox"
+                        checked={courses.length > 0 && selectedCourseIds.length === courses.length}
+                        onChange={toggleSelectAll}
+                        aria-label="Chọn tất cả khóa học"
+                      />
+                    </th>
                     <th className="pb-3 pr-4">Tiêu đề</th>
                     <th className="pb-3 pr-4">Danh mục</th>
                     <th className="pb-3 pr-4">Trạng thái</th>
@@ -150,6 +232,14 @@ export default function AdminCoursesPage() {
                 <tbody>
                   {courses.map((c) => (
                     <tr key={c.id} className="border-b border-zinc-100 transition-colors hover:bg-zinc-50/50">
+                      <td className="py-3 pr-4 align-top">
+                        <input
+                          type="checkbox"
+                          checked={selectedCourseIds.includes(c.id)}
+                          onChange={() => toggleCourseSelection(c.id)}
+                          aria-label={`Chọn khóa học ${c.title}`}
+                        />
+                      </td>
                       <td className="max-w-50 truncate py-3 pr-4 font-medium">{c.title}</td>
                       <td className="py-3 pr-4 text-muted-foreground">{c.category || '—'}</td>
                       <td className="py-3 pr-4">
@@ -229,8 +319,12 @@ export default function AdminCoursesPage() {
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
-        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
-        onConfirm={confirmDialog.onConfirm}
+        onClose={() => {
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        }}
+        onConfirm={async () => {
+          await confirmDialog.onConfirm();
+        }}
         title={confirmDialog.title}
         message={confirmDialog.message}
         variant={confirmDialog.variant}

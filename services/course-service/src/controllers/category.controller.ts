@@ -5,11 +5,20 @@ import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
 import { cacheGet, cacheInvalidate } from '@lms/cache';
+import { writeAuditLog } from '../lib/audit';
 
 const createCategorySchema = z.object({
   name: z.string().min(2, 'Ten danh muc toi thieu 2 ky tu'),
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/, 'Slug chi chua chu thuong, so va dau gach ngang').optional(),
   order: z.number().int().min(0).default(0),
+});
+
+const updateCategorySchema = z.object({
+  name: z.string().min(2, 'Ten danh muc toi thieu 2 ky tu').optional(),
+  slug: z.string().min(2).regex(/^[a-z0-9-]+$/, 'Slug chi chua chu thuong, so va dau gach ngang').optional(),
+  order: z.number().int().min(0).optional(),
+}).refine((value) => Boolean(value.name || value.slug || value.order !== undefined), {
+  message: 'At least one field is required',
 });
 
 function normalizeSlug(input: string): string {
@@ -106,6 +115,17 @@ export async function createCategory(req: Request, res: Response) {
       },
     });
 
+    await writeAuditLog({
+      actorId: res.locals.userId as string,
+      actorRole: 'ADMIN',
+      action: 'CATEGORY_CREATED',
+      resourceType: 'CATEGORY',
+      resourceId: category.id,
+      targetLabel: category.name,
+      payload: category,
+      traceId,
+    });
+
     const response: ApiResponse<unknown> = {
       success: true,
       code: 201,
@@ -128,5 +148,149 @@ export async function createCategory(req: Request, res: Response) {
       return res.status(400).json(bad);
     }
     return handlePrismaError(err, res, traceId, 'createCategory');
+  }
+}
+
+/** PATCH /api/admin/categories/:id — admin only */
+export async function updateCategory(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+
+  try {
+    const { id } = req.params;
+    const validated = updateCategorySchema.parse(req.body);
+
+    const existing = await prisma.category.findUnique({ where: { id } });
+    if (!existing) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Category not found',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(response);
+    }
+
+    const slugInput = validated.slug?.trim();
+    const normalizedSlug = slugInput ? normalizeSlug(slugInput) : undefined;
+
+    if (normalizedSlug && normalizedSlug !== existing.slug) {
+      const conflict = await prisma.category.findUnique({ where: { slug: normalizedSlug } });
+      if (conflict) {
+        const response: ApiResponse<null> = {
+          success: false,
+          code: 409,
+          message: 'Slug da ton tai',
+          data: null,
+          trace_id: traceId,
+        };
+        return res.status(409).json(response);
+      }
+    }
+
+    const category = await prisma.category.update({
+      where: { id },
+      data: {
+        ...(validated.name ? { name: validated.name } : {}),
+        ...(normalizedSlug ? { slug: normalizedSlug } : {}),
+        ...(validated.order !== undefined ? { order: validated.order } : {}),
+      },
+    });
+
+    await writeAuditLog({
+      actorId: res.locals.userId as string,
+      actorRole: 'ADMIN',
+      action: 'CATEGORY_UPDATED',
+      resourceType: 'CATEGORY',
+      resourceId: category.id,
+      targetLabel: category.name,
+      payload: { before: existing, after: category },
+      traceId,
+    });
+
+    await cacheInvalidate('cache:categories:all');
+
+    const response: ApiResponse<typeof category> = {
+      success: true,
+      code: 200,
+      message: 'Category updated',
+      data: category,
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const bad: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: err.errors[0].message,
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(bad);
+    }
+    return handlePrismaError(err, res, traceId, 'updateCategory');
+  }
+}
+
+/** DELETE /api/admin/categories/:id — admin only */
+export async function deleteCategory(req: Request, res: Response) {
+  const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
+
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.category.findUnique({
+      where: { id },
+      include: { _count: { select: { courses: true } } },
+    });
+
+    if (!existing) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 404,
+        message: 'Category not found',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(response);
+    }
+
+    if (existing._count.courses > 0) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 409,
+        message: 'Cannot delete category that still has courses',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(409).json(response);
+    }
+
+    await prisma.category.delete({ where: { id } });
+
+    await writeAuditLog({
+      actorId: res.locals.userId as string,
+      actorRole: 'ADMIN',
+      action: 'CATEGORY_DELETED',
+      resourceType: 'CATEGORY',
+      resourceId: existing.id,
+      targetLabel: existing.name,
+      payload: existing,
+      traceId,
+    });
+
+    await cacheInvalidate('cache:categories:all');
+
+    const response: ApiResponse<null> = {
+      success: true,
+      code: 200,
+      message: 'Category deleted',
+      data: null,
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'deleteCategory');
   }
 }

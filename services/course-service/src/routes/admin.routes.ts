@@ -14,12 +14,17 @@ import {
   retryFailedEvent,
   resolveFailedEvent,
 } from '../controllers/dlq.controller';
+import { updateCategory, deleteCategory } from '../controllers/category.controller';
 
 const router: ExpressRouter = Router();
 
 // Course moderation
 router.get('/courses', listAdminCourses);
 router.patch('/courses/:id/status', updateCourseStatus);
+
+// Category management
+router.patch('/categories/:id', updateCategory);
+router.delete('/categories/:id', deleteCategory);
 
 // Review moderation
 router.get('/reviews', listAdminReviews);

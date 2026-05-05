@@ -1,4 +1,4 @@
-import { PrismaClient } from '../generated/prisma';
+import { PrismaClient } from '../generated/prisma-v2';
 
 // Prisma Singleton — tranh "too many connections" khi dev HMR.
 declare global {

@@ -103,3 +103,41 @@ export const getInternalUsersBatch = async (req: Request, res: Response): Promis
     return res.status(500).json(response);
   }
 };
+
+export const getInternalInstructors = async (req: Request, res: Response): Promise<Response | void> => {
+  if (!ensureInternal(req, res)) return;
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+
+  try {
+    const instructors = await prisma.user.findMany({
+      where: { role: 'INSTRUCTOR' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        username: true,
+        role: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const response: ApiResponse<{ users: typeof instructors }> = {
+      success: true,
+      code: 200,
+      message: 'OK',
+      data: { users: instructors },
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (error) {
+    logger.error({ error }, 'getInternalInstructors error');
+    const response: ApiResponse<null> = {
+      success: false,
+      code: 500,
+      message: 'Internal server error while fetching instructors',
+      data: null,
+      trace_id: traceId,
+    };
+    return res.status(500).json(response);
+  }
+};

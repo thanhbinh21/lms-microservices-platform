@@ -2,6 +2,44 @@
 
 import { callApi, type ApiResponse } from '@/lib/api-client';
 
+export interface AdminCategoryDto {
+  id: string;
+  name: string;
+  slug: string;
+  order: number;
+  createdAt?: string;
+  courseCount?: number;
+}
+
+export interface AdminPayoutDto {
+  id: string;
+  instructorId: string;
+  instructorName?: string | null;
+  instructorEmail?: string | null;
+  amount: number;
+  bankAccountMasked: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAID';
+  adminNote?: string | null;
+  processedAt?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface AdminAuditLogDto {
+  id: string;
+  actorId: string;
+  actorName?: string | null;
+  actorEmail?: string | null;
+  actorRole: string;
+  action: string;
+  resourceType?: string | null;
+  resourceId?: string | null;
+  targetLabel?: string | null;
+  payload?: unknown;
+  traceId?: string | null;
+  createdAt: string;
+}
+
 // ---------------------------------------------------------------------------
 // User Management
 // ---------------------------------------------------------------------------
@@ -158,6 +196,37 @@ export async function getAdminCourseStats(): Promise<ApiResponse<any>> {
 }
 
 // ---------------------------------------------------------------------------
+// Category Management
+// ---------------------------------------------------------------------------
+
+export async function getAdminCategoriesAction(): Promise<ApiResponse<AdminCategoryDto[]>> {
+  return callApi<AdminCategoryDto[]>(`/course/api/categories`, { method: 'GET' }, true);
+}
+
+export async function createAdminCategoryAction(payload: { name: string; slug?: string; order?: number }): Promise<ApiResponse<AdminCategoryDto>> {
+  return callApi<AdminCategoryDto>(
+    `/course/api/admin/categories`,
+    { method: 'POST', body: JSON.stringify(payload) },
+    true,
+  );
+}
+
+export async function updateAdminCategoryAction(
+  categoryId: string,
+  payload: { name?: string; slug?: string; order?: number },
+): Promise<ApiResponse<AdminCategoryDto>> {
+  return callApi<AdminCategoryDto>(
+    `/course/api/admin/categories/${categoryId}`,
+    { method: 'PATCH', body: JSON.stringify(payload) },
+    true,
+  );
+}
+
+export async function deleteAdminCategoryAction(categoryId: string): Promise<ApiResponse<null>> {
+  return callApi<null>(`/course/api/admin/categories/${categoryId}`, { method: 'DELETE' }, true);
+}
+
+// ---------------------------------------------------------------------------
 // Review Management
 // ---------------------------------------------------------------------------
 
@@ -261,6 +330,66 @@ export async function resolveAdminFailedEvent(
   return callApi<any>(
     `/course/api/admin/failed-events/${eventId}/resolve`,
     { method: 'PATCH', body: JSON.stringify({ status }) },
+    true,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Payout Management
+// ---------------------------------------------------------------------------
+
+export async function getAdminPayoutsAction(params: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  instructorId?: string;
+}): Promise<ApiResponse<{ items: AdminPayoutDto[]; pagination: any }>> {
+  const query = new URLSearchParams();
+  if (params.page) query.set('page', String(params.page));
+  if (params.limit) query.set('limit', String(params.limit));
+  if (params.status) query.set('status', params.status);
+  if (params.instructorId) query.set('instructorId', params.instructorId);
+
+  return callApi<{ items: AdminPayoutDto[]; pagination: any }>(
+    `/payment/api/admin/payouts?${query.toString()}`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function updateAdminPayoutAction(
+  payoutId: string,
+  status: 'APPROVED' | 'REJECTED' | 'PAID',
+  adminNote?: string,
+): Promise<ApiResponse<AdminPayoutDto>> {
+  return callApi<AdminPayoutDto>(
+    `/payment/api/admin/payouts/${payoutId}`,
+    { method: 'PATCH', body: JSON.stringify({ status, adminNote }) },
+    true,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Audit Log Management
+// ---------------------------------------------------------------------------
+
+export async function getAdminAuditLogsAction(params: {
+  page?: number;
+  limit?: number;
+  action?: string;
+  resourceType?: string;
+  actorId?: string;
+}): Promise<ApiResponse<{ items: AdminAuditLogDto[]; pagination: any }>> {
+  const query = new URLSearchParams();
+  if (params.page) query.set('page', String(params.page));
+  if (params.limit) query.set('limit', String(params.limit));
+  if (params.action) query.set('action', params.action);
+  if (params.resourceType) query.set('resourceType', params.resourceType);
+  if (params.actorId) query.set('actorId', params.actorId);
+
+  return callApi<{ items: AdminAuditLogDto[]; pagination: any }>(
+    `/auth/admin/audit-logs?${query.toString()}`,
+    { method: 'GET' },
     true,
   );
 }

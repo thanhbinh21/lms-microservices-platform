@@ -1,4 +1,5 @@
 import { logger } from '@lms/logger';
+import { fetchWithTimeout } from './http';
 
 export interface UserInternalData {
   id: string;
@@ -9,7 +10,7 @@ export interface UserInternalData {
 export async function getUserData(userId: string): Promise<UserInternalData | null> {
   const baseUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3101';
   try {
-    const res = await fetch(`${baseUrl}/internal/users/${userId}`, {
+    const res = await fetchWithTimeout(`${baseUrl}/internal/users/${userId}`, {
       headers: {
         'x-internal-call': 'true'
       }

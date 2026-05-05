@@ -1,11 +1,12 @@
 import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import type { Prisma } from '../generated/prisma/index.js';
+import type { Prisma } from '../generated/prisma-v2/index.js';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
 import { resolveUserNames, getDisplayName } from '../lib/community';
+import { fetchInternalInstructors } from '../lib/auth-client';
 
 const listInstructorsQuerySchema = z.object({
   q: z.string().trim().optional(),
@@ -169,31 +170,66 @@ export async function listInstructors(req: Request, res: Response): Promise<Resp
   try {
     const { q, sortBy, page, limit } = parsedQuery.data;
 
-    const where: Prisma.InstructorProfileWhereInput = {};
-    if (q) {
-      where.OR = [
-        { displayName: { contains: q, mode: 'insensitive' } },
-        { headline: { contains: q, mode: 'insensitive' } },
-      ];
+    const instructors = await fetchInternalInstructors(traceId);
+    const sourceInstructorIds = instructors.map((instructor) => instructor.id);
+    const existingProfiles = sourceInstructorIds.length > 0
+      ? await prisma.instructorProfile.findMany({
+          where: { instructorId: { in: sourceInstructorIds } },
+          select: {
+            id: true,
+            instructorId: true,
+            slug: true,
+            displayName: true,
+            headline: true,
+            bio: true,
+            avatar: true,
+            socialLinks: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        })
+      : [];
+
+    const profileMap = new Map(existingProfiles.map((profile) => [profile.instructorId, profile]));
+    const nameMap = sourceInstructorIds.length > 0 ? await resolveUserNames(sourceInstructorIds) : new Map();
+    const missingInstructorIds = sourceInstructorIds.filter((id) => !profileMap.has(id));
+
+    if (missingInstructorIds.length > 0) {
+      void Promise.allSettled(missingInstructorIds.map((id) => ensureInstructorProfile(id)));
     }
 
-    const profiles = await prisma.instructorProfile.findMany({
-      where,
-      select: {
-        id: true,
-        instructorId: true,
-        slug: true,
-        displayName: true,
-        headline: true,
-        bio: true,
-        avatar: true,
-        socialLinks: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const profiles = instructors.map((instructor) => {
+      const existingProfile = profileMap.get(instructor.id);
+      if (existingProfile) {
+        return existingProfile;
+      }
+
+      const displayName = instructor.name || getDisplayName(instructor.id, nameMap);
+      const slug = normalizeSlug(displayName) || `giang-vien-${instructor.id.slice(0, 8)}`;
+
+      return {
+        id: `fallback-${instructor.id}`,
+        instructorId: instructor.id,
+        slug,
+        displayName,
+        headline: null,
+        bio: null,
+        avatar: null,
+        socialLinks: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
     });
 
-    const instructorIds = profiles.map((profile) => profile.instructorId);
+    const filteredProfiles = q
+      ? profiles.filter((profile) =>
+          [profile.displayName, profile.headline || ''].some((value) =>
+            value.toLowerCase().includes(q.toLowerCase()),
+          ),
+        )
+      : profiles;
+
+    const instructorIds = filteredProfiles.map((profile) => profile.instructorId);
     const courseStats = instructorIds.length > 0
       ? await prisma.course.groupBy({
           by: ['instructorId'],
@@ -213,7 +249,7 @@ export async function listInstructors(req: Request, res: Response): Promise<Resp
       ]),
     );
 
-    const items = profiles.map((profile) => {
+    const items = filteredProfiles.map((profile) => {
       const stats = statsMap.get(profile.instructorId) || { courseCount: 0, averageRating: 0 };
       return {
         ...profile,

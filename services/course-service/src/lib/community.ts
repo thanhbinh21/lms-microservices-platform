@@ -1,6 +1,7 @@
-import { Prisma } from '../generated/prisma/index.js';
+import { Prisma } from '../generated/prisma-v2/index.js';
 import prisma from './prisma';
 import { logger } from '@lms/logger';
+import { fetchWithTimeout } from './http';
 
 // Cache ten nguoi dung de giam goi auth-service (TTL 5 phut)
 const userNameCache = new Map<string, { name: string; username: string | null; role: string; expiresAt: number }>();
@@ -91,7 +92,7 @@ export async function resolveUserNames(
   if (uncachedIds.length === 0) return result;
 
   try {
-    const response = await fetch(`${AUTH_SERVICE_URL}/internal/users/batch`, {
+    const response = await fetchWithTimeout(`${AUTH_SERVICE_URL}/internal/users/batch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
