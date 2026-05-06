@@ -245,13 +245,13 @@
 
 **Priority: P2** | **Effort: 1-2 ngày**
 
-### 33.1 — Course API: Include Instructor Object ⏳ PENDING
+### 33.1 — Course API: Include Instructor Object ✅ DONE
 
 **Backend tasks:**
-- [ ] Update course listing/detail API: include `instructor { id, name, displayName, avatar, slug }`
-- [ ] Public instructor listing: `GET /instructors` (for `/instructors` page)
+- [x] Update course listing/detail API: include `instructor { id, name, displayName, avatar, slug }`
+- [x] Public instructor listing: `GET /instructors` (for `/instructors` page)
 
-### 33.2 — Course Detail: Instructor Display ⏳ PENDING
+### 33.2 — Course Detail: Instructor Display ✅ DONE
 
 **File:** `apps/web-client/src/app/courses/[slug]/page.tsx`
 
@@ -261,14 +261,14 @@
 3. Instructor bio 1 dòng
 4. Link đến `/instructors/[slug]` (Phase 24)
 
-### 33.3 — Course Detail: Related Courses ⏳ PENDING
+### 33.3 — Course Detail: Related Courses ✅ DONE
 
 **Tasks:**
 1. Section "Khóa học liên quan" bên dưới
 2. Fetch cùng category, exclude current course
 3. Horizontal scroll carousel (mobile-friendly)
 
-### 33.4 — Reviews: Polish ⏳ PENDING
+### 33.4 — Reviews: Polish ✅ DONE
 
 **Tasks:**
 1. Fix heading typo: `'Danh gia va nhan xet'` → `'Danh gia va nhan xet'` (consistent encoding)
@@ -521,9 +521,9 @@ Sau khi Phase 24 hoàn thành:
 - [ ] Cross-tab progress sync — **chưa làm**
 
 ### Phase 33
-- [ ] Instructor real name on course detail
-- [ ] Related courses section
-- [ ] Reviews pagination + search
+- [x] Instructor real name on course detail
+- [x] Related courses section
+- [x] Reviews pagination + search
 - [x] Login forgot password + remember me
 
 ### Phase 34

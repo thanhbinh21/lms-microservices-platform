@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   Users, Plus, Pencil, Trash2, X, Loader2, CheckCircle2,
-  BookOpen, Settings, ExternalLink, Sparkles,
+  BookOpen, Settings, ExternalLink, Sparkles, MessageSquare,
 } from 'lucide-react';
 import { FocusTrap } from 'focus-trap-react';
 import { Button } from '@/components/ui/button';
@@ -182,6 +182,18 @@ export default function InstructorCommunitiesPage() {
           <p className="mt-1 text-sm font-medium text-muted-foreground">
             Quản lý nhóm cộng đồng cho học viên tham gia thảo luận.
           </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+              Legacy/Archive
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Nhóm cộng đồng cũ chỉ để lưu trữ. Hỏi đáp mới chuyển sang Global Q&A.
+            </span>
+            <a href="/instructor/qa" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+              <MessageSquare className="size-3.5" />
+              Đi tới Q&A
+            </a>
+          </div>
         </div>
         <Button onClick={openCreateModal} className="rounded-xl font-bold shadow-md md:w-auto w-full">
           <Plus className="mr-2 size-4" />
@@ -216,6 +228,9 @@ export default function InstructorCommunitiesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h3 className="font-bold text-base text-foreground truncate">{group.name}</h3>
+                        <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-700">
+                          Legacy/Archive
+                        </span>
                         <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                           group.type === 'PUBLIC' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
                         }`}>
@@ -337,7 +352,7 @@ export default function InstructorCommunitiesPage() {
                       ))}
                     </select>
                     <p className="mt-1.5 text-xs text-muted-foreground">
-                      Nhóm sẽ được gắn vào khóa học đã chọn. Học viên đăng ký khóa học sẽ tự động được thêm vào nhóm.
+                      Legacy mode: nhóm chỉ để lưu trữ nội dung cũ, không dùng cho hỏi đáp mới.
                     </p>
                   </div>
                 )}

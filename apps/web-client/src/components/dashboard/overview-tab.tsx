@@ -1,7 +1,7 @@
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { BookOpen, Trophy, MessageSquare, Clock, PlayCircle, GraduationCap, ArrowRight, Flame, Activity } from 'lucide-react';
+import { BookOpen, Trophy, MessageSquare, Clock, PlayCircle, GraduationCap, ArrowRight, Flame, Activity, ListChecks, Search } from 'lucide-react';
 import Link from 'next/link';
 import { StatCard } from './stat-card';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -176,6 +176,35 @@ export function OverviewTab({ user, data, myCourses, streak, setActiveTab, canBe
           </ScrollReveal>
 
           {/* Quick Actions */}
+          <ScrollReveal delay={80}>
+            <div className="flex items-center justify-between px-1 mb-3">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <ListChecks className="size-4 text-primary" />
+                Thao tác nhanh
+              </h2>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" className="justify-start rounded-xl" onClick={() => setActiveTab('my-courses')}>
+                <BookOpen className="mr-2 size-4" />
+                Khóa học của tôi
+              </Button>
+              <Button variant="outline" className="justify-start rounded-xl" onClick={() => setActiveTab('certificates')}>
+                <Trophy className="mr-2 size-4" />
+                Chứng chỉ
+              </Button>
+              <Button variant="outline" className="justify-start rounded-xl" onClick={() => setActiveTab('qa')}>
+                <MessageSquare className="mr-2 size-4" />
+                Q&A
+              </Button>
+              <Link href="/courses">
+                <Button variant="outline" className="w-full justify-start rounded-xl">
+                  <Search className="mr-2 size-4" />
+                  Khám phá khóa học
+                </Button>
+              </Link>
+            </div>
+          </ScrollReveal>
+
           {/* Recent Activity */}
           <ScrollReveal delay={100}>
             <div className="flex items-center justify-between px-1 mb-3">
@@ -225,22 +254,24 @@ export function OverviewTab({ user, data, myCourses, streak, setActiveTab, canBe
           <div className="grid gap-4">
             {data.recommendedCourses.map((course: any, idx: number) => (
               <ScrollReveal key={idx} delay={idx * 150}>
-                <Card className="glass-panel glass-card-hover group rounded-2xl border-white/60 flex flex-col">
-                  <CardContent className="p-4 space-y-3">
-                    <div className="relative aspect-video overflow-hidden rounded-xl bg-[linear-gradient(120deg,hsl(var(--primary)/0.05),hsl(var(--primary)/0.01))] border border-white/50 border-b-0 shadow-inner">
-                      <span className="absolute right-2 top-2 rounded-full bg-white/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-bold text-primary shadow-sm border border-primary/10">
-                        {course.category}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="line-clamp-2 text-sm font-bold leading-tight mb-2 group-hover:text-primary transition-colors">{course.title}</p>
-                      <div className="flex items-center justify-between text-xs font-semibold">
-                        <span className="text-primary">{course.price}</span>
-                        <span className="text-muted-foreground flex items-center gap-1">⭐ {course.rating}</span>
+                <Link href={`/courses/${course.slug ?? course.id}`}>
+                  <Card className="glass-panel glass-card-hover group rounded-2xl border-white/60 flex flex-col">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="relative aspect-video overflow-hidden rounded-xl bg-[linear-gradient(120deg,hsl(var(--primary)/0.05),hsl(var(--primary)/0.01))] border border-white/50 border-b-0 shadow-inner">
+                        <span className="absolute right-2 top-2 rounded-full bg-white/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-bold text-primary shadow-sm border border-primary/10">
+                          {course.category}
+                        </span>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <div>
+                        <p className="line-clamp-2 text-sm font-bold leading-tight mb-2 group-hover:text-primary transition-colors">{course.title}</p>
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-primary">{course.price}</span>
+                          <span className="text-muted-foreground flex items-center gap-1">⭐ {course.rating}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
               </ScrollReveal>
             ))}
           </div>

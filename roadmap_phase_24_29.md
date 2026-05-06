@@ -58,36 +58,36 @@
 **Mục tiêu:** Thay thế course community groups bằng 1 trang Q&A global toàn hệ thống.
 
 **Backend (Course Service):**
-- [ ] Model `Question` trong `course_db`: `id`, `userId`, `title`, `content`, `courseId` (nullable, optional — gắn Q&A vào khóa học cụ thể nếu cần), `lessonId` (nullable), `isResolved` (default false), `viewCount`, upvoteCount, createdAt, updatedAt
-- [ ] Model `Answer`: `id`, `questionId`, `userId`, `content`, `isAccepted` (default false), upvoteCount, createdAt, updatedAt
-- [ ] Model `QuestionUpvote` / `AnswerUpvote` (unique constraint user+question/answer)
-- [ ] API: `POST /api/questions` — create question (auth)
-- [ ] API: `GET /api/questions` — list questions (public, paginated, filter by courseId?search, sort by recent/popular/unanswered)
-- [ ] API: `GET /api/questions/:id` — question detail + answers
-- [ ] API: `PATCH /api/questions/:id` — update question (owner only)
-- [ ] API: `DELETE /api/questions/:id` — delete question (owner or admin)
-- [ ] API: `POST /api/questions/:id/answers` — create answer
-- [ ] API: `PATCH /api/answers/:id` — update/delete answer (owner only)
-- [ ] API: `POST /api/questions/:id/accept-answer/:answerId` — accept answer (question owner only)
-- [ ] API: `POST /api/questions/:id/upvote` — upvote question
-- [ ] API: `POST /api/answers/:id/upvote` — upvote answer
+- [x] Model `Question` trong `course_db`: `id`, `userId`, `title`, `content`, `courseId` (nullable, optional — gắn Q&A vào khóa học cụ thể nếu cần), `lessonId` (nullable), `isResolved` (default false), `viewCount`, upvoteCount, createdAt, updatedAt
+- [x] Model `Answer`: `id`, `questionId`, `userId`, `content`, `isAccepted` (default false), upvoteCount, createdAt, updatedAt
+- [x] Model `QuestionUpvote` / `AnswerUpvote` (unique constraint user+question/answer)
+- [x] API: `POST /api/questions` — create question (auth)
+- [x] API: `GET /api/questions` — list questions (public, paginated, filter by courseId?search, sort by recent/popular/unanswered)
+- [x] API: `GET /api/questions/:id` — question detail + answers
+- [x] API: `PATCH /api/questions/:id` — update question (owner only)
+- [x] API: `DELETE /api/questions/:id` — delete question (owner or admin)
+- [x] API: `POST /api/questions/:id/answers` — create answer
+- [x] API: `PATCH /api/answers/:id` — update/delete answer (owner only)
+- [x] API: `POST /api/questions/:id/accept-answer/:answerId` — accept answer (question owner only)
+- [x] API: `POST /api/questions/:id/upvote` — upvote question
+- [x] API: `POST /api/answers/:id/upvote` — upvote answer
 
 **Frontend:**
-- [ ] `/dashboard/qa` — trang Q&A toàn hệ thống (thay thế community tab trên dashboard)
+- [x] `/dashboard/qa` — trang Q&A toàn hệ thống (thay thế community tab trên dashboard)
   - Filter: Tất cả / Chưa trả lời / Đã giải quyết
   - Filter theo khóa học (dropdown)
   - Sort: Mới nhất / Nhiều lượt xem / Nhiều upvote
   - Search bar (tìm theo title)
   - Pagination
   - Button "Đặt câu hỏi" → modal
-- [ ] `/qa/[questionId]` — trang chi tiết câu hỏi
+- [x] `/qa/[questionId]` — trang chi tiết câu hỏi
   - Question content + metadata (author, course, timestamp, view count)
   - Answer list (sorted: accepted first, then by upvotes)
   - Answer form
   - Upvote button
   - "Chấp nhận câu trả lời" cho owner
-- [ ] Migration: Xóa auto-join community group flow (Kafka event `learning.enrollment.created` không còn tạo community membership)
-- [ ] Migration: Option — migrate existing community posts sang Questions hoặc archive
+- [x] Migration: Xóa auto-join community group flow (Kafka event `learning.enrollment.created` không còn tạo community membership)
+- [x] Migration: Option — migrate existing community posts sang Questions hoặc archive
 
 **Acceptance Criteria:**
 - User có thể đặt câu hỏi, được giải đáp bởi cộng đồng
@@ -105,10 +105,10 @@
 **Mục tiêu:** Cập nhật UI community để phân biệt rõ giảng viên vs học viên bằng verify badge.
 
 **Frontend (chỉ update UI, không thay đổi logic):**
-- [ ] Update community post/feed UI: thêm verify badge (icon xanh) cho author có role INSTRUCTOR
-- [ ] Badge design: Icon `CheckCircle2` màu xanh dương (`text-blue-500`) bên cạnh tên giảng viên
-- [ ] Cập nhật instructor profile link trên community — click vào tên giảng viên → `/instructors/[slug]`
-- [ ] Nếu Phase 25 chưa xong: update existing community posts/comments để hiển thị badge
+- [x] Update community post/feed UI: thêm verify badge (icon xanh) cho author có role INSTRUCTOR (đã triển khai trên Global Q&A)
+- [x] Badge design: Icon `CheckCircle2` màu xanh dương (`text-blue-500`) bên cạnh tên giảng viên
+- [x] Cập nhật instructor profile link trên community — click vào tên giảng viên → `/instructors/[slug]`
+- [x] Nếu Phase 25 chưa xong: update existing community posts/comments để hiển thị badge (đã gộp vào Phase 25)
 
 **Lưu ý:** Nếu Phase 25 (Global Q&A) được làm trước, Phase 26 có thể merge vào Phase 25 vì Q&A cũng cần verify badge.
 

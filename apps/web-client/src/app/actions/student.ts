@@ -123,13 +123,15 @@ export async function updateLessonProgressAction(
 
 export async function getCourseReviewsAction(
   courseId: string,
-  params?: { page?: number; limit?: number; sortBy?: 'newest' | 'highest' | 'lowest' },
+  params?: { page?: number; limit?: number; sortBy?: 'newest' | 'highest' | 'lowest'; search?: string; rating?: number },
 ): Promise<ApiResponse<CourseReviewListDto>> {
   try {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.sortBy) query.set('sortBy', params.sortBy);
+    if (params?.search) query.set('search', params.search);
+    if (params?.rating) query.set('rating', String(params.rating));
 
     const suffix = query.toString() ? `?${query.toString()}` : '';
     return callApi<CourseReviewListDto>(

@@ -129,6 +129,10 @@ export function CourseReviewPanel({
   const router = useRouter();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [sortBy, setSortBy] = useState<SortByType>('newest');
+  const [search, setSearch] = useState('');
+  const [ratingFilter, setRatingFilter] = useState<number>(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorStr, setErrorStr] = useState('');
@@ -152,9 +156,11 @@ export function CourseReviewPanel({
   const loadReviews = async (nextSortBy: SortByType) => {
     setLoading(true);
     const reviewRes = await getCourseReviewsAction(courseId, {
-      page: 1,
+      page,
       limit: 10,
       sortBy: nextSortBy,
+      search,
+      rating: ratingFilter || undefined,
     });
 
     if (!reviewRes.success || !reviewRes.data) {
@@ -165,6 +171,8 @@ export function CourseReviewPanel({
     }
 
     setReviews(reviewRes.data.reviews || []);
+    setTotalPages(reviewRes.data.pagination.totalPages || 1);
+    setPage(reviewRes.data.pagination.page || 1);
     setStats(reviewRes.data.stats);
     setErrorStr('');
     setMyReview(null);
@@ -187,7 +195,7 @@ export function CourseReviewPanel({
   useEffect(() => {
     void loadReviews(sortBy);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseId, sortBy, isAuthenticated, isEnrolled]);
+  }, [courseId, sortBy, isAuthenticated, isEnrolled, search, ratingFilter, page]);
 
   const handleSubmit = async () => {
     if (!isAuthenticated) {
@@ -257,8 +265,26 @@ export function CourseReviewPanel({
               </option>
             ))}
           </select>
+          <select
+            value={ratingFilter}
+            onChange={(e) => setRatingFilter(Number(e.target.value))}
+            className="bg-transparent text-sm font-semibold outline-none"
+          >
+            <option value={0}>Tat ca sao</option>
+            <option value={5}>5 sao</option>
+            <option value={4}>4 sao</option>
+            <option value={3}>3 sao</option>
+            <option value={2}>2 sao</option>
+            <option value={1}>1 sao</option>
+          </select>
         </div>
       </div>
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+        placeholder="Tim trong danh gia..."
+      />
 
       <div className="grid gap-4 md:grid-cols-[280px,1fr]">
         <div className="rounded-2xl border border-white/70 bg-white/75 p-4 space-y-3">
@@ -411,6 +437,15 @@ export function CourseReviewPanel({
                 </article>
               ))
             )}
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              Truoc
+            </Button>
+            <span className="text-xs text-muted-foreground">Trang {page}/{totalPages}</span>
+            <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+              Sau
+            </Button>
           </div>
         </div>
       </div>

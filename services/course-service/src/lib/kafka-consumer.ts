@@ -14,7 +14,6 @@ import {
 } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
 import prisma from './prisma';
-import { ensureCommunityMembershipForCourse } from './community';
 
 /**
  * Course-service Kafka consumers (Phase 16).
@@ -112,11 +111,12 @@ export async function startKafkaConsumers(): Promise<void> {
     }),
   );
 
-  // Auto-join community theo event da enroll thanh cong.
-  const communityConsumer = await createConsumer('course-service.community.autojoin');
-  await consumeWithRetry<EnrollmentCreatedEvent>(communityConsumer, producer, {
+  // Phase 25: global Q&A thay the flow auto-join community.
+  // Van keep event validation logging de theo doi traffic cu.
+  const enrollmentSignalConsumer = await createConsumer('course-service.enrollment.signal');
+  await consumeWithRetry<EnrollmentCreatedEvent>(enrollmentSignalConsumer, producer, {
     topic: TOPICS.ENROLLMENT_CREATED,
-    groupId: 'course-service.community.autojoin',
+    groupId: 'course-service.enrollment.signal',
     handler: async (event) => {
       const validated = validateKafkaEvent(
         EnrollmentCreatedSchema,
@@ -124,26 +124,12 @@ export async function startKafkaConsumers(): Promise<void> {
         'enrollment.created',
         logger,
       );
-      if (!validated) return; // Reject malformed events
-
-      const { user_id, course_id } = validated;
-      const result = await ensureCommunityMembershipForCourse({
-        userId: user_id,
-        courseId: course_id,
-      });
-
+      if (!validated) return;
       logger.info(
-        {
-          userId: user_id,
-          courseId: course_id,
-          groupId: result.group.id,
-          memberCreated: result.memberCreated,
-        },
-        'Community auto-join handled from learning.enrollment.created',
+        { userId: validated.user_id, courseId: validated.course_id },
+        'Enrollment created signal consumed (community auto-join disabled)',
       );
     },
-    onError: (err) => logger.error({ err }, 'Community auto-join consumer failed'),
+    onError: (err) => logger.error({ err }, 'Enrollment signal consumer failed'),
   });
-
-  logger.info({ topic: TOPICS.ENROLLMENT_CREATED }, 'Kafka consumer running');
 }

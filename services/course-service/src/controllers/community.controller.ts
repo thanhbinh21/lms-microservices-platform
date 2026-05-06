@@ -104,6 +104,7 @@ function mapGroupSummary(group: {
   description: string | null;
   memberCount: number;
   postCount: number;
+  isArchived?: boolean;
   createdAt: Date;
   updatedAt: Date;
   course: {
@@ -124,6 +125,7 @@ function mapGroupSummary(group: {
     description: group.description,
     memberCount: group.memberCount,
     postCount: group.postCount,
+    isArchived: Boolean(group.isArchived),
     createdAt: group.createdAt,
     updatedAt: group.updatedAt,
     course: group.course,
@@ -159,6 +161,7 @@ export async function listCommunityGroups(req: Request, res: Response): Promise<
             description: true,
             memberCount: true,
             postCount: true,
+            isArchived: true,
             createdAt: true,
             updatedAt: true,
             course: {
@@ -193,6 +196,7 @@ export async function listCommunityGroups(req: Request, res: Response): Promise<
         description: true,
         memberCount: true,
         postCount: true,
+        isArchived: true,
         createdAt: true,
         updatedAt: true,
         course: {
@@ -252,6 +256,7 @@ export async function listInstructorCommunityGroups(req: Request, res: Response)
         description: true,
         memberCount: true,
         postCount: true,
+        isArchived: true,
         createdAt: true,
         updatedAt: true,
         course: {
@@ -571,6 +576,7 @@ export async function reactCommunityPost(req: Request, res: Response): Promise<R
       },
       select: {
         id: true,
+        group: { select: { isArchived: true } },
         likedByIds: true,
         likeCount: true,
       },
@@ -585,6 +591,16 @@ export async function reactCommunityPost(req: Request, res: Response): Promise<R
         trace_id: traceId,
       };
       return res.status(404).json(response);
+    }
+    if (post.group?.isArchived) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 410,
+        message: 'Nhom cong dong da duoc luu tru (chi doc)',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(410).json(response);
     }
 
     const hasLiked = post.likedByIds.includes(userId);
@@ -663,6 +679,16 @@ export async function joinCommunityGroup(req: Request, res: Response): Promise<R
         trace_id: traceId,
       };
       return res.status(403).json(response);
+    }
+    if ((result.group as any).isArchived) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 410,
+        message: 'Nhom cong dong da duoc luu tru (chi doc)',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(410).json(response);
     }
 
     const response: ApiResponse<{
@@ -757,6 +783,16 @@ export async function listCommunityPosts(req: Request, res: Response): Promise<R
         trace_id: traceId,
       };
       return res.status(403).json(response);
+    }
+    if ((membership.group as any).isArchived) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 410,
+        message: 'Nhom cong dong da duoc luu tru (chi doc)',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(410).json(response);
     }
 
     const where: Prisma.CommunityPostWhereInput = {
@@ -958,6 +994,16 @@ export async function createCommunityPost(req: Request, res: Response): Promise<
         trace_id: traceId,
       };
       return res.status(403).json(response);
+    }
+    if ((membership.group as any).isArchived) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 410,
+        message: 'Nhom cong dong da duoc luu tru (chi doc)',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(410).json(response);
     }
 
     const post = await prisma.$transaction(async (tx) => {

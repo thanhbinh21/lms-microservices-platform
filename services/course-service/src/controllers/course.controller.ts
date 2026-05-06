@@ -294,6 +294,8 @@ export async function listCourses(req: Request, res: Response) {
     const q = (req.query.q as string)?.trim() || '';
     const categorySlug = (req.query.category as string)?.trim() || '';
     const sortBy = (req.query.sortBy as string) || 'newest';
+    const search = (req.query.search as string)?.trim() || '';
+    const rating = req.query.rating !== undefined ? Number(req.query.rating) : undefined;
     const minPrice = req.query.minPrice !== undefined ? Number(req.query.minPrice) : undefined;
     const maxPrice = req.query.maxPrice !== undefined ? Number(req.query.maxPrice) : undefined;
     const minRating = req.query.minRating !== undefined ? Number(req.query.minRating) : undefined;
@@ -441,7 +443,14 @@ export async function listCourseReviews(req: Request, res: Response) {
 
     const [reviews, total, stats] = await Promise.all([
       prisma.review.findMany({
-        where: { courseId, isFlagged: false },
+        where: {
+          courseId,
+          isFlagged: false,
+          ...(search
+            ? { comment: { contains: search, mode: 'insensitive' } }
+            : {}),
+          ...(rating && rating >= 1 && rating <= 5 ? { rating } : {}),
+        },
         orderBy,
         skip,
         take: limit,
@@ -454,7 +463,16 @@ export async function listCourseReviews(req: Request, res: Response) {
           updatedAt: true,
         },
       }),
-      prisma.review.count({ where: { courseId, isFlagged: false } }),
+      prisma.review.count({
+        where: {
+          courseId,
+          isFlagged: false,
+          ...(search
+            ? { comment: { contains: search, mode: 'insensitive' } }
+            : {}),
+          ...(rating && rating >= 1 && rating <= 5 ? { rating } : {}),
+        },
+      }),
       buildCourseReviewStats(courseId),
     ]);
 
@@ -748,8 +766,22 @@ export async function getCourseBySlug(req: Request, res: Response) {
     }
 
     // Chi tra ve URL bai hoc trong /playback API khi da enroll. Tra ve null de an video tren trang course detail (review mode).
+    const instructorProfile = await prisma.instructorProfile.findUnique({
+      where: { instructorId: course.instructorId },
+      select: { displayName: true, bio: true, avatar: true, slug: true },
+    });
+
     const sanitizedCourse = {
       ...serializeCourse(course),
+      instructor: instructorProfile
+        ? {
+            id: course.instructorId,
+            displayName: instructorProfile.displayName,
+            bio: instructorProfile.bio,
+            avatar: instructorProfile.avatar,
+            slug: instructorProfile.slug,
+          }
+        : null,
       chapters: course.chapters.map((chapter) => ({
         ...chapter,
         lessons: chapter.lessons.map((lesson) => ({
@@ -760,9 +792,28 @@ export async function getCourseBySlug(req: Request, res: Response) {
       })),
     };
 
+    const relatedCoursesRaw = await prisma.course.findMany({
+      where: {
+        status: 'PUBLISHED',
+        id: { not: course.id },
+        categoryId: course.categoryId ?? undefined,
+      },
+      orderBy: [{ enrollmentCount: 'desc' }, { averageRating: 'desc' }],
+      take: 8,
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        thumbnail: true,
+        price: true,
+        averageRating: true,
+        ratingCount: true,
+      },
+    });
+
     const response: ApiResponse<unknown> = {
       success: true, code: 200, message: 'Course fetched successfully',
-      data: sanitizedCourse, trace_id: traceId,
+      data: { ...sanitizedCourse, relatedCourses: relatedCoursesRaw.map(serializeCourse) }, trace_id: traceId,
     };
     return res.status(200).json(response);
   } catch (err) {

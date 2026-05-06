@@ -153,6 +153,22 @@ export interface CourseCurriculumDto {
   instructorId?: string;
   createdAt?: string;
   updatedAt?: string;
+  instructor?: {
+    id: string;
+    displayName: string;
+    bio?: string | null;
+    avatar?: string | null;
+    slug?: string | null;
+  } | null;
+  relatedCourses?: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    thumbnail?: string | null;
+    price: number;
+    averageRating?: number;
+    ratingCount?: number;
+  }>;
   chapters: ChapterDto[];
 }
 
