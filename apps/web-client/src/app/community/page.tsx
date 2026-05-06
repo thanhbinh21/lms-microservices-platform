@@ -109,6 +109,7 @@ export default function CommunityPage() {
 
   const [replyingPostId, setReplyingPostId] = useState<string | null>(null);
   const [replySubmittingForPost, setReplySubmittingForPost] = useState<string | null>(null);
+  const isReadOnlyArchive = true;
 
   const loadInitial = useCallback(async () => {
     setLoading(true);
@@ -230,6 +231,7 @@ export default function CommunityPage() {
   };
 
   const handleCreatePost = async () => {
+    if (isReadOnlyArchive) return;
     const content = composerValue.trim();
     if (!content || !globalGroup) return;
 
@@ -250,6 +252,7 @@ export default function CommunityPage() {
   };
 
   const handleReact = async (postId: string) => {
+    if (isReadOnlyArchive) return;
     if (!globalGroup) return;
     
     // Optimistic update
@@ -272,6 +275,7 @@ export default function CommunityPage() {
   };
 
   const handleReply = async (postId: string, content: string) => {
+    if (isReadOnlyArchive) return;
     if (!globalGroup) return;
     setReplySubmittingForPost(postId);
     const result = await replyCommunityPostAction(globalGroup.id, postId, content);
@@ -354,50 +358,8 @@ export default function CommunityPage() {
           </div>
         </div>
 
-        <Card className="glass-panel rounded-3xl border-white/60 p-6 shadow-sm">
-          <h2 className="text-base font-bold text-slate-800">Tạo bài viết mới</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Bạn đang nghĩ gì? Hãy chia sẻ cùng cộng đồng.
-          </p>
-          <textarea
-            value={composerValue}
-            onChange={(e) => setComposerValue(e.target.value)}
-            placeholder="Bạn đang nghĩ gì?"
-            className="mt-4 min-h-24 w-full resize-y rounded-xl border-none bg-transparent px-4 py-3 text-lg outline-none transition placeholder:text-slate-400"
-          />
-          {composerImageUrl && (
-            <div className="mt-2 relative">
-              <Image src={composerImageUrl} alt="Xem trước ảnh đính kèm" width={1200} height={900} className="max-h-60 rounded-xl object-cover" />
-              <button onClick={() => setComposerImageUrl('')} className="absolute top-2 right-2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70">✕</button>
-            </div>
-          )}
-          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="text-slate-500 hover:bg-slate-100 rounded-full" onClick={() => attachmentInputRef.current?.click()} disabled={uploadingAttachment}>
-                <ImageIcon className="size-5 mr-2 text-emerald-500" />
-                {uploadingAttachment ? 'Đang tải...' : 'Tải ảnh lên'}
-              </Button>
-              <input
-                ref={attachmentInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  void handleAttachmentUpload(file);
-                  event.currentTarget.value = '';
-                }}
-              />
-            </div>
-            <Button
-              className="gap-2 rounded-full font-bold px-6"
-              disabled={posting || refreshing || !composerValue.trim()}
-              onClick={handleCreatePost}
-            >
-              {posting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-              Đăng
-            </Button>
-          </div>
+        <Card className="rounded-2xl border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Khu community cũ đã chuyển sang chế độ lưu trữ chỉ đọc. Vui lòng dùng Global Q&A để tạo nội dung mới.
         </Card>
 
         {error ? (
@@ -455,6 +417,7 @@ export default function CommunityPage() {
                   variant="ghost" 
                   className={`flex-1 gap-2 rounded-xl font-semibold ${post.likedByMe ? 'text-blue-600' : 'text-slate-600'}`}
                   onClick={() => handleReact(post.id)}
+                  disabled={isReadOnlyArchive}
                 >
                   <ThumbsUp className="size-5" />
                   Thích
@@ -463,6 +426,7 @@ export default function CommunityPage() {
                   variant="ghost" 
                   className="flex-1 gap-2 rounded-xl font-semibold text-slate-600"
                   onClick={() => setReplyingPostId((current) => (current === post.id ? null : post.id))}
+                  disabled={isReadOnlyArchive}
                 >
                   <MessageSquare className="size-5" />
                   Bình luận
@@ -491,7 +455,7 @@ export default function CommunityPage() {
                 </div>
               ) : null}
 
-              {replyingPostId === post.id ? (
+              {replyingPostId === post.id && !isReadOnlyArchive ? (
                 <ReplyComposer
                   loading={replySubmittingForPost === post.id || refreshing}
                   onSubmit={async (content) => {

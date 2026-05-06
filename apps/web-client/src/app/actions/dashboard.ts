@@ -25,6 +25,7 @@ interface DashboardData {
   }[];
   recommendedCourses: {
     id: string;
+    slug: string;
     title: string;
     category: string;
     price: string;
@@ -71,6 +72,7 @@ export async function getDashboardData(): Promise<{ success: boolean; data?: Das
       })),
     recommendedCourses: publicCourses.slice(0, 3).map((item) => ({
       id: item.id,
+      slug: item.slug,
       title: item.title,
       category: item.level,
       price: `${Number(item.price).toLocaleString('vi-VN')}đ`,

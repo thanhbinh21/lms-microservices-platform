@@ -40,6 +40,19 @@ import {
   assignCommunityGroupToCourse,
 } from './controllers/community.controller';
 import {
+  createQuestion,
+  listQuestions,
+  getQuestionDetail,
+  updateQuestion,
+  deleteQuestion,
+  createAnswer,
+  acceptAnswer,
+  upvoteQuestion,
+  upvoteAnswer,
+  updateAnswer,
+  deleteAnswer,
+} from './controllers/qa.controller';
+import {
   listInstructors,
   getInstructorBySlug,
   listInstructorCoursesBySlug,
@@ -122,6 +135,19 @@ app.get('/api/community/groups/:groupId/posts', requireAuth, listCommunityPosts)
 app.post('/api/community/groups/:groupId/posts', requireAuth, createCommunityPost);
 app.post('/api/community/groups/:groupId/posts/:postId/reply', requireAuth, replyCommunityPost);
 app.post('/api/community/groups/:groupId/posts/:postId/react', requireAuth, reactCommunityPost);
+
+// ─── Global Q&A Routes ──────────────────────────────────────────────────────
+app.post('/api/questions', requireAuth, createQuestion);
+app.get('/api/questions', listQuestions);
+app.get('/api/questions/:id', requireAuth, getQuestionDetail);
+app.patch('/api/questions/:id', requireAuth, updateQuestion);
+app.delete('/api/questions/:id', requireAuth, deleteQuestion);
+app.post('/api/questions/:id/answers', requireAuth, createAnswer);
+app.post('/api/questions/:id/accept-answer/:answerId', requireAuth, acceptAnswer);
+app.post('/api/questions/:id/upvote', requireAuth, upvoteQuestion);
+app.post('/api/answers/:id/upvote', requireAuth, upvoteAnswer);
+app.patch('/api/answers/:id', requireAuth, updateAnswer);
+app.delete('/api/answers/:id', requireAuth, deleteAnswer);
 
 // ─── Instructor Profile Routes ─────────────────────────────────────────────
 app.get('/api/instructors/profile', ...requireRole('instructor', 'admin'), getMyInstructorProfile);

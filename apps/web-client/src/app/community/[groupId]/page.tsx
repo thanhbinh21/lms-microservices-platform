@@ -6,18 +6,14 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useAppSelector } from '@/lib/redux/hooks';
 import {
-  createCommunityPostAction,
   getCommunityPostsAction,
-  replyCommunityPostAction,
-  toggleCommunityPostReactAction,
   type CommunityPostDto,
   type CommunityPostsResult,
 } from '@/app/actions/community';
-import { confirmMediaUploadAction, requestMediaUploadAction } from '@/app/actions/instructor';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Users, MessageSquare, Send, ArrowLeft, Globe, Lock, ThumbsUp, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
+import { Loader2, Users, MessageSquare, ArrowLeft, Globe, Lock, CheckCircle2 } from 'lucide-react';
 
 function formatDate(dateIso: string) {
   return new Date(dateIso).toLocaleString('vi-VN', {
@@ -99,168 +95,36 @@ function GroupHeader({
   );
 }
 
-function ReplyComposer({
-  onSubmit,
-  loading,
-}: {
-  onSubmit: (content: string) => Promise<void>;
-  loading: boolean;
-}) {
-  const [value, setValue] = useState('');
-
-  return (
-    <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <textarea
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Viết phản hồi của bạn..."
-        className="min-h-20 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-primary"
-      />
-      <div className="flex justify-end">
-        <Button
-          size="sm"
-          disabled={loading}
-          className="gap-2 rounded-lg"
-          onClick={async () => {
-            const next = value.trim();
-            if (!next) {
-              return;
-            }
-            await onSubmit(next);
-            setValue('');
-          }}
-        >
-          {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-          Gửi trả lời
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export default function CommunityGroupPage() {
   const params = useParams();
   const router = useRouter();
   const groupId = params.groupId as string;
 
-  const { isAuthenticated, isLoading: authLoading, user } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, isLoading: authLoading } = useAppSelector((state) => state.auth);
 
   const [group, setGroup] = useState<CommunityPostsResult['group'] | null>(null);
   const [posts, setPosts] = useState<CommunityPostDto[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [composerValue, setComposerValue] = useState('');
-  const [composerImageUrl, setComposerImageUrl] = useState('');
-  const [posting, setPosting] = useState(false);
-  const [uploadingAttachment, setUploadingAttachment] = useState(false);
-  const [replyingPostId, setReplyingPostId] = useState<string | null>(null);
-  const [replySubmittingForPost, setReplySubmittingForPost] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
-
-  const fetchPosts = useCallback(
-    async (cursor?: string | null) => {
-      const result = await getCommunityPostsAction(groupId, {
-        limit: 20,
-        cursor: cursor || undefined,
-      });
-
-      if (!result.success || !result.data) {
-        return {
-          ok: false as const,
-          message: result.message || 'Không thể tải bài viết',
-        };
-      }
-
-      return {
-        ok: true as const,
-        data: result.data,
-      };
-    },
-    [groupId],
-  );
+  const isReadOnlyArchive = true;
 
   const loadInitial = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    const result = await fetchPosts();
-    if (!result.ok) {
-      setError(result.message);
+    const result = await getCommunityPostsAction(groupId, { limit: 20 });
+    if (!result.success || !result.data) {
+      setError(result.message || 'Không thể tải bài viết');
       setLoading(false);
       return;
     }
-
     setGroup(result.data.group);
     setPosts(result.data.items);
     setNextCursor(result.data.nextCursor);
     setLoading(false);
-  }, [fetchPosts]);
-
-  const uploadWithPresigned = async (presignedUrl: string, file: File, uploadFields?: Record<string, string>) => {
-    if (uploadFields) {
-      const formData = new FormData();
-      Object.entries(uploadFields).forEach(([key, value]) => formData.append(key, value));
-      formData.append('file', file);
-
-      const response = await fetch(presignedUrl, {
-        method: 'POST',
-        body: formData,
-      });
-
-      return response.ok;
-    }
-
-    const response = await fetch(presignedUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': file.type || 'application/octet-stream' },
-      body: file,
-    });
-
-    return response.ok;
-  };
-
-  const handleAttachmentUpload = async (file?: File | null) => {
-    if (!file) return;
-
-    setUploadingAttachment(true);
-    try {
-      const presigned = await requestMediaUploadAction({
-        filename: file.name,
-        mimeType: file.type || 'image/jpeg',
-        size: file.size,
-        type: 'IMAGE',
-      });
-
-      if (!presigned.success || !presigned.data) {
-        setError(presigned.message || 'Không tạo được phiên upload ảnh.');
-        return;
-      }
-
-      const uploaded = await uploadWithPresigned(
-        presigned.data.presignedUrl,
-        file,
-        presigned.data.uploadMethod === 'POST_FORM' ? presigned.data.uploadFields : undefined,
-      );
-
-      if (!uploaded) {
-        setError('Upload ảnh thất bại.');
-        return;
-      }
-
-      const confirmed = await confirmMediaUploadAction(presigned.data.mediaId);
-      if (!confirmed.success || !confirmed.data?.url) {
-        setError(confirmed.message || 'Không xác nhận được ảnh.');
-        return;
-      }
-
-      setComposerImageUrl(confirmed.data.url);
-    } finally {
-      setUploadingAttachment(false);
-    }
-  };
+  }, [groupId]);
 
   useEffect(() => {
     if (authLoading) {
@@ -274,78 +138,24 @@ export default function CommunityGroupPage() {
     void loadInitial();
   }, [authLoading, isAuthenticated, loadInitial, router]);
 
-  const handleCreatePost = async () => {
-    const content = composerValue.trim();
-    if (!content) return;
-
-    setPosting(true);
-    const result = await createCommunityPostAction(groupId, content, composerImageUrl || undefined);
-    setPosting(false);
-
-    if (!result.success) {
-      setError(result.message || 'Không thể đăng bài viết');
-      return;
-    }
-
-    setComposerValue('');
-    setComposerImageUrl('');
-    setRefreshing(true);
-    await loadInitial();
-    setRefreshing(false);
-  };
-
-  const handleReact = async (postId: string) => {
-    // Optimistic update
-    setPosts(prev => prev.map(p => {
-      if (p.id === postId) {
-        return {
-          ...p,
-          likedByMe: !p.likedByMe,
-          likeCount: (p.likeCount || 0) + (p.likedByMe ? -1 : 1)
-        };
-      }
-      return p;
-    }));
-
-    const result = await toggleCommunityPostReactAction(groupId, postId);
-    if (!result.success) {
-      // Revert optimistic update
-      await loadInitial();
-    }
-  };
-
-  const handleReply = async (postId: string, content: string) => {
-    setReplySubmittingForPost(postId);
-    const result = await replyCommunityPostAction(groupId, postId, content);
-    setReplySubmittingForPost(null);
-
-    if (!result.success) {
-      setError(result.message || 'Không thể gửi phản hồi');
-      return;
-    }
-
-    setRefreshing(true);
-    await loadInitial();
-    setRefreshing(false);
-    setReplyingPostId(null);
-  };
-
   const handleLoadMore = async () => {
     if (!nextCursor || loadingMore) {
       return;
     }
 
     setLoadingMore(true);
-    const result = await fetchPosts(nextCursor);
+    const result = await getCommunityPostsAction(groupId, {
+      limit: 20,
+      cursor: nextCursor || undefined,
+    });
     setLoadingMore(false);
-
-    if (!result.ok) {
-      setError(result.message);
+    if (!result.success || !result.data) {
+      setError(result.message || 'Không thể tải thêm bài viết');
       return;
     }
-
-    setPosts((prev) => [...prev, ...result.data.items]);
-    setNextCursor(result.data.nextCursor);
+    const nextData = result.data;
+    setPosts((prev) => [...prev, ...nextData.items]);
+    setNextCursor(nextData.nextCursor);
   };
 
   const sortedPosts = useMemo(() => {
@@ -390,54 +200,9 @@ export default function CommunityGroupPage() {
 
         {group ? <GroupHeader group={group} /> : null}
 
-        {/* Chỉ cho phép giảng viên khóa học (group.owner) tạo bài viết mới */}
-        {group && group.ownerId === user?.id && (
-          <Card className="glass-panel rounded-2xl border-white/60 p-5">
-            <h2 className="text-base font-bold text-slate-800">Tạo bài viết mới</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Tạo bài thảo luận, đặt câu hỏi, chia sẻ kinh nghiệm cho học viên.
-            </p>
-            <textarea
-              value={composerValue}
-              onChange={(e) => setComposerValue(e.target.value)}
-              placeholder="Bạn đang nghĩ gì?"
-              className="mt-4 min-h-24 w-full resize-y rounded-xl border-none bg-transparent px-4 py-3 text-lg outline-none transition placeholder:text-slate-400"
-            />
-            {composerImageUrl && (
-              <div className="mt-2 relative">
-                <Image src={composerImageUrl} alt="Xem trước ảnh đính kèm" width={1200} height={900} className="max-h-60 rounded-xl object-cover" />
-                <button onClick={() => setComposerImageUrl('')} className="absolute top-2 right-2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70">✕</button>
-              </div>
-            )}
-            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" className="rounded-full text-slate-500 hover:bg-slate-100" onClick={() => attachmentInputRef.current?.click()} disabled={uploadingAttachment}>
-                  <ImageIcon className="size-5 mr-2 text-emerald-500" />
-                  {uploadingAttachment ? 'Đang tải...' : 'Tải ảnh lên'}
-                </Button>
-                <input
-                  ref={attachmentInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    void handleAttachmentUpload(file);
-                    event.currentTarget.value = '';
-                  }}
-                />
-              </div>
-              <Button
-                className="gap-2 rounded-full font-bold px-6"
-                disabled={posting || refreshing || !composerValue.trim()}
-                onClick={handleCreatePost}
-              >
-                {posting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-                Đăng
-              </Button>
-            </div>
-          </Card>
-        )}
+        <Card className="rounded-2xl border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Khu community cũ đã chuyển sang chế độ lưu trữ chỉ đọc. Vui lòng dùng Global Q&A để tạo nội dung mới.
+        </Card>
 
         {error ? (
           <Card className="rounded-2xl border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
@@ -473,33 +238,9 @@ export default function CommunityGroupPage() {
                 </div>
               )}
 
-              <div className="mt-4 flex items-center justify-between text-sm text-slate-500 px-2">
-                <div className="flex items-center gap-1.5">
-                  <div className="flex size-5 items-center justify-center rounded-full bg-blue-500 text-white">
-                    <ThumbsUp className="size-3" />
-                  </div>
-                  <span>{post.likeCount || 0}</span>
-                </div>
-                <div>{post.replies.length} bình luận</div>
-              </div>
-
-              <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
-                <Button 
-                  variant="ghost" 
-                  className={`flex-1 gap-2 rounded-xl font-semibold ${post.likedByMe ? 'text-blue-600' : 'text-slate-600'}`}
-                  onClick={() => handleReact(post.id)}
-                >
-                  <ThumbsUp className="size-5" />
-                  Thích
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  className="flex-1 gap-2 rounded-xl font-semibold text-slate-600"
-                  onClick={() => setReplyingPostId((current) => (current === post.id ? null : post.id))}
-                >
-                  <MessageSquare className="size-5" />
-                  Bình luận
-                </Button>
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm text-slate-500">
+                <span>{post.likeCount || 0} lượt thích</span>
+                <span>{post.replies.length} bình luận</span>
               </div>
 
               {post.replies.length > 0 ? (
@@ -524,14 +265,7 @@ export default function CommunityGroupPage() {
                 </div>
               ) : null}
 
-              {replyingPostId === post.id ? (
-                <ReplyComposer
-                  loading={replySubmittingForPost === post.id || refreshing}
-                  onSubmit={async (content) => {
-                    await handleReply(post.id, content);
-                  }}
-                />
-              ) : null}
+              {isReadOnlyArchive ? null : null}
             </Card>
           ))}
         </div>

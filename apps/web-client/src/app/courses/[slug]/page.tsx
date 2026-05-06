@@ -33,7 +33,7 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
   const course = result.data;
   const totalLessons = course.chapters.reduce((acc, chapter) => acc + chapter.lessons.length, 0);
   const totalChapters = course.chapters.length;
-  const instructorDisplayName = `Giảng viên #${(course.instructorId || '').slice(0, 8)}`;
+  const instructorDisplayName = course.instructor?.displayName || `Giảng viên #${(course.instructorId || '').slice(0, 8)}`;
   const formattedPrice = `${Number(course.price || 0).toLocaleString('vi-VN')}đ`;
   const updatedLabel = course.updatedAt || course.createdAt
     ? new Date(course.updatedAt || course.createdAt || Date.now()).toLocaleDateString('vi-VN')
@@ -89,7 +89,18 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
           <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 text-sm">
             <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Giảng viên</p>
-              <p className="mt-1 font-bold text-slate-800">{instructorDisplayName}</p>
+              <div className="mt-1">
+                {course.instructor?.slug ? (
+                  <Link href={`/instructors/${course.instructor.slug}`} className="font-bold text-primary hover:underline">
+                    {instructorDisplayName}
+                  </Link>
+                ) : (
+                  <p className="font-bold text-slate-800">{instructorDisplayName}</p>
+                )}
+                {course.instructor?.bio && (
+                  <p className="line-clamp-1 text-xs text-muted-foreground">{course.instructor.bio}</p>
+                )}
+              </div>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cấp độ</p>
@@ -164,11 +175,25 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
           </div>
         </section>
 
+        {Array.isArray(course.relatedCourses) && course.relatedCourses.length > 0 && (
+          <section className="space-y-4">
+            <h2 className="text-xl font-bold">Khóa học liên quan</h2>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {course.relatedCourses.map((item) => (
+                <Link key={item.id} href={`/courses/${item.slug}`} className="min-w-[240px] rounded-2xl border border-white/60 bg-white/70 p-4 hover:border-primary/50">
+                  <p className="font-bold line-clamp-2">{item.title}</p>
+                  <p className="mt-2 text-sm text-primary">{Number(item.price || 0).toLocaleString('vi-VN')}đ</p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
         <CourseReviewPanel
           courseId={course.id}
           isEnrolled={isEnrolled}
           isCourseCompleted={isCourseCompleted}
-          heading="Danh gia va nhan xet"
+          heading="Đánh giá và nhận xét"
         />
       </main>
 

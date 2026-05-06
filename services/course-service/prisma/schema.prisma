@@ -81,6 +81,7 @@ model Course {
   chapters    Chapter[]
   enrollments Enrollment[]
   reviews     Review[]
+  questions   Question[]
   certificates Certificate[]
   certificateTemplates CourseCertificateTemplate[]
   communityGroups CommunityGroup[]
@@ -253,6 +254,7 @@ model CommunityGroup {
   description String?
   memberCount Int                @default(0) @map("member_count")
   postCount   Int                @default(0) @map("post_count")
+  isArchived  Boolean            @default(false) @map("is_archived")
   createdAt   DateTime           @default(now()) @map("created_at")
   updatedAt   DateTime           @updatedAt @map("updated_at")
 
@@ -292,6 +294,7 @@ model CommunityPost {
   imageUrl     String?  @map("image_url")
   likeCount    Int      @default(0) @map("like_count")
   likedByIds   String[] @default([]) @map("liked_by_ids")
+  isArchived   Boolean  @default(false) @map("is_archived")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -303,6 +306,75 @@ model CommunityPost {
   @@index([parentId])
   @@index([authorId])
   @@map("community_posts")
+}
+
+model Question {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  title       String
+  content     String
+  courseId    String?  @map("course_id")
+  lessonId    String?  @map("lesson_id")
+  isResolved  Boolean  @default(false) @map("is_resolved")
+  viewCount   Int      @default(0) @map("view_count")
+  upvoteCount Int      @default(0) @map("upvote_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  course   Course?          @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  answers  Answer[]
+  upvotes  QuestionUpvote[]
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([isResolved])
+  @@index([createdAt(sort: Desc)])
+  @@map("questions")
+}
+
+model Answer {
+  id          String   @id @default(uuid())
+  questionId  String   @map("question_id")
+  userId      String   @map("user_id")
+  content     String
+  isAccepted  Boolean  @default(false) @map("is_accepted")
+  upvoteCount Int      @default(0) @map("upvote_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  question Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  upvotes  AnswerUpvote[]
+
+  @@index([questionId])
+  @@index([userId])
+  @@index([isAccepted])
+  @@map("answers")
+}
+
+model QuestionUpvote {
+  id         String   @id @default(uuid())
+  questionId String   @map("question_id")
+  userId     String   @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, userId])
+  @@index([userId])
+  @@map("question_upvotes")
+}
+
+model AnswerUpvote {
+  id        String   @id @default(uuid())
+  answerId  String   @map("answer_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  answer Answer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+
+  @@unique([answerId, userId])
+  @@index([userId])
+  @@map("answer_upvotes")
 }
 
 model FailedEvent {
