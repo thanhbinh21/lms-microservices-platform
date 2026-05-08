@@ -79,6 +79,8 @@ export interface PaymentCompletedEvent {
   vnp_txn_ref: string;
   vnp_transaction_no: string;
   paid_at: string;
+  instructor_share_ratio?: number;
+  platform_fee_ratio?: number;
 }
 
 // Event enrollment (publish boi course-service sau khi tao enrollment)

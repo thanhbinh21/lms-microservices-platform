@@ -13,7 +13,10 @@ export default function LearnCoursePage() {
   useEffect(() => {
     (async () => {
       const res = await getLearnDataAction(courseId);
-      if (!res.success || !res.data) return;
+      if (!res.success || !res.data) {
+        router.replace('/dashboard/courses');
+        return;
+      }
 
       const { chapters } = res.data;
       const allLessons = chapters.flatMap((ch) => ch.lessons);
@@ -26,6 +29,8 @@ export default function LearnCoursePage() {
 
       if (target) {
         router.replace(`/learn/${courseId}/lesson/${target.id}`);
+      } else {
+        router.replace('/dashboard/courses');
       }
     })();
   }, [courseId, router]);

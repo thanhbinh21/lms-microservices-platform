@@ -20,11 +20,13 @@ export default function InstructorCoursesPage() {
   const router = useRouter();
   const [courses, setCourses] = useState<InstructorCourseView[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCourses = async () => {
       const result = await getInstructorCoursesAction();
       if (!result.success || !result.data) {
+        setErrorMessage(result.message || 'Khong the tai danh sach khoa hoc.');
         setCourses([]);
         setLoading(false);
         return;
@@ -40,6 +42,7 @@ export default function InstructorCoursesPage() {
       }));
 
       setCourses(mapped);
+      setErrorMessage(null);
       setLoading(false);
     };
 
@@ -68,6 +71,11 @@ export default function InstructorCoursesPage() {
 
       {/* Course list */}
       <div className="space-y-3">
+        {errorMessage && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {errorMessage}
+          </div>
+        )}
         {loading && (
           <div className="rounded-2xl border border-dashed border-border bg-white/30 py-16 text-center">
             <p className="text-sm text-muted-foreground">Đang tải danh sách khóa học...</p>

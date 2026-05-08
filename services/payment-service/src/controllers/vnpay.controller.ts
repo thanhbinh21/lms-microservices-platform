@@ -4,7 +4,7 @@ import prisma from '../lib/prisma';
 import { logger } from '@lms/logger';
 import { loadVNPayConfig, verifyReturn, isSuccessful } from '../lib/vnpay';
 import { publishPaymentCompleted } from '../lib/kafka-producer';
-import { createInstructorEarning } from '../lib/earnings-service';
+import { getInstructorRevenueShareRatio } from '../lib/revenue-share';
 
 /**
  * GET /api/vnpay-return — user quay ve frontend sau khi thanh toan.
@@ -72,10 +72,11 @@ export const handleVNPayReturn = async (req: Request, res: Response): Promise<Re
             vnp_txn_ref: updated.vnpTxnRef,
             vnp_transaction_no: result.transactionNo,
             paid_at: (updated.paidAt || new Date()).toISOString(),
+            instructor_share_ratio: getInstructorRevenueShareRatio(),
+            platform_fee_ratio: Number((1 - getInstructorRevenueShareRatio()).toFixed(4)),
           },
           traceId,
         );
-        await createInstructorEarning(updated.id, updated.instructorId, updated.courseId, updated.amount);
         logger.info({ orderId: updated.id }, '[DEV] Marked COMPLETED via Return URL fallback');
       } catch (err) {
         logger.error({ err, orderId: order.id }, 'Dev fallback update failed');
@@ -211,12 +212,13 @@ export const handleVNPayIPN = async (req: Request, res: Response): Promise<Respo
         vnp_txn_ref: updated.vnpTxnRef,
         vnp_transaction_no: result.transactionNo,
         paid_at: (updated.paidAt || new Date()).toISOString(),
+        instructor_share_ratio: getInstructorRevenueShareRatio(),
+        platform_fee_ratio: Number((1 - getInstructorRevenueShareRatio()).toFixed(4)),
       },
       traceId,
     );
-    await createInstructorEarning(updated.id, updated.instructorId, updated.courseId, updated.amount);
   } catch (err) {
-    logger.error({ err, orderId: updated.id }, 'Failed to publish Kafka event / create earning');
+    logger.error({ err, orderId: updated.id }, 'Failed to publish Kafka event');
     // VNPay can tra OK de khong bi retry lien tuc; ta da luu DB, event se retry boi outbox job
     // neu sau nay trien khai. De don gian: van tra OK.
   }
