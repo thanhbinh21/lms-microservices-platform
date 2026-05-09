@@ -52,6 +52,13 @@ const vnpayEnvSchema = z.object({
   PAYMENT_COMMAND: z.string().default('pay'),
   PAYMENT_LOCALE: z.string().default('vn'),
   PAYMENT_ORDER_TYPE: z.string().default('other'),
+  PAYMENT_INSTRUCTOR_SHARE_RATIO: z
+    .string()
+    .refine((value) => {
+      const n = Number(value);
+      return Number.isFinite(n) && n > 0 && n < 1;
+    }, 'PAYMENT_INSTRUCTOR_SHARE_RATIO must be a number between 0 and 1')
+    .default('0.7'),
 });
 
 // Service discovery noi bo (payment -> course de verify price)

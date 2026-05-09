@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Users, BookOpen, GraduationCap, Flag, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/admin/StatusBadge';
@@ -148,6 +149,23 @@ export default function AdminDashboardPage() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      <div className="mt-8 grid gap-4 md:grid-cols-3">
+        {[
+          { href: '/admin/revenue', title: 'Revenue Analytics', desc: 'GMV, fee nen tang, top instructors' },
+          { href: '/admin/notifications', title: 'Notification History', desc: 'Lich su thong bao da gui' },
+          { href: '/admin/system-config', title: 'System Config', desc: 'Quan ly cau hinh he thong co audit' },
+        ].map((item) => (
+          <Link key={item.href} href={item.href}>
+            <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md transition hover:bg-white/70">
+              <CardHeader>
+                <CardTitle className="text-base">{item.title}</CardTitle>
+                <CardDescription>{item.desc}</CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        ))}
       </div>
     </div>
   );

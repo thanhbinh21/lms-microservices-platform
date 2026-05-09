@@ -6,9 +6,22 @@
 import { Request, Response } from 'express';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
+import { z } from 'zod';
 
 function apiError(res: Response, code: number, message: string, traceId: string): Response {
   return res.status(code).json({ success: false, code, message, data: null, trace_id: traceId } as ApiResponse<null>);
+}
+
+const payoutProfileSchema = z.object({
+  bankAccount: z.string().min(8, 'Bank account must be at least 8 characters'),
+  bankName: z.string().min(2, 'Bank name is required'),
+  accountHolder: z.string().min(2, 'Account holder is required'),
+});
+
+function maskBankAccount(value: string): string {
+  if (value.length <= 4) return '*'.repeat(value.length);
+  const suffix = value.slice(-4);
+  return `${'*'.repeat(Math.max(0, value.length - 4))}${suffix}`;
 }
 
 export const getInstructorEarnings = async (
@@ -29,6 +42,8 @@ export const getInstructorEarnings = async (
         grossAmount: true,
         platformFee: true,
         netAmount: true,
+        revenueSharePct: true,
+        platformFeePct: true,
         status: true,
         createdAt: true,
       },
@@ -42,6 +57,8 @@ export const getInstructorEarnings = async (
         grossAmount: number;
         platformFee: number;
         netAmount: number;
+        revenueSharePct: number;
+        platformFeePct: number;
         status: string;
         createdAt: Date;
       }>
@@ -54,11 +71,101 @@ export const getInstructorEarnings = async (
         grossAmount: e.grossAmount.toNumber(),
         platformFee: e.platformFee.toNumber(),
         netAmount: e.netAmount.toNumber(),
+        revenueSharePct: e.revenueSharePct.toNumber(),
+        platformFeePct: e.platformFeePct.toNumber(),
       })),
       trace_id: traceId,
     };
     return res.status(200).json(response);
   } catch (err) {
+    return apiError(res, 500, 'Server error', traceId);
+  }
+};
+
+export const getInstructorPayoutProfile = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const instructorId = res.locals.userId as string;
+
+  try {
+    const profile = await prisma.instructorPayoutProfile.findUnique({
+      where: { instructorId },
+      select: {
+        bankName: true,
+        bankAccountMasked: true,
+        accountHolder: true,
+        updatedAt: true,
+      },
+    });
+
+    const response: ApiResponse<{
+      bankName: string;
+      bankAccountMasked: string;
+      accountHolder: string;
+      updatedAt: Date;
+    } | null> = {
+      success: true,
+      code: 200,
+      message: 'Payout profile fetched',
+      data: profile,
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch {
+    return apiError(res, 500, 'Server error', traceId);
+  }
+};
+
+export const upsertInstructorPayoutProfile = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const instructorId = res.locals.userId as string;
+  const parsed = payoutProfileSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    return apiError(res, 400, parsed.error.issues[0]?.message || 'Invalid payload', traceId);
+  }
+
+  const normalizedAccount = parsed.data.bankAccount.replace(/\s+/g, '');
+  const masked = maskBankAccount(normalizedAccount);
+
+  try {
+    const profile = await prisma.instructorPayoutProfile.upsert({
+      where: { instructorId },
+      create: {
+        instructorId,
+        bankName: parsed.data.bankName.trim(),
+        bankAccount: normalizedAccount,
+        bankAccountMasked: masked,
+        accountHolder: parsed.data.accountHolder.trim(),
+      },
+      update: {
+        bankName: parsed.data.bankName.trim(),
+        bankAccount: normalizedAccount,
+        bankAccountMasked: masked,
+        accountHolder: parsed.data.accountHolder.trim(),
+      },
+      select: {
+        bankName: true,
+        bankAccountMasked: true,
+        accountHolder: true,
+        updatedAt: true,
+      },
+    });
+
+    const response: ApiResponse<typeof profile> = {
+      success: true,
+      code: 200,
+      message: 'Payout profile saved',
+      data: profile,
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch {
     return apiError(res, 500, 'Server error', traceId);
   }
 };

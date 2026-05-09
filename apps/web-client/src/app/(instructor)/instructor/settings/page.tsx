@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import {
   getInstructorEarningsSummaryAction,
   getInstructorEarningsAction,
+  getInstructorPayoutProfileAction,
+  saveInstructorPayoutProfileAction,
   type InstructorEarningDto,
   type InstructorEarningsSummary,
 } from '@/app/actions/instructor';
@@ -16,6 +18,8 @@ export default function InstructorChannelSettingsPage() {
   const [summary, setSummary] = useState<InstructorEarningsSummary | null>(null);
   const [earnings, setEarnings] = useState<InstructorEarningDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const [bankAccount, setBankAccount] = useState('');
   const [bankName, setBankName] = useState('');
@@ -27,14 +31,38 @@ export default function InstructorChannelSettingsPage() {
         getInstructorEarningsSummaryAction(),
         getInstructorEarningsAction(),
       ]);
+      const payoutProfileRes = await getInstructorPayoutProfileAction();
       if (summaryRes.success && summaryRes.data) setSummary(summaryRes.data);
       if (earningsRes.success && earningsRes.data) setEarnings(earningsRes.data);
+      if (payoutProfileRes.success && payoutProfileRes.data) {
+        setBankName(payoutProfileRes.data.bankName);
+        setAccountHolder(payoutProfileRes.data.accountHolder);
+      }
       setLoading(false);
     }
     load();
   }, []);
 
   const formatVND = (n: number) => n.toLocaleString('vi-VN') + ' đ';
+  const payoutSharePct = earnings[0]?.revenueSharePct ? Math.round(earnings[0].revenueSharePct * 100) : 70;
+  const platformSharePct = earnings[0]?.platformFeePct ? Math.round(earnings[0].platformFeePct * 100) : 30;
+
+  async function savePayoutProfile() {
+    setSaveMessage(null);
+    setSaving(true);
+    const res = await saveInstructorPayoutProfileAction({
+      bankAccount,
+      bankName,
+      accountHolder,
+    });
+    if (res.success) {
+      setSaveMessage('Da luu thong tin nhan thanh toan.');
+      setBankAccount('');
+    } else {
+      setSaveMessage(res.message || 'Khong the luu thong tin.');
+    }
+    setSaving(false);
+  }
 
   return (
     <div className="p-6 md:p-8">
@@ -88,6 +116,25 @@ export default function InstructorChannelSettingsPage() {
           </CardContent>
         </Card>
 
+        <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-sm font-bold">Chinh sach chia doanh thu</CardTitle>
+            <CardDescription className="text-xs">
+              Moi don hang thanh cong duoc tu dong chia theo ty le hien tai.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-xs text-emerald-700">Giang vien nhan</p>
+              <p className="text-lg font-bold text-emerald-700">{payoutSharePct}%</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-600">Nen tang giu phi</p>
+              <p className="text-lg font-bold">{platformSharePct}%</p>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Bank withdrawal setup */}
         <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
           <CardHeader>
@@ -132,7 +179,16 @@ export default function InstructorChannelSettingsPage() {
                 Thông tin tài khoản sẽ được lưu an toàn. Rút tiền sẽ được xử lý trong 1-3 ngày làm việc.
               </p>
             )}
+            {saveMessage && <p className="text-xs font-semibold text-muted-foreground">{saveMessage}</p>}
             <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                className="rounded-xl font-bold"
+                onClick={savePayoutProfile}
+                disabled={!bankAccount || !bankName || !accountHolder || saving}
+              >
+                {saving ? 'Dang luu...' : 'Luu thong tin'}
+              </Button>
               <Button type="button" variant="outline" className="rounded-xl font-bold" disabled>
                 <ArrowDownToLine className="mr-2 size-4" />
                 Rút tiền

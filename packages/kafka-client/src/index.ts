@@ -68,6 +68,8 @@ export const PaymentOrderCompletedSchema = z.object({
   vnp_txn_ref: z.string(),
   vnp_transaction_no: z.string(),
   paid_at: z.string().datetime(),
+  instructor_share_ratio: z.number().gt(0).lt(1).optional(),
+  platform_fee_ratio: z.number().gt(0).lt(1).optional(),
 });
 
 export const EnrollmentCreatedSchema = z.object({
@@ -123,6 +125,8 @@ export interface PaymentOrderCompletedEvent {
   vnp_txn_ref: string;
   vnp_transaction_no: string;
   paid_at: string;
+  instructor_share_ratio?: number;
+  platform_fee_ratio?: number;
 }
 
 export interface EnrollmentCreatedEvent {

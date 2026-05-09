@@ -18,6 +18,9 @@ import {
   ArrowLeft,
   Menu,
   X,
+  Bell,
+  Settings2,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -34,6 +37,9 @@ const navLinks: NavLink[] = [
   { label: 'Danh mục', href: '/admin/categories', icon: Shapes },
   { label: 'Quản lý đánh giá', href: '/admin/reviews', icon: Star },
   { label: 'Payouts', href: '/admin/payouts', icon: Wallet },
+  { label: 'Revenue Analytics', href: '/admin/revenue', icon: BarChart3 },
+  { label: 'Notification History', href: '/admin/notifications', icon: Bell },
+  { label: 'System Config', href: '/admin/system-config', icon: Settings2 },
   { label: 'Audit log', href: '/admin/audit-log', icon: ClipboardList },
   { label: 'Đơn Giảng Viên', href: '/admin/instructor-requests', icon: GraduationCap },
   { label: 'Hệ thống DLQ', href: '/admin/system', icon: AlertTriangle },

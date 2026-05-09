@@ -63,7 +63,13 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
     }
   }, [user, isAuthenticated, isLoading, router]);
 
-  if (!mounted || isLoading || !user) return null;
+  if (!mounted || isLoading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm font-medium text-muted-foreground">Dang tai Instructor Studio...</p>
+      </div>
+    );
+  }
 
   if (user.role !== 'INSTRUCTOR') {
     return null;

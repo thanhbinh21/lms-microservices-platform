@@ -17,17 +17,20 @@ import prisma from './lib/prisma';
 import { requireAuth } from './middleware/require-auth';
 import {
   listMyNotifications,
+  listAdminNotifications,
   markAllAsRead,
   markAsRead,
 } from './controllers/notification.controller';
 import { sendEmail, getPaymentSuccessTemplate, getEnrollmentCreatedTemplate } from './lib/mailer';
 import { getUserData } from './lib/user';
+import { createRequireAdmin } from '@lms/types';
 
 // Validate env khi khoi dong
 validateNotificationServiceEnv();
 
 const app = express();
 const PORT = process.env.PORT || 3005;
+const requireAdmin = createRequireAdmin();
 
 app.use(helmet());
 app.use(
@@ -53,6 +56,7 @@ app.get('/health', (_req: Request, res: Response) => {
 app.get('/api/my', requireAuth, listMyNotifications);
 app.post('/api/read-all', requireAuth, markAllAsRead);
 app.post('/api/:id/read', requireAuth, markAsRead);
+app.get('/api/admin/history', requireAdmin, listAdminNotifications);
 
 const server = app.listen(PORT, () => {
   logger.info(`[NOTIFICATION-SERVICE] Listening on port ${PORT}`);

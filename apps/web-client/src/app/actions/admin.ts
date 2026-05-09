@@ -40,6 +40,39 @@ export interface AdminAuditLogDto {
   createdAt: string;
 }
 
+export interface AdminRevenueAnalyticsDto {
+  from: string;
+  to: string;
+  grossRevenue: number;
+  platformFeeRevenue: number;
+  instructorNetRevenue: number;
+  totalCompletedOrders: number;
+  topCourses: Array<{ courseId: string; grossRevenue: number; completedOrders: number }>;
+  topInstructors: Array<{ instructorId: string; grossRevenue: number; completedOrders: number }>;
+}
+
+export interface AdminNotificationHistoryDto {
+  id: string;
+  userId: string;
+  type: string;
+  channel: string;
+  status: string;
+  title: string;
+  body: string;
+  eventId?: string | null;
+  traceId?: string | null;
+  createdAt: string;
+}
+
+export interface AdminSystemConfigDto {
+  id: string;
+  key: string;
+  value: unknown;
+  description?: string | null;
+  updatedBy?: string | null;
+  updatedAt: string;
+}
+
 // ---------------------------------------------------------------------------
 // User Management
 // ---------------------------------------------------------------------------
@@ -390,6 +423,59 @@ export async function getAdminAuditLogsAction(params: {
   return callApi<{ items: AdminAuditLogDto[]; pagination: any }>(
     `/auth/admin/audit-logs?${query.toString()}`,
     { method: 'GET' },
+    true,
+  );
+}
+
+export async function getAdminRevenueAnalyticsAction(params?: {
+  from?: string;
+  to?: string;
+}): Promise<ApiResponse<AdminRevenueAnalyticsDto>> {
+  const query = new URLSearchParams();
+  if (params?.from) query.set('from', params.from);
+  if (params?.to) query.set('to', params.to);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return callApi<AdminRevenueAnalyticsDto>(
+    `/payment/api/admin/revenue-analytics${suffix}`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function getAdminNotificationHistoryAction(params?: {
+  page?: number;
+  limit?: number;
+  type?: string;
+  status?: string;
+}): Promise<ApiResponse<{ items: AdminNotificationHistoryDto[]; pagination: any }>> {
+  const query = new URLSearchParams();
+  if (params?.page) query.set('page', String(params.page));
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.type) query.set('type', params.type);
+  if (params?.status) query.set('status', params.status);
+  return callApi<{ items: AdminNotificationHistoryDto[]; pagination: any }>(
+    `/notification/api/admin/history?${query.toString()}`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function getAdminSystemConfigsAction(): Promise<ApiResponse<AdminSystemConfigDto[]>> {
+  return callApi<AdminSystemConfigDto[]>(
+    `/auth/admin/system-configs`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function upsertAdminSystemConfigAction(payload: {
+  key: string;
+  value: unknown;
+  description?: string;
+}): Promise<ApiResponse<AdminSystemConfigDto>> {
+  return callApi<AdminSystemConfigDto>(
+    `/auth/admin/system-configs`,
+    { method: 'PUT', body: JSON.stringify(payload) },
     true,
   );
 }

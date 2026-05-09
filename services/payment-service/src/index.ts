@@ -5,13 +5,25 @@ import { logger } from '@lms/logger';
 import { validatePaymentServiceEnv } from '@lms/env-validator';
 import type { ApiResponse } from '@lms/types';
 import { requireAuth } from './middleware/require-auth';
-import { createOrder, getOrder, getMyOrders, getRevenueAnalytics } from './controllers/order.controller';
+import {
+  createOrder,
+  getOrder,
+  getMyOrders,
+  getRevenueAnalytics,
+  getAdminRevenueAnalytics,
+} from './controllers/order.controller';
 import { handleVNPayReturn, handleVNPayIPN } from './controllers/vnpay.controller';
-import { getInstructorEarnings, getInstructorEarningsSummary } from './controllers/earnings.controller';
+import {
+  getInstructorEarnings,
+  getInstructorEarningsSummary,
+  getInstructorPayoutProfile,
+  upsertInstructorPayoutProfile,
+} from './controllers/earnings.controller';
 import { listPayouts, updatePayout } from './controllers/payout.controller';
 import prisma from './lib/prisma';
 import { disconnectProducer } from './lib/kafka-producer';
 import { createRequireAdmin } from '@lms/types';
+import { startKafkaConsumers } from './lib/kafka-consumer';
 
 // Validate env ngay luc khoi dong.
 validatePaymentServiceEnv();
@@ -64,8 +76,11 @@ app.post('/api/orders/analytics/revenue', requireAuth, getRevenueAnalytics);
 app.post('/api/orders', requireAuth, createOrder);
 app.get('/api/orders/my', requireAuth, getMyOrders);
 app.get('/api/orders/:id', requireAuth, getOrder);
+app.get('/api/admin/revenue-analytics', requireAdmin, getAdminRevenueAnalytics);
 app.get('/api/instructor/earnings/summary', requireAuth, getInstructorEarningsSummary);
 app.get('/api/instructor/earnings', requireAuth, getInstructorEarnings);
+app.get('/api/instructor/payout-profile', requireAuth, getInstructorPayoutProfile);
+app.put('/api/instructor/payout-profile', requireAuth, upsertInstructorPayoutProfile);
 app.get('/api/admin/payouts', requireAdmin, listPayouts);
 app.patch('/api/admin/payouts/:id', requireAdmin, updatePayout);
 
@@ -99,6 +114,12 @@ const server = app.listen(PORT, () => {
   logger.info(`[PAYMENT-SERVICE] Listening on port ${PORT}`);
   logger.info(`NODE_ENV: ${process.env.NODE_ENV}`);
 });
+
+if (process.env.KAFKA_BROKER) {
+  startKafkaConsumers().catch((err) => {
+    logger.error({ err }, '[PAYMENT-SERVICE] Kafka consumer failed to start');
+  });
+}
 
 // Tat server an toan
 const shutdown = async (signal: string) => {

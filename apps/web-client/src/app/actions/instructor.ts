@@ -1030,6 +1030,8 @@ export interface InstructorEarningDto {
   grossAmount: number;
   platformFee: number;
   netAmount: number;
+  revenueSharePct: number;
+  platformFeePct: number;
   status: string;
   createdAt: string;
 }
@@ -1053,6 +1055,36 @@ export async function getInstructorEarningsAction() {
   return callApi<InstructorEarningDto[]>(
     `/payment/api/instructor/earnings`,
     { method: 'GET' },
+    true,
+  );
+}
+
+export interface InstructorPayoutProfileDto {
+  bankName: string;
+  bankAccountMasked: string;
+  accountHolder: string;
+  updatedAt: string;
+}
+
+export async function getInstructorPayoutProfileAction() {
+  return callApi<InstructorPayoutProfileDto | null>(
+    `/payment/api/instructor/payout-profile`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function saveInstructorPayoutProfileAction(payload: {
+  bankAccount: string;
+  bankName: string;
+  accountHolder: string;
+}) {
+  return callApi<InstructorPayoutProfileDto>(
+    `/payment/api/instructor/payout-profile`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
     true,
   );
 }

@@ -58,6 +58,19 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model SystemConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json     @db.JsonB
+  description String?
+  updatedBy   String?  @map("updated_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([updatedAt(sort: Desc)])
+  @@map("system_configs")
+}
+
 enum UserRole {
   STUDENT
   INSTRUCTOR

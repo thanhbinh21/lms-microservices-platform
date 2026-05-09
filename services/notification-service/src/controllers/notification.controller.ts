@@ -129,3 +129,70 @@ export async function markAllAsRead(req: Request, res: Response): Promise<void> 
     res.status(500).json(response);
   }
 }
+
+/**
+ * GET /notification/api/admin/history
+ * Admin xem lich su thong bao toan he thong.
+ */
+export async function listAdminNotifications(req: Request, res: Response): Promise<void> {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const page = Math.max(parseInt((req.query.page as string) || '1', 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt((req.query.limit as string) || '20', 10) || 20, 1), 100);
+  const type = (req.query.type as string) || '';
+  const status = (req.query.status as string) || '';
+  const channel = (req.query.channel as string) || '';
+  const userId = (req.query.userId as string) || '';
+
+  try {
+    const where: Record<string, unknown> = {};
+    if (type) where.type = type;
+    if (status) where.status = status;
+    if (channel) where.channel = channel;
+    if (userId) where.userId = userId;
+
+    const [items, total] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.notification.count({ where }),
+    ]);
+
+    const response: ApiResponse<{
+      items: typeof items;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    }> = {
+      success: true,
+      code: 200,
+      message: 'OK',
+      data: {
+        items,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      },
+      trace_id: traceId,
+    };
+    res.status(200).json(response);
+  } catch (err) {
+    logger.error({ err, traceId }, 'listAdminNotifications failed');
+    const response: ApiResponse<null> = {
+      success: false,
+      code: 500,
+      message: 'Internal error',
+      data: null,
+      trace_id: traceId,
+    };
+    res.status(500).json(response);
+  }
+}

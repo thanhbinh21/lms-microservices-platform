@@ -110,6 +110,8 @@ model InstructorEarning {
   courseId    String        @map("course_id")
   grossAmount Decimal        @db.Decimal(12, 2) @map("gross_amount")
   platformFee Decimal        @db.Decimal(12, 2) @default(0.30) @map("platform_fee")
+  revenueSharePct Decimal    @db.Decimal(5, 4) @default(0.7000) @map("revenue_share_pct")
+  platformFeePct  Decimal    @db.Decimal(5, 4) @default(0.3000) @map("platform_fee_pct")
   netAmount   Decimal       @db.Decimal(12, 2) @map("net_amount")
   status      EarningStatus @default(PENDING)
   createdAt   DateTime      @default(now()) @map("created_at")
@@ -117,6 +119,21 @@ model InstructorEarning {
   @@index([instructorId])
   @@index([courseId])
   @@map("instructor_earnings")
+}
+
+/// Ho so thanh toan cua giang vien de phuc vu payout.
+model InstructorPayoutProfile {
+  id               String   @id @default(uuid())
+  instructorId     String   @unique @map("instructor_id")
+  bankName         String   @map("bank_name")
+  bankAccount      String   @map("bank_account")
+  bankAccountMasked String  @map("bank_account_masked")
+  accountHolder    String   @map("account_holder")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([updatedAt(sort: Desc)])
+  @@map("instructor_payout_profiles")
 }
 
 /// Yeu cau rut tien cua giang vien cho admin duyet.

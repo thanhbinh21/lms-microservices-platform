@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Clock3, PlayCircle, BookOpen, CheckCircle2, ListChecks, ChevronLeft, ChevronRight, Keyboard } from 'lucide-react';
+import { Loader2, Clock3, PlayCircle, BookOpen, CheckCircle2, ListChecks, Keyboard } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getLearnDataAction, type LearnDataDto, type LearnLessonDto } from '@/app/actions/learning';
 import { VideoPlayer } from '@/components/learning/video-player';
@@ -71,10 +71,10 @@ export default function LessonPage() {
         e.preventDefault();
         setShowShortcuts((prev) => !prev);
       } else if (e.key === 'ArrowLeft') {
-        const prevBtn = document.querySelector<HTMLAnchorElement>('a[href*="/lesson/"]:has([data-nav="prev"])');
+        const prevBtn = document.querySelector<HTMLAnchorElement>('a[data-nav="prev"]');
         if (prevBtn) prevBtn.click();
       } else if (e.key === 'ArrowRight') {
-        const nextBtn = document.querySelector<HTMLAnchorElement>('a[href*="/lesson/"]:has([data-nav="next"])');
+        const nextBtn = document.querySelector<HTMLAnchorElement>('a[data-nav="next"]');
         if (nextBtn) nextBtn.click();
       }
     };

@@ -294,3 +294,97 @@ export const getRevenueAnalytics = async (req: Request, res: Response): Promise<
     return apiError(res, 500, 'Internal server error', traceId);
   }
 };
+
+/**
+ * GET /api/admin/revenue-analytics — thong ke doanh thu toan nen tang cho admin.
+ */
+export const getAdminRevenueAnalytics = async (req: Request, res: Response): Promise<Response | void> => {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const fromRaw = req.query.from as string | undefined;
+  const toRaw = req.query.to as string | undefined;
+  const from = fromRaw ? new Date(fromRaw) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const to = toRaw ? new Date(toRaw) : new Date();
+
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+    return apiError(res, 400, 'Invalid date range', traceId);
+  }
+
+  try {
+    const [orderAgg, earningAgg, topCourses, topInstructors] = await Promise.all([
+      prisma.order.aggregate({
+        where: {
+          status: 'COMPLETED',
+          paidAt: { gte: from, lte: to },
+        },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      prisma.instructorEarning.aggregate({
+        where: {
+          createdAt: { gte: from, lte: to },
+        },
+        _sum: { netAmount: true, platformFee: true },
+      }),
+      prisma.order.groupBy({
+        by: ['courseId'],
+        where: {
+          status: 'COMPLETED',
+          paidAt: { gte: from, lte: to },
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
+        orderBy: { _sum: { amount: 'desc' } },
+        take: 5,
+      }),
+      prisma.order.groupBy({
+        by: ['instructorId'],
+        where: {
+          status: 'COMPLETED',
+          paidAt: { gte: from, lte: to },
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
+        orderBy: { _sum: { amount: 'desc' } },
+        take: 5,
+      }),
+    ]);
+
+    const response: ApiResponse<{
+      from: string;
+      to: string;
+      grossRevenue: number;
+      platformFeeRevenue: number;
+      instructorNetRevenue: number;
+      totalCompletedOrders: number;
+      topCourses: Array<{ courseId: string; grossRevenue: number; completedOrders: number }>;
+      topInstructors: Array<{ instructorId: string; grossRevenue: number; completedOrders: number }>;
+    }> = {
+      success: true,
+      code: 200,
+      message: 'OK',
+      data: {
+        from: from.toISOString(),
+        to: to.toISOString(),
+        grossRevenue: Number(orderAgg._sum.amount ?? 0),
+        platformFeeRevenue: Number(earningAgg._sum.platformFee ?? 0),
+        instructorNetRevenue: Number(earningAgg._sum.netAmount ?? 0),
+        totalCompletedOrders: orderAgg._count ?? 0,
+        topCourses: topCourses.map((item) => ({
+          courseId: item.courseId,
+          grossRevenue: Number(item._sum.amount ?? 0),
+          completedOrders: item._count._all,
+        })),
+        topInstructors: topInstructors.map((item) => ({
+          instructorId: item.instructorId,
+          grossRevenue: Number(item._sum.amount ?? 0),
+          completedOrders: item._count._all,
+        })),
+      },
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    logger.error({ err }, 'getAdminRevenueAnalytics error');
+    return apiError(res, 500, 'Internal server error', traceId);
+  }
+};
