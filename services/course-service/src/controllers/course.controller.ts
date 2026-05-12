@@ -3,10 +3,12 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '../generated/prisma-v2/index.js';
 import type { ApiResponse } from '@lms/types';
+import { logger } from '@lms/logger';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
 import { withRetry } from '@lms/db-prisma';
 import { cacheGet } from '@lms/cache';
+import { fetchWithTimeout } from '../lib/http';
 
 // Schema tao khoa hoc
 const createCourseSchema = z.object({
@@ -46,6 +48,8 @@ const reviewBodySchema = z.object({
   rating: z.number().int().min(1, 'Rating toi thieu 1 sao').max(5, 'Rating toi da 5 sao'),
   comment: z.string().trim().max(1000, 'Comment toi da 1000 ky tu').optional(),
 });
+
+const LEARNING_SERVICE_URL = (process.env.LEARNING_SERVICE_URL || 'http://localhost:3006').replace(/\/$/, '');
 
 // Tao hash ngan tu query params de lam cache key cho list endpoint
 function buildCacheKey(prefix: string, params: Record<string, unknown>): string {
@@ -242,35 +246,35 @@ async function buildCourseReviewStats(courseId: string): Promise<{
   };
 }
 
-async function getUserCourseCompletionState(userId: string, courseId: string) {
-  const [totalLessons, completedLessons] = await prisma.$transaction([
-    prisma.lesson.count({
-      where: {
-        isPublished: true,
-        chapter: { courseId },
-      },
-    }),
-    prisma.lessonProgress.count({
-      where: {
-        userId,
-        isCompleted: true,
-        lesson: {
-          isPublished: true,
-          chapter: { courseId },
+async function getUserCourseCompletionState(userId: string, courseId: string, traceId: string) {
+  try {
+    const res = await fetchWithTimeout(
+      `${LEARNING_SERVICE_URL}/internal/courses/${courseId}/completion?userId=${userId}`,
+      {
+        headers: {
+          'x-internal-call': 'true',
+          'x-trace-id': traceId,
         },
       },
-    }),
-  ]);
+    );
 
-  const progressPercent =
-    totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+    if (!res.ok) return null;
 
-  return {
-    totalLessons,
-    completedLessons,
-    progressPercent,
-    completed: totalLessons > 0 && completedLessons >= totalLessons,
-  };
+    const json = (await res.json()) as {
+      data?: {
+        enrolled: boolean;
+        totalLessons: number;
+        completedLessons: number;
+        progressPercent: number;
+        completed: boolean;
+      };
+    };
+
+    return json?.data ?? null;
+  } catch (err) {
+    logger.warn({ err, userId, courseId }, 'getUserCourseCompletionState failed');
+    return null;
+  }
 }
 
 // ─── Controllers ──────────────────────────────────────────────────────────────
@@ -417,6 +421,8 @@ export async function listCourseReviews(req: Request, res: Response) {
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
     const skip = (page - 1) * limit;
     const sortBy = (req.query.sortBy as string) || 'newest';
+    const search = (req.query.search as string) || '';
+    const rating = Number(req.query.rating) || 0;
 
     const course = await prisma.course.findUnique({
       where: { id: courseId },
@@ -622,12 +628,19 @@ export async function upsertCourseReview(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
 
-    const enrollment = await prisma.enrollment.findUnique({
-      where: { userId_courseId: { userId, courseId } },
-      select: { id: true },
-    });
+    const completionState = await getUserCourseCompletionState(userId, courseId, traceId);
+    if (!completionState) {
+      const badGateway: ApiResponse<null> = {
+        success: false,
+        code: 503,
+        message: 'Khong the kiem tra tien do hoc tap. Vui long thu lai sau.',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(503).json(badGateway);
+    }
 
-    if (!enrollment) {
+    if (!completionState.enrolled) {
       const forbidden: ApiResponse<null> = {
         success: false,
         code: 403,
@@ -654,7 +667,6 @@ export async function upsertCourseReview(req: Request, res: Response) {
       return res.status(409).json(conflict);
     }
 
-    const completionState = await getUserCourseCompletionState(userId, courseId);
     if (!completionState.completed) {
       const forbidden: ApiResponse<null> = {
         success: false,
@@ -857,10 +869,7 @@ export async function getInstructorCourseById(req: Request, res: Response) {
     const course = await prisma.course.findUnique({
       where: { id: courseId, instructorId },
       include: {
-        _count: { select: { chapters: true, enrollments: true } },
-        communityGroups: {
-          select: { id: true, name: true, slug: true, courseId: true },
-        },
+        _count: { select: { chapters: true } },
       },
     });
 

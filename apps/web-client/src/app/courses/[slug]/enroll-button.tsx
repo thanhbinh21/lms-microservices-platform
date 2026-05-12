@@ -45,7 +45,7 @@ export function EnrollButton({ courseId, isEnrolled, isFree = true, price = 0 }:
     setErrorStr('');
 
     if (isFree) {
-      // Khoa hoc free: goi thang course-service enroll.
+      // Khoa hoc free: goi thang learning-service enroll.
       const result = await enrollCourseAction(courseId);
       setIsLoading(false);
 

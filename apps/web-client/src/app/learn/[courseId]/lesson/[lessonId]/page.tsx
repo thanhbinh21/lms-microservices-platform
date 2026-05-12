@@ -198,7 +198,7 @@ export default function LessonPage() {
           videoUrl={lesson.videoUrl!}
           sourceType={lesson.sourceType}
           duration={lesson.duration}
-          lastPosition={lesson.progress?.lastPosition || 0}
+          lastPosition={lesson.progress?.lastWatched || 0}
           isCompleted={lesson.progress?.isCompleted || false}
           onComplete={handleComplete}
         />

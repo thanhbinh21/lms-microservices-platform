@@ -236,6 +236,9 @@ importers:
       '@prisma/client':
         specifier: ^6.6.0
         version: 6.19.3(prisma@6.19.3)(typescript@5.9.3)
+      axios:
+        specifier: ^1.6.7
+        version: 1.16.0
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
@@ -279,6 +282,52 @@ importers:
       '@types/node-cron':
         specifier: ^3.0.11
         version: 3.0.11
+      prisma:
+        specifier: ^6.6.0
+        version: 6.19.3(typescript@5.9.3)
+      tsx:
+        specifier: ^4.7.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  services/community-service:
+    dependencies:
+      '@lms/env-validator':
+        specifier: workspace:*
+        version: link:../../packages/env-validator
+      '@lms/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@lms/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@prisma/client':
+        specifier: ^6.6.0
+        version: 6.19.3(prisma@6.19.3)(typescript@5.9.3)
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.6
+      express:
+        specifier: ^4.21.2
+        version: 4.22.1
+      helmet:
+        specifier: ^8.1.0
+        version: 8.1.0
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.76
+    devDependencies:
+      '@types/cors':
+        specifier: ^2.8.17
+        version: 2.8.19
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      '@types/node':
+        specifier: ^20.10.6
+        version: 20.19.39
       prisma:
         specifier: ^6.6.0
         version: 6.19.3(typescript@5.9.3)
@@ -388,6 +437,58 @@ importers:
         version: 6.19.3(typescript@5.9.3)
       tsx:
         specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  services/learning-service:
+    dependencies:
+      '@lms/env-validator':
+        specifier: workspace:*
+        version: link:../../packages/env-validator
+      '@lms/kafka-client':
+        specifier: workspace:*
+        version: link:../../packages/kafka-client
+      '@lms/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@lms/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@prisma/client':
+        specifier: ^6.6.0
+        version: 6.19.3(prisma@6.19.3)(typescript@5.9.3)
+      axios:
+        specifier: ^1.6.7
+        version: 1.16.0
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.6
+      express:
+        specifier: ^4.21.2
+        version: 4.22.1
+      helmet:
+        specifier: ^8.1.0
+        version: 8.1.0
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.76
+    devDependencies:
+      '@types/cors':
+        specifier: ^2.8.17
+        version: 2.8.19
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      '@types/node':
+        specifier: ^20.10.6
+        version: 20.19.39
+      prisma:
+        specifier: ^6.6.0
+        version: 6.19.3(typescript@5.9.3)
+      tsx:
+        specifier: ^4.7.0
         version: 4.21.0
       typescript:
         specifier: ^5.7.2

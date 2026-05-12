@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 
 const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:8000';
 const AUTH_PREFIX = process.env.NEXT_PUBLIC_AUTH_PREFIX || '/auth';
-/** Goi thang instructor-service (vd: http://localhost:3006) de tranh Kong khi dev / Kong chua co route. */
+/** Goi thang auth-service (vd: http://localhost:3101) de tranh Kong khi dev / Kong chua co route. */
 const INSTRUCTOR_SERVICE_URL = process.env.INSTRUCTOR_SERVICE_URL?.trim() || '';
 
 export interface BecomeInstructorInput {

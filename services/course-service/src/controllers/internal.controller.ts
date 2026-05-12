@@ -45,6 +45,10 @@ export const getCourseByIdInternal = async (req: Request, res: Response): Promis
         price: true,
         status: true,
         instructorId: true,
+        totalLessons: true,
+        totalDuration: true,
+        level: true,
+        thumbnail: true,
       },
     });
 
@@ -76,6 +80,119 @@ export const getCourseByIdInternal = async (req: Request, res: Response): Promis
       code: 500,
       message: 'Internal Server Error',
       data: null,
+      trace_id: traceId,
+    };
+    return res.status(500).json(response);
+  }
+};
+
+/**
+ * GET /internal/courses/:id/curriculum
+ * Tra ve danh sach chapter + lessons cua 1 course.
+ * Learning-service dung de render trang /learn.
+ */
+export const getCourseCurriculumInternal = async (req: Request, res: Response): Promise<Response | void> => {
+  if (!ensureInternal(req, res)) return;
+
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const { id } = req.params;
+
+  try {
+    const chapters = await prisma.chapter.findMany({
+      where: { courseId: id, isPublished: true },
+      orderBy: { order: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        order: true,
+        lessons: {
+          where: { isPublished: true },
+          orderBy: { order: 'asc' },
+          select: {
+            id: true,
+            title: true,
+            order: true,
+            content: true,
+            videoUrl: true,
+            sourceType: true,
+            duration: true,
+            isFree: true,
+          },
+        },
+      },
+    });
+
+    const response: ApiResponse<typeof chapters> = {
+      success: true,
+      code: 200,
+      message: 'OK',
+      data: chapters,
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    logger.error({ err, id }, 'getCourseCurriculumInternal error');
+    const response: ApiResponse<null> = {
+      success: false,
+      code: 500,
+      message: 'Internal Server Error',
+      data: null,
+      trace_id: traceId,
+    };
+    return res.status(500).json(response);
+  }
+};
+
+/**
+ * GET /internal/lessons/:id
+ * Tra ve thong tin lesson: courseId, chapterId, isFree, duration.
+ * Learning-service dung de verify enrollment truoc khi update progress.
+ */
+export const getLessonByIdInternal = async (req: Request, res: Response): Promise<Response | void> => {
+  if (!ensureInternal(req, res)) return;
+
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const { id } = req.params;
+
+  try {
+    const lesson = await prisma.lesson.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        title: true,
+        isFree: true,
+        duration: true,
+        chapter: {
+          select: { id: true, courseId: true },
+        },
+      },
+    });
+
+    if (!lesson) {
+      const response: ApiResponse<null> = {
+        success: false, code: 404, message: 'Lesson not found', data: null,
+        trace_id: traceId,
+      };
+      return res.status(404).json(response);
+    }
+
+    const data = {
+      id: lesson.id,
+      title: lesson.title,
+      isFree: lesson.isFree,
+      duration: lesson.duration,
+      chapterId: lesson.chapter.id,
+      courseId: lesson.chapter.courseId,
+    };
+
+    const response: ApiResponse<typeof data> = {
+      success: true, code: 200, message: 'OK', data, trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    logger.error({ err, id }, 'getLessonByIdInternal error');
+    const response: ApiResponse<null> = {
+      success: false, code: 500, message: 'Internal Server Error', data: null,
       trace_id: traceId,
     };
     return res.status(500).json(response);

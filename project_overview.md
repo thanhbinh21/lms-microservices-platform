@@ -64,11 +64,13 @@ interface ApiResponse<T> {
 - No Docker overhead for local development
 
 ### Required Databases:
-1. `auth_db` - Authentication & User Management
-2. `course_db` - Course, Curriculum, Lessons
-3. `payment_db` - Orders, Transactions, VNPay Audit
-4. `media_db` - Media URLs, Presigned Links
-5. `notification_db` - Email Queue, Notification Logs
+1. `auth_db` - Authentication, User Management, Instructor Requests
+2. `course_db` - Course, Chapter, Lesson, Category, Review, Instructor Profile, Certificate Templates
+3. `learning_db` - Enrollment, Lesson Progress, Certificate, Failed Events
+4. `community_db` - Community Groups, Posts, Q&A (Questions/Answers, Upvotes)
+5. `payment_db` - Orders, Transactions, VNPay Audit
+6. `media_db` - Media URLs, Presigned Links
+7. `notification_db` - Email Queue, Notification Logs
 
 ### Setup Steps:
 1. Create account at [Neon.tech](https://neon.tech)
@@ -214,6 +216,8 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
   - Security: JWT verification in auth middleware (done — verifyToken already full), IDOR fix enrollment (done — uses x-user-id header), VNPay transaction ID verify tu DB (done), enrollment unique constraint (done — schema), Kafka event payload validation with Zod schemas (done), Redis keys TTL, request timeouts, graceful shutdown all services, CORS origin restriction (done — env-based).
   ~4-5 ngay. done - 2026-05-10 - by BINH
 
+- [x] **Phase 35:** Option A Microservices Refactor — Loai bo "God Service" pattern tu course-service. Tach learning-service (Enrollment/Progress/Certificate/DLQ) va community-service (Community/Q&A) thanh service rieng biet. Merge instructor-service vao auth-service. Cap nhat Kong routes, course-service internal API, Kafka consumers, frontend Server Actions. Chi tiet: `service_architecture_analysis.md` + `plan/refactor_option_a_plan.md`. done - 2026-05-12 - by AI AGENT
+
 ### Phase 9.13: DX Hardening ✅ COMPLETED
 - [x] **Phase 9.13:** DX Hardening — `pnpm run setup` bootstrap (install + docker:up + setup:db + seed), `.nvmrc` node version pin, Prisma orchestration vao turbo pipeline. ✅ Completed: Apr 27, 2026
 
@@ -245,6 +249,8 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 *   **Instructor Channel:** Mỗi instructor có 1 `InstructorProfile` (slug unique, displayName, headline, bio, avatar, socialLinks). Public listing at `/instructors`.
 *   **Revenue Share:** Instructor nhận 70% mỗi order thành công, platform giữ 30%. Số % này là system config (admin có thể thay đổi từ `/admin/settings`).
 *   **Q&A vs Community:** Hệ thống chuyển từ Community Groups (per-course, auto-join) sang Global Q&A (1 trang toàn hệ thống, Q&A có thể gắn courseId tùy chọn). Dữ liệu community cũ được soft-archive.
+*   **Microservices Layout (Phase 35):** 7 services — auth (3101), course (3002), learning (3006), community (3007), payment (3003), media (3004), notification (3005). Learning và community tách ra khỏi course-service để đảm bảo Single Responsibility Principle. InstructorRequest merge vào auth-service. Kafka consumer cho enrollment chạy tại learning-service thay vì course-service.
+*   **Internal API Pattern:** Các service gọi nhau qua `/internal/*` endpoints (không qua Kong Gateway), xác thực bằng `x-internal-call: true` header. Course-service cung cấp `/internal/courses/:id` và `/internal/lessons/:id`. Learning-service cung cấp `/internal/enrollment/check` và `/internal/courses/:courseId/completion`.
 
 ### Environment & Validation
 *   **T3 Env Pattern:** Package `env-validator` sử dụng Zod để validate `.env` ngay lúc runtime. App sẽ crash với error message rõ ràng nếu thiếu biến.

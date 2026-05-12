@@ -306,7 +306,7 @@ export async function getAdminStats(req: Request, res: Response) {
     ] = await Promise.all([
       prisma.course.count(),
       prisma.course.groupBy({ by: ['status'], _count: { id: true } }),
-      prisma.enrollment.count(),
+      prisma.enrollmentSignal.count(),
       prisma.review.count(),
       prisma.review.count({ where: { isFlagged: true } }),
     ]);

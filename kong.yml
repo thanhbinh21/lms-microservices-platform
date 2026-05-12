@@ -17,6 +17,18 @@ services:
           - PATCH
           - DELETE
           - OPTIONS
+      # Route /instructor merge tu instructor-service (Phase 1 refactor)
+      - name: instructor-request-route
+        paths:
+          - /instructor
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
     plugins:
       - name: rate-limiting
         config:
@@ -41,9 +53,73 @@ services:
         paths:
           - /course
         strip_path: true
-      - name: community-route
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - "x-user-id:$(headers['x-user-id'])"
+              - "x-user-role:$(headers['x-user-role'])"
+      - name: correlation-id
+        config:
+          header_name: x-trace-id
+          generator: uuid
+          echo_downstream: true
+
+  # Learning Service (Phase 2 refactor — tach tu course-service)
+  - name: learning-service
+    url: http://host.docker.internal:3006
+    routes:
+      - name: learning-route
+        paths:
+          - /learning
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - "x-user-id:$(headers['x-user-id'])"
+              - "x-user-role:$(headers['x-user-role'])"
+      - name: correlation-id
+        config:
+          header_name: x-trace-id
+          generator: uuid
+          echo_downstream: true
+
+  # Community Service (Phase 3 refactor — tach tu course-service)
+  - name: community-service
+    url: http://host.docker.internal:3007
+    routes:
+      - name: community-new-route
         paths:
           - /community
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+      - name: qa-route
+        paths:
+          - /qa
         strip_path: true
         methods:
           - GET
@@ -152,37 +228,6 @@ services:
           generator: uuid
           echo_downstream: true
 
-  - name: instructor-service
-    url: http://host.docker.internal:3006
-    routes:
-      - name: instructor-route
-        paths:
-          - /instructor
-        strip_path: false
-        methods:
-          - GET
-          - POST
-          - PUT
-          - PATCH
-          - DELETE
-          - OPTIONS
-    plugins:
-      # JWT do instructor-service tu verify (giong course-service). Tranh loi Kong JWT/kid khi dev.
-      - name: rate-limiting
-        config:
-          minute: 100
-          policy: local
-      - name: request-transformer
-        config:
-          add:
-            headers:
-              - "x-user-id:$(headers['x-user-id'])"
-              - "x-user-role:$(headers['x-user-role'])"
-      - name: correlation-id
-        config:
-          header_name: x-trace-id
-          generator: uuid
-          echo_downstream: true
 
 # Global Plugins
 plugins:

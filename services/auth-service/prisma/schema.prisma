@@ -82,3 +82,39 @@ enum UserStatus {
   BANNED
   SUSPENDED
 }
+
+// Don xin tro thanh giang vien — do auth-service quan ly vi lien quan den User domain
+model InstructorRequest {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  fullName          String    @map("full_name")
+  phone             String
+  email             String
+  dateOfBirth       DateTime? @map("date_of_birth")
+  address           String?
+  expertise         String
+  specialization    String
+  experienceYears   Int       @map("experience_years")
+  currentJob        String?   @map("current_job")
+  bio               String
+  github            String?
+  linkedin          String?
+  website           String?
+  youtube           String?
+  cvFile            String?   @map("cv_file")
+  certificateFile   String?   @map("certificate_file")
+  identityCard      String?   @map("identity_card")
+  avatar            String?
+  courseTitle       String    @map("course_title")
+  courseCategory    String    @map("course_category")
+  courseDescription String    @map("course_description")
+  targetStudents    String?   @map("target_students")
+  status            String    @default("pending")
+  reviewedBy        String?   @map("reviewed_by")
+  reviewedAt        DateTime? @map("reviewed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([status])
+  @@map("instructor_requests")
+}

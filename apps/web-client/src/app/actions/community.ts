@@ -15,7 +15,7 @@ export interface CommunityGroupCourseDto {
 
 export interface CommunityGroupDto {
   id: string;
-  type: 'PUBLIC' | 'COURSE_PRIVATE';
+  type: 'PUBLIC' | 'GLOBAL' | 'COURSE_PRIVATE';
   courseId: string | null;
   ownerId: string;
   name: string;
@@ -69,7 +69,7 @@ export interface CommunityGroupsResult {
 
 export interface CommunityPostsResult {
   group: CommunityGroupDto;
-  items: CommunityPostDto[];
+  items: CommunityPostDto[] | null;
   nextCursor: string | null;
 }
 

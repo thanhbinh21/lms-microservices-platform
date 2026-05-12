@@ -2,7 +2,7 @@
 
 import { callApi } from './instructor';
 
-const COURSE_PREFIX = '/course';
+const QA_PREFIX = process.env.NEXT_PUBLIC_QA_PREFIX || '/qa';
 
 export interface QaAuthor {
   id: string;
@@ -56,7 +56,7 @@ export async function listQuestionsAction(params?: {
   if (params?.search) query.set('search', params.search);
   const suffix = query.toString() ? `?${query.toString()}` : '';
   return callApi<{ items: QuestionListItem[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
-    `${COURSE_PREFIX}/api/questions${suffix}`,
+    `${QA_PREFIX}/api/qa/questions${suffix}`,
     { method: 'GET' },
     true,
   );
@@ -64,7 +64,7 @@ export async function listQuestionsAction(params?: {
 
 export async function getQuestionDetailAction(id: string) {
   return callApi<QuestionDetail>(
-    `${COURSE_PREFIX}/api/questions/${id}`,
+    `${QA_PREFIX}/api/qa/questions/${id}`,
     { method: 'GET' },
     true,
   );
@@ -72,7 +72,7 @@ export async function getQuestionDetailAction(id: string) {
 
 export async function createQuestionAction(payload: { title: string; content: string; courseId?: string | null }) {
   return callApi<QuestionDetail>(
-    `${COURSE_PREFIX}/api/questions`,
+    `${QA_PREFIX}/api/qa/questions`,
     { method: 'POST', body: JSON.stringify(payload) },
     true,
   );
@@ -80,7 +80,7 @@ export async function createQuestionAction(payload: { title: string; content: st
 
 export async function createAnswerAction(questionId: string, payload: { content: string }) {
   return callApi<unknown>(
-    `${COURSE_PREFIX}/api/questions/${questionId}/answers`,
+    `${QA_PREFIX}/api/qa/questions/${questionId}/answers`,
     { method: 'POST', body: JSON.stringify(payload) },
     true,
   );
@@ -88,15 +88,15 @@ export async function createAnswerAction(questionId: string, payload: { content:
 
 export async function acceptAnswerAction(questionId: string, answerId: string) {
   return callApi<unknown>(
-    `${COURSE_PREFIX}/api/questions/${questionId}/accept-answer/${answerId}`,
-    { method: 'POST' },
+    `${QA_PREFIX}/api/qa/questions/${questionId}/answers/${answerId}/accept`,
+    { method: 'PUT' },
     true,
   );
 }
 
 export async function upvoteQuestionAction(questionId: string) {
   return callApi<{ upvoted: boolean }>(
-    `${COURSE_PREFIX}/api/questions/${questionId}/upvote`,
+    `${QA_PREFIX}/api/qa/questions/${questionId}/upvote`,
     { method: 'POST' },
     true,
   );
@@ -104,7 +104,7 @@ export async function upvoteQuestionAction(questionId: string) {
 
 export async function upvoteAnswerAction(answerId: string) {
   return callApi<{ upvoted: boolean }>(
-    `${COURSE_PREFIX}/api/answers/${answerId}/upvote`,
+    `${QA_PREFIX}/api/qa/answers/${answerId}/upvote`,
     { method: 'POST' },
     true,
   );
@@ -112,15 +112,15 @@ export async function upvoteAnswerAction(answerId: string) {
 
 export async function updateAnswerAction(answerId: string, payload: { content: string }) {
   return callApi<unknown>(
-    `${COURSE_PREFIX}/api/answers/${answerId}`,
-    { method: 'PATCH', body: JSON.stringify(payload) },
+    `${QA_PREFIX}/api/qa/answers/${answerId}`,
+    { method: 'PUT', body: JSON.stringify(payload) },
     true,
   );
 }
 
 export async function deleteAnswerAction(answerId: string) {
   return callApi<unknown>(
-    `${COURSE_PREFIX}/api/answers/${answerId}`,
+    `${QA_PREFIX}/api/qa/answers/${answerId}`,
     { method: 'DELETE' },
     true,
   );

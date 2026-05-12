@@ -5,8 +5,7 @@ import type { Prisma } from '../generated/prisma-v2/index.js';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
-import { resolveUserNames, getDisplayName } from '../lib/community';
-import { fetchInternalInstructors } from '../lib/auth-client';
+import { fetchInternalInstructors, fetchInternalUsersBatch } from '../lib/auth-client';
 
 const listInstructorsQuerySchema = z.object({
   q: z.string().trim().optional(),
@@ -132,8 +131,9 @@ async function ensureInstructorProfile(instructorId: string) {
   const existing = await prisma.instructorProfile.findUnique({ where: { instructorId } });
   if (existing) return existing;
 
-  const nameMap = await resolveUserNames([instructorId]);
-  const displayName = getDisplayName(instructorId, nameMap);
+  const nameMap = await fetchInternalUsersBatch([instructorId]);
+  const info = nameMap[instructorId];
+  const displayName = info?.name || info?.username || `Giảng viên #${instructorId.slice(0, 8)}`;
   const fallbackSlug = `giang-vien-${instructorId.slice(0, 8)}`;
   const baseSlug = normalizeSlug(displayName) || fallbackSlug;
   const slug = baseSlug ? await generateUniqueInstructorSlug(baseSlug) : fallbackSlug;
@@ -191,7 +191,6 @@ export async function listInstructors(req: Request, res: Response): Promise<Resp
       : [];
 
     const profileMap = new Map(existingProfiles.map((profile) => [profile.instructorId, profile]));
-    const nameMap = sourceInstructorIds.length > 0 ? await resolveUserNames(sourceInstructorIds) : new Map();
     const missingInstructorIds = sourceInstructorIds.filter((id) => !profileMap.has(id));
 
     if (missingInstructorIds.length > 0) {
@@ -204,7 +203,7 @@ export async function listInstructors(req: Request, res: Response): Promise<Resp
         return existingProfile;
       }
 
-      const displayName = instructor.name || getDisplayName(instructor.id, nameMap);
+      const displayName = instructor.name || instructor.username || `Giảng viên #${instructor.id.slice(0, 8)}`;
       const slug = normalizeSlug(displayName) || `giang-vien-${instructor.id.slice(0, 8)}`;
 
       return {

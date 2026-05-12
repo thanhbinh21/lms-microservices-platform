@@ -13,10 +13,20 @@ import { logout } from './controllers/logout.controller.js';
 import { updateUserRole } from './controllers/update-role.controller.js';
 import { becomeEducator } from './controllers/become-educator.controller.js';
 import { requireAdmin } from './middlewares/requireAdmin.js';
+import { requireAuth } from './middlewares/requireAuth.js';
 import { getInternalUser, getInternalUsersBatch, getInternalInstructors } from './controllers/internal.controller.js';
 import { createAuditLog } from './controllers/audit.controller.js';
 import adminRouter from './routes/admin.routes.js';
 import { startCleanupJobs } from './jobs/cleanup.js';
+import {
+  createInstructorRequest,
+  getMyInstructorRequest,
+  listInstructorRequests,
+  getInstructorRequestStats,
+  getInstructorRequestById,
+  approveInstructorRequest,
+  rejectInstructorRequest,
+} from './controllers/instructor-request.controller.js';
 
 // Validate bien moi truong khi khoi dong
 const env = initEnv();
@@ -67,6 +77,15 @@ app.post('/refresh', refresh);
 app.post('/logout', logout);
 app.post('/become-educator', becomeEducator);
 app.patch('/users/role', requireAdmin, updateUserRole);
+
+// Routes don xin tro thanh giang vien (merge tu instructor-service)
+app.post('/instructor/request', requireAuth, createInstructorRequest);
+app.get('/instructor/my-request', requireAuth, getMyInstructorRequest);
+app.get('/admin/instructor/requests/stats', requireAdmin, getInstructorRequestStats);
+app.get('/admin/instructor/requests', requireAdmin, listInstructorRequests);
+app.get('/admin/instructor/requests/:id', requireAdmin, getInstructorRequestById);
+app.put('/admin/instructor/approve/:id', requireAdmin, approveInstructorRequest);
+app.put('/admin/instructor/reject/:id', requireAdmin, rejectInstructorRequest);
 
 // Internal routes (khong qua Gateway)
 app.get('/internal/users/:id', getInternalUser);

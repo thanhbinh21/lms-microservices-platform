@@ -200,9 +200,11 @@ export default function CommunityGroupPage() {
 
         {group ? <GroupHeader group={group} /> : null}
 
-        <Card className="rounded-2xl border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Khu community cũ đã chuyển sang chế độ lưu trữ chỉ đọc. Vui lòng dùng Global Q&A để tạo nội dung mới.
-        </Card>
+        {group?.type === 'PUBLIC' && (
+          <Card className="rounded-2xl border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            Khu community cũ đã chuyển sang chế độ lưu trữ chỉ đọc. Vui lòng dùng Global Q&A để tạo nội dung mới.
+          </Card>
+        )}
 
         {error ? (
           <Card className="rounded-2xl border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">

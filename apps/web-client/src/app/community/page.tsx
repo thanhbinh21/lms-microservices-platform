@@ -109,7 +109,7 @@ export default function CommunityPage() {
 
   const [replyingPostId, setReplyingPostId] = useState<string | null>(null);
   const [replySubmittingForPost, setReplySubmittingForPost] = useState<string | null>(null);
-  const isReadOnlyArchive = true;
+  const isReadOnlyArchive = globalGroup?.type === 'PUBLIC';
 
   const loadInitial = useCallback(async () => {
     setLoading(true);
@@ -123,17 +123,23 @@ export default function CommunityPage() {
       return;
     }
 
-    let publicGroup: CommunityGroupDto | undefined = groupsRes.data.joinedGroups.find(g => g.type === 'PUBLIC');
+    let publicGroup: CommunityGroupDto | undefined = groupsRes.data.joinedGroups.find(g => g.type === 'GLOBAL');
+    if (!publicGroup) {
+      publicGroup = groupsRes.data.joinedGroups.find(g => g.type === 'PUBLIC');
+    }
     if (!publicGroup) {
       // If not joined yet, find in public groups and try to auto-join
+      publicGroup = groupsRes.data.publicGroups.find(g => g.type === 'GLOBAL');
+    }
+    if (!publicGroup) {
       publicGroup = groupsRes.data.publicGroups.find(g => g.type === 'PUBLIC');
-      if (publicGroup) {
-        await joinCommunityGroupAction(publicGroup.id);
-      }
+    }
+    if (publicGroup) {
+      await joinCommunityGroupAction(publicGroup.id);
     }
     
     if (!publicGroup) {
-      setError('Cộng đồng công khai chưa được cấu hình. (Không tìm thấy PUBLIC group).');
+      setError('Cộng đồng công khai chưa được cấu hình. (Không tìm thấy GLOBAL hoặc PUBLIC group).');
       setLoading(false);
       return;
     }
@@ -148,7 +154,7 @@ export default function CommunityPage() {
       return;
     }
 
-    setPosts(postsRes.data.items);
+    setPosts(postsRes.data.items ?? []);
     setNextCursor(postsRes.data.nextCursor);
     setLoading(false);
   }, []);
@@ -307,7 +313,7 @@ export default function CommunityPage() {
     // Capture result.data in a const to help TS type inference
     const fetchedData = result.data;
 
-    setPosts((prev) => [...prev, ...fetchedData.items]);
+    setPosts((prev) => [...prev, ...(fetchedData.items ?? [])]);
     setNextCursor(fetchedData.nextCursor);
   };
 
@@ -358,9 +364,11 @@ export default function CommunityPage() {
           </div>
         </div>
 
-        <Card className="rounded-2xl border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Khu community cũ đã chuyển sang chế độ lưu trữ chỉ đọc. Vui lòng dùng Global Q&A để tạo nội dung mới.
-        </Card>
+        {globalGroup?.type === 'PUBLIC' && (
+          <Card className="rounded-2xl border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            Khu community cũ đã chuyển sang chế độ lưu trữ chỉ đọc. Vui lòng dùng Global Q&A để tạo nội dung mới.
+          </Card>
+        )}
 
         {error ? (
           <Card className="rounded-2xl border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
