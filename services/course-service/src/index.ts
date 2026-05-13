@@ -46,7 +46,7 @@ import {
   getLessonPlayback,
 } from './controllers/lesson.controller';
 import { listCategories, createCategory } from './controllers/category.controller';
-import { getCourseByIdInternal, getLessonByIdInternal, getCourseCurriculumInternal } from './controllers/internal.controller';
+import { getCourseByIdInternal, getLessonByIdInternal, getCourseCurriculumInternal, getInstructorCourseIdsInternal } from './controllers/internal.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import adminRouter from './routes/admin.routes';
 import prisma from './lib/prisma';
@@ -90,6 +90,7 @@ app.get('/health', (_req: Request, res: Response) => {
 app.get('/internal/courses/:id', getCourseByIdInternal);
 app.get('/internal/courses/:id/curriculum', getCourseCurriculumInternal);
 app.get('/internal/lessons/:id', getLessonByIdInternal);
+app.get('/internal/instructors/:instructorId/courses', getInstructorCourseIdsInternal);
 
 // ─── Instructor Profile Routes ─────────────────────────────────────────────
 app.get('/api/instructors/profile', ...requireRole('instructor', 'admin'), getMyInstructorProfile);

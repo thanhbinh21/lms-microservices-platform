@@ -51,6 +51,7 @@ export interface CommunityPostDto {
   imageUrl?: string | null;
   likeCount?: number;
   likedByMe?: boolean;
+  isOwner?: boolean;
   createdAt: string;
   updatedAt: string;
   author: {
@@ -68,8 +69,7 @@ export interface CommunityGroupsResult {
 }
 
 export interface CommunityPostsResult {
-  group: CommunityGroupDto;
-  items: CommunityPostDto[] | null;
+  posts: CommunityPostDto[];
   nextCursor: string | null;
 }
 
@@ -80,6 +80,25 @@ function buildCommunityPath(path: string): string {
 export async function getMyCommunityGroupsAction() {
   return callApi<CommunityGroupsResult>(
     buildCommunityPath('/api/community/groups'),
+    { method: 'GET' },
+    true,
+  );
+}
+
+export interface CommunityMyGroupItem {
+  id: string;
+  type: 'PUBLIC' | 'GLOBAL' | 'COURSE_PRIVATE';
+  name: string;
+  description: string | null;
+  memberCount: number;
+  postCount: number;
+  courseId: string | null;
+  isArchived: boolean;
+}
+
+export async function getMyGroupsAction() {
+  return callApi<CommunityMyGroupItem[]>(
+    buildCommunityPath('/api/community/groups/my-groups'),
     { method: 'GET' },
     true,
   );
@@ -148,6 +167,52 @@ export async function toggleCommunityPostReactAction(
   return callApi<{ liked: boolean; likeCount: number }>(
     buildCommunityPath(`/api/community/groups/${groupId}/posts/${postId}/react`),
     { method: 'POST' },
+    true,
+  );
+}
+
+export async function updatePostAction(
+  groupId: string,
+  postId: string,
+  data: { content?: string; imageUrl?: string | null },
+) {
+  return callApi<CommunityPostDto>(
+    buildCommunityPath(`/api/community/groups/${groupId}/posts/${postId}`),
+    {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    },
+    true,
+  );
+}
+
+export async function deletePostAction(groupId: string, postId: string) {
+  return callApi<{ deleted: boolean }>(
+    buildCommunityPath(`/api/community/groups/${groupId}/posts/${postId}`),
+    { method: 'DELETE' },
+    true,
+  );
+}
+
+export async function getHotPostsAction(groupId: string) {
+  return callApi<CommunityPostDto[]>(
+    buildCommunityPath(`/api/community/groups/${groupId}/posts/hot`),
+    { method: 'GET' },
+    true,
+  );
+}
+
+export interface FeaturedMember {
+  authorId: string;
+  displayName: string;
+  role: string;
+  postCount: number;
+}
+
+export async function getFeaturedMembersAction(groupId: string) {
+  return callApi<FeaturedMember[]>(
+    buildCommunityPath(`/api/community/groups/${groupId}/members/featured`),
+    { method: 'GET' },
     true,
   );
 }

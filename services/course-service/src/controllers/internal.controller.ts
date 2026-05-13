@@ -198,3 +198,39 @@ export const getLessonByIdInternal = async (req: Request, res: Response): Promis
     return res.status(500).json(response);
   }
 };
+
+/**
+ * GET /internal/instructors/:instructorId/courses
+ * Tra ve danh sach course IDs cua 1 instructor.
+ * Community-service dung de loc cau hoi theo khoa hoc cua giang vien.
+ */
+export const getInstructorCourseIdsInternal = async (req: Request, res: Response): Promise<Response | void> => {
+  if (!ensureInternal(req, res)) return;
+
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const { instructorId } = req.params;
+
+  try {
+    const courses = await prisma.course.findMany({
+      where: { instructorId },
+      select: { id: true, title: true, slug: true },
+    });
+
+    const data = {
+      courseIds: courses.map((c) => c.id),
+      courses: courses,
+    };
+
+    const response: ApiResponse<typeof data> = {
+      success: true, code: 200, message: 'OK', data, trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    logger.error({ err, instructorId }, 'getInstructorCourseIdsInternal error');
+    const response: ApiResponse<null> = {
+      success: false, code: 500, message: 'Internal Server Error', data: null,
+      trace_id: traceId,
+    };
+    return res.status(500).json(response);
+  }
+};

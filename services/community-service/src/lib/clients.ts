@@ -30,8 +30,8 @@ export async function checkEnrollment(userId: string, courseId: string): Promise
   }
 }
 
-// Lay thong tin course tu course-service (de lay title, slug)
-export async function getCourseById(courseId: string): Promise<{ id: string; title: string; slug: string } | null> {
+// Lay thong tin course tu course-service (de lay title, slug, instructorId)
+export async function getCourseById(courseId: string): Promise<{ id: string; title: string; slug: string; instructorId?: string } | null> {
   try {
     const res = await fetchWithTimeout(`${COURSE_SERVICE_URL}/internal/courses/${courseId}`, {
       headers: { 'x-internal-call': 'true' },
@@ -45,22 +45,52 @@ export async function getCourseById(courseId: string): Promise<{ id: string; tit
   }
 }
 
+// Lay thong tin lesson tu course-service (id, title)
+export async function getLessonById(lessonId: string): Promise<{ id: string; title: string } | null> {
+  try {
+    const res = await fetchWithTimeout(`${COURSE_SERVICE_URL}/internal/lessons/${lessonId}`, {
+      headers: { 'x-internal-call': 'true' },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as any;
+    return json?.data ?? null;
+  } catch (err) {
+    logger.warn({ err, lessonId }, '[community-service] getLessonById failed');
+    return null;
+  }
+}
+
+// Lay danh sach course IDs cua 1 instructor
+export async function getInstructorCourseIds(instructorId: string): Promise<string[]> {
+  try {
+    const res = await fetchWithTimeout(`${COURSE_SERVICE_URL}/internal/instructors/${instructorId}/courses`, {
+      headers: { 'x-internal-call': 'true' },
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as any;
+    return json?.data?.courseIds ?? [];
+  } catch (err) {
+    logger.warn({ err, instructorId }, '[community-service] getInstructorCourseIds failed');
+    return [];
+  }
+}
+
 // Lay thong tin auth-service de hien thi ten nguoi dung (batch)
 const AUTH_SERVICE_URL = (process.env.AUTH_SERVICE_URL || 'http://localhost:3101').replace(/\/$/, '');
-const userNameCache = new Map<string, { name: string; username: string | null; expiresAt: number }>();
+const userNameCache = new Map<string, { name: string; username: string | null; role: string; expiresAt: number }>();
 const USER_CACHE_TTL = 5 * 60 * 1000; // 5 phut
 
 export async function resolveUserNames(
   userIds: string[],
-): Promise<Map<string, { name: string; username: string | null }>> {
-  const result = new Map<string, { name: string; username: string | null }>();
+): Promise<Map<string, { name: string; username: string | null; role?: string }>> {
+  const result = new Map<string, { name: string; username: string | null; role?: string }>();
   const uncachedIds: string[] = [];
   const now = Date.now();
 
   for (const id of userIds) {
     const cached = userNameCache.get(id);
     if (cached && cached.expiresAt > now) {
-      result.set(id, { name: cached.name, username: cached.username });
+      result.set(id, { name: cached.name, username: cached.username, role: cached.role });
     } else {
       uncachedIds.push(id);
     }
@@ -76,11 +106,11 @@ export async function resolveUserNames(
     });
     if (res.ok) {
       const json = (await res.json()) as any;
-      const usersMap = json?.data?.users as Record<string, { name: string; username: string | null }> | undefined;
+      const usersMap = json?.data?.users as Record<string, { name: string; username: string | null; role?: string }> | undefined;
       if (usersMap) {
         for (const [id, info] of Object.entries(usersMap)) {
-          result.set(id, info);
-          userNameCache.set(id, { ...info, expiresAt: now + USER_CACHE_TTL });
+          result.set(id, { name: info.name, username: info.username, role: info.role });
+          userNameCache.set(id, { name: info.name, username: info.username, role: info.role || '', expiresAt: now + USER_CACHE_TTL });
         }
       }
     }
@@ -93,7 +123,7 @@ export async function resolveUserNames(
 
 export function getDisplayName(
   userId: string,
-  nameMap: Map<string, { name: string; username: string | null }>,
+  nameMap: Map<string, { name: string; username: string | null; role?: string }>,
 ): string {
   const info = nameMap.get(userId);
   return info?.name || info?.username || `Người dùng #${userId.slice(0, 6)}`;

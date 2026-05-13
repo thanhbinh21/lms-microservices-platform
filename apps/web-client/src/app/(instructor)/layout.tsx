@@ -7,9 +7,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   LayoutDashboard, BookOpen, Users, Award,
-  BarChart3, Settings, ArrowLeft, Menu, X, UserCircle, MessageSquare,
+  BarChart3, Settings, ArrowLeft, Menu, X, UserCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { QaNavItem } from '@/components/instructor/qa-nav-item';
 
 interface NavLink {
   label: string;
@@ -22,7 +23,7 @@ const navLinks: NavLink[] = [
   { label: 'Tổng quan', description: 'Xem nhanh trạng thái studio', href: '/instructor', icon: LayoutDashboard },
   { label: 'Khóa học', description: 'Tạo và quản lý nội dung', href: '/instructor/courses', icon: BookOpen },
   { label: 'Cộng đồng', description: 'Nhóm thảo luận cho học viên', href: '/instructor/communities', icon: Users },
-  { label: 'Q&A', description: 'Trả lời câu hỏi của học viên', href: '/instructor/qa', icon: MessageSquare },
+  // Q&A duoc render rieng biet voi badge counter (xem QaNavItem)
   { label: 'Chứng chỉ', description: 'Mẫu chứng chỉ hoàn thành', href: '/instructor/certificates', icon: Award },
   { label: 'Phân tích', description: 'Theo dõi doanh thu và tăng trưởng', href: '/instructor/analytics', icon: BarChart3 },
   { label: 'Thanh toán', description: 'Doanh thu và nhận tiền', href: '/instructor/settings', icon: Settings },
@@ -140,6 +141,8 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                   </Link>
                 );
               })}
+              {/* Q&A nav item voi badge counter */}
+              <QaNavItem />
             </div>
           </div>
 

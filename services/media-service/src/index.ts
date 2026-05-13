@@ -51,9 +51,9 @@ app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json(response);
 });
 
-// Route upload (chi giang vien/admin)
-app.post('/api/upload/presigned', ...requireRole('instructor', 'admin'), requestPresignedUpload);
-app.post('/api/upload/complete', ...requireRole('instructor', 'admin'), confirmUpload);
+// Route upload presigned (tat ca user da dang nhap)
+app.post('/api/upload/presigned', requireAuth, requestPresignedUpload);
+app.post('/api/upload/complete', requireAuth, confirmUpload);
 app.post('/api/upload/external', ...requireRole('instructor', 'admin'), registerExternalMedia);
 
 // Route upload local (duoc bat khi local duoc chon hoac la fallback cho Cloudinary)
