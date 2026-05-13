@@ -1,6 +1,7 @@
 import { fetchWithTimeout } from './http';
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3101';
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
 
 export interface InternalInstructorUser {
   id: string;
@@ -22,6 +23,7 @@ export async function fetchInternalInstructors(traceId?: string): Promise<Intern
       headers: {
         'Content-Type': 'application/json',
         'x-internal-call': 'course-service',
+        'x-internal-secret': INTERNAL_SERVICE_SECRET,
         'x-trace-id': traceId || '',
       },
     });
@@ -57,6 +59,7 @@ export async function fetchInternalUsersBatch(
       headers: {
         'Content-Type': 'application/json',
         'x-internal-call': 'course-service',
+        'x-internal-secret': INTERNAL_SERVICE_SECRET,
         'x-trace-id': traceId || '',
       },
       body: JSON.stringify({ userIds }),

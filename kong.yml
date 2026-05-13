@@ -1,258 +1,558 @@
 _format_version: "3.0"
 _transform: true
 
-# Services - Microservices Backend
+# JWT consumer for access token verification (HS256)
+consumers:
+  - username: lms-access-consumer
+  - username: lms-anonymous-consumer
+
+jwt_secrets:
+  - consumer: lms-access-consumer
+    key: access
+    algorithm: HS256
+    secret: lms-dev-gateway-secret-2026-min-32chars
+
 services:
   - name: auth-service
     url: http://host.docker.internal:3101
     routes:
-      - name: auth-route
+      - name: auth-public-route
+        paths:
+          - /auth/login
+          - /auth/register
+          - /auth/refresh
+          - /auth/logout
+          - /auth/health
+        strip_path: true
+        methods: [GET, POST, OPTIONS]
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100
+              policy: local
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+
+      - name: auth-protected-route
         paths:
           - /auth
         strip_path: true
-        methods:
-          - GET
-          - POST
-          - PUT
-          - PATCH
-          - DELETE
-          - OPTIONS
-      # Route /instructor merge tu instructor-service (Phase 1 refactor)
-      - name: instructor-request-route
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        headers:
+          authorization:
+            - "~*.+"
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100
+              policy: local
+          - name: jwt
+            config:
+              key_claim_name: type
+              claims_to_verify: [exp, nbf]
+              run_on_preflight: false
+              header_names: [authorization]
+              uri_param_names: []
+              cookie_names: []
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+              add:
+                headers:
+                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
+                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
+                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
+
+      - name: auth-noauth-route
+        paths:
+          - /auth
+        strip_path: true
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        plugins:
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+          - name: request-termination
+            config:
+              status_code: 401
+              message: Unauthorized
+
+      - name: instructor-protected-route
         paths:
           - /instructor
         strip_path: true
-        methods:
-          - GET
-          - POST
-          - PUT
-          - PATCH
-          - DELETE
-          - OPTIONS
-    plugins:
-      - name: rate-limiting
-        config:
-          minute: 100
-          policy: local
-      - name: request-transformer
-        config:
-          add:
-            headers:
-              - "x-user-id:$(headers['x-user-id'])"
-              - "x-user-role:$(headers['x-user-role'])"
-      - name: correlation-id
-        config:
-          header_name: x-trace-id
-          generator: uuid
-          echo_downstream: true
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        headers:
+          authorization:
+            - "~*.+"
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100
+              policy: local
+          - name: jwt
+            config:
+              key_claim_name: type
+              claims_to_verify: [exp, nbf]
+              run_on_preflight: false
+              header_names: [authorization]
+              uri_param_names: []
+              cookie_names: []
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+              add:
+                headers:
+                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
+                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
+                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
+
+      - name: instructor-noauth-route
+        paths:
+          - /instructor
+        strip_path: true
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        plugins:
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+          - name: request-termination
+            config:
+              status_code: 401
+              message: Unauthorized
 
   - name: course-service
     url: http://host.docker.internal:3002
     routes:
-      - name: course-route
+      - name: course-protected-route
         paths:
           - /course
         strip_path: true
-    plugins:
-      - name: rate-limiting
-        config:
-          minute: 100
-          policy: local
-      - name: request-transformer
-        config:
-          add:
-            headers:
-              - "x-user-id:$(headers['x-user-id'])"
-              - "x-user-role:$(headers['x-user-role'])"
-      - name: correlation-id
-        config:
-          header_name: x-trace-id
-          generator: uuid
-          echo_downstream: true
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        headers:
+          authorization:
+            - "~*.+"
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100
+              policy: local
+          - name: jwt
+            config:
+              key_claim_name: type
+              claims_to_verify: [exp, nbf]
+              run_on_preflight: false
+              header_names: [authorization]
+              uri_param_names: []
+              cookie_names: []
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+              add:
+                headers:
+                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
+                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
+                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
 
-  # Learning Service (Phase 2 refactor — tach tu course-service)
+      - name: course-public-route
+        paths:
+          - /course
+        strip_path: true
+        methods: [GET, OPTIONS]
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100
+              policy: local
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local method = kong.request.get_method()
+                  local path = kong.request.get_path()
+                  if method == "GET" then
+                    if path == "/course/health"
+                      or path == "/course/api/categories"
+                      or path == "/course/api/courses"
+                      or path:match("^/course/api/courses/[^/]+$")
+                      or path:match("^/course/api/courses/[^/]+/reviews$")
+                      or path:match("^/course/api/courses/[^/]+/reviews/stats$")
+                      or path == "/course/api/instructors"
+                      or path:match("^/course/api/instructors/[^/]+$")
+                      or path:match("^/course/api/instructors/[^/]+/courses$")
+                    then
+                      return
+                    end
+                  end
+                  return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
+
   - name: learning-service
     url: http://host.docker.internal:3006
     routes:
-      - name: learning-route
+      - name: learning-protected-route
         paths:
           - /learning
         strip_path: true
-        methods:
-          - GET
-          - POST
-          - PUT
-          - PATCH
-          - DELETE
-          - OPTIONS
-    plugins:
-      - name: rate-limiting
-        config:
-          minute: 100
-          policy: local
-      - name: request-transformer
-        config:
-          add:
-            headers:
-              - "x-user-id:$(headers['x-user-id'])"
-              - "x-user-role:$(headers['x-user-role'])"
-      - name: correlation-id
-        config:
-          header_name: x-trace-id
-          generator: uuid
-          echo_downstream: true
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        headers:
+          authorization:
+            - "~*.+"
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100
+              policy: local
+          - name: jwt
+            config:
+              key_claim_name: type
+              claims_to_verify: [exp, nbf]
+              run_on_preflight: false
+              header_names: [authorization]
+              uri_param_names: []
+              cookie_names: []
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+              add:
+                headers:
+                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
+                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
+                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
 
-  # Community Service (Phase 3 refactor — tach tu course-service)
+      - name: learning-public-route
+        paths:
+          - /learning
+        strip_path: true
+        methods: [GET, OPTIONS]
+        plugins:
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local path = kong.request.get_path()
+                  if path == "/learning/health" then
+                    return
+                  end
+                  return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
+
   - name: community-service
     url: http://host.docker.internal:3007
     routes:
-      - name: community-new-route
+      - name: community-protected-route
         paths:
           - /community
-        strip_path: true
-        methods:
-          - GET
-          - POST
-          - PUT
-          - PATCH
-          - DELETE
-          - OPTIONS
-      - name: qa-route
-        paths:
           - /qa
         strip_path: true
-        methods:
-          - GET
-          - POST
-          - PUT
-          - PATCH
-          - DELETE
-          - OPTIONS
-    plugins:
-      - name: rate-limiting
-        config:
-          minute: 100
-          policy: local
-      - name: request-transformer
-        config:
-          add:
-            headers:
-              - "x-user-id:$(headers['x-user-id'])"
-              - "x-user-role:$(headers['x-user-role'])"
-      - name: correlation-id
-        config:
-          header_name: x-trace-id
-          generator: uuid
-          echo_downstream: true
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        headers:
+          authorization:
+            - "~*.+"
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100
+              policy: local
+          - name: jwt
+            config:
+              key_claim_name: type
+              claims_to_verify: [exp, nbf]
+              run_on_preflight: false
+              header_names: [authorization]
+              uri_param_names: []
+              cookie_names: []
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+              add:
+                headers:
+                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
+                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
+                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
+
+      - name: community-public-route
+        paths:
+          - /community
+          - /qa
+        strip_path: true
+        methods: [GET, OPTIONS]
+        plugins:
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local path = kong.request.get_path()
+                  if path == "/community/health" or path == "/qa/health" then
+                    return
+                  end
+                  return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
 
   - name: payment-service
     url: http://host.docker.internal:3003
     routes:
-      - name: payment-route
+      - name: payment-protected-route
         paths:
           - /payment
         strip_path: true
-        methods:
-          - GET
-          - POST
-          - PUT
-          - PATCH
-          - DELETE
-          - OPTIONS
-    plugins:
-      # JWT do payment-service tu trust header (giong course-service) de dong bo local-dev.
-      # Endpoint callback VNPay (/api/vnpay-return, /api/vnpay-ipn) public — khong auth.
-      - name: rate-limiting
-        config:
-          minute: 200
-          policy: local
-      - name: request-transformer
-        config:
-          add:
-            headers:
-              - "x-user-id:$(headers['x-user-id'])"
-              - "x-user-role:$(headers['x-user-role'])"
-      - name: correlation-id
-        config:
-          header_name: x-trace-id
-          generator: uuid
-          echo_downstream: true
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        headers:
+          authorization:
+            - "~*.+"
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 200
+              policy: local
+          - name: jwt
+            config:
+              key_claim_name: type
+              claims_to_verify: [exp, nbf]
+              run_on_preflight: false
+              header_names: [authorization]
+              uri_param_names: []
+              cookie_names: []
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+              add:
+                headers:
+                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
+                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
+                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
+
+      - name: payment-public-route
+        paths:
+          - /payment
+        strip_path: true
+        methods: [GET, POST, OPTIONS]
+        plugins:
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local method = kong.request.get_method()
+                  local path = kong.request.get_path()
+                  if path == "/payment/health" then
+                    return
+                  end
+                  if path == "/payment/api/vnpay-return" and (method == "GET" or method == "POST") then
+                    return
+                  end
+                  if path == "/payment/api/vnpay-ipn" and (method == "GET" or method == "POST") then
+                    return
+                  end
+                  return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
 
   - name: media-service
     url: http://host.docker.internal:3004
     routes:
-      - name: media-route
+      - name: media-protected-route
         paths:
           - /media
         strip_path: true
-    plugins:
-      # JWT do media-service trust header tu Gateway (giong course-service) de dong bo local-dev flow.
-      - name: rate-limiting
-        config:
-          minute: 100
-          policy: local
-      - name: request-transformer
-        config:
-          add:
-            headers:
-              - "x-user-id:$(headers['x-user-id'])"
-              - "x-user-role:$(headers['x-user-role'])"
-      - name: correlation-id
-        config:
-          header_name: x-trace-id
-          generator: uuid
-          echo_downstream: true
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        headers:
+          authorization:
+            - "~*.+"
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100
+              policy: local
+          - name: jwt
+            config:
+              key_claim_name: type
+              claims_to_verify: [exp, nbf]
+              run_on_preflight: false
+              header_names: [authorization]
+              uri_param_names: []
+              cookie_names: []
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+              add:
+                headers:
+                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
+                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
+                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
+
+      - name: media-public-route
+        paths:
+          - /media
+        strip_path: true
+        methods: [GET, PUT, OPTIONS]
+        plugins:
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local method = kong.request.get_method()
+                  local path = kong.request.get_path()
+                  if path == "/media/health" then
+                    return
+                  end
+                  if method == "GET" and path:match("^/media/api/media/[^/]+$") then
+                    return
+                  end
+                  if method == "GET" and path:match("^/media/api/media/lesson/[^/]+$") then
+                    return
+                  end
+                  if method == "GET" and path:match("^/media/api/media/file/.+$") then
+                    return
+                  end
+                  if method == "PUT" and path:match("^/media/api/upload/local/.+$") then
+                    return
+                  end
+                  return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
 
   - name: notification-service
     url: http://host.docker.internal:3005
     routes:
-      - name: notification-route
+      - name: notification-protected-route
         paths:
           - /notification
         strip_path: true
-    plugins:
-      # Stub service (Phase 11 chua hoan chinh) — chi health + consumer, trust header.
-      - name: rate-limiting
-        config:
-          minute: 100
-          policy: local
-      - name: request-transformer
-        config:
-          add:
-            headers:
-              - "x-user-id:$(headers['x-user-id'])"
-              - "x-user-role:$(headers['x-user-role'])"
-      - name: correlation-id
-        config:
-          header_name: x-trace-id
-          generator: uuid
-          echo_downstream: true
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        headers:
+          authorization:
+            - "~*.+"
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100
+              policy: local
+          - name: jwt
+            config:
+              key_claim_name: type
+              claims_to_verify: [exp, nbf]
+              run_on_preflight: false
+              header_names: [authorization]
+              uri_param_names: []
+              cookie_names: []
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+              add:
+                headers:
+                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
+                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
+                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
 
+      - name: notification-public-route
+        paths:
+          - /notification
+        strip_path: true
+        methods: [GET, OPTIONS]
+        plugins:
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local path = kong.request.get_path()
+                  if path == "/notification/health" then
+                    return
+                  end
+                  return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
 
-# Global Plugins
 plugins:
   - name: cors
     config:
       origins:
         - "http://localhost:3000"
-      methods:
-        - GET
-        - POST
-        - PUT
-        - DELETE
-        - PATCH
-        - OPTIONS
-      headers:
-        - Accept
-        - Authorization
-        - Content-Type
-        - x-trace-id
-        - x-user-id
-        - x-user-role
-      exposed_headers:
-        - x-trace-id
+      methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+      headers: [Accept, Authorization, Content-Type, x-trace-id]
+      exposed_headers: [x-trace-id]
       credentials: true
       max_age: 3600
 
-# JWT Consumers (will be managed by auth-service)
-# This is placeholder - actual JWT validation will use auth-service's public key
+  - name: correlation-id
+    config:
+      header_name: x-trace-id
+      generator: uuid
+      echo_downstream: true

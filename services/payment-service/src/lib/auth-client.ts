@@ -1,6 +1,7 @@
 import { fetchWithTimeout } from './http';
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3101';
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
 
 export interface AuthUserLite {
   id: string;
@@ -18,6 +19,7 @@ export async function fetchUsersByIds(userIds: string[], traceId?: string): Prom
       headers: {
         'Content-Type': 'application/json',
         'x-internal-call': 'payment-service',
+        'x-internal-secret': INTERNAL_SERVICE_SECRET,
         'x-trace-id': traceId || '',
       },
       body: JSON.stringify({ userIds: userIds.slice(0, 100) }),

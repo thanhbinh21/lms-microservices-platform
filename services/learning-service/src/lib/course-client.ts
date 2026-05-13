@@ -1,6 +1,7 @@
 import { logger } from '@lms/logger';
 
 const COURSE_SERVICE_URL = (process.env.COURSE_SERVICE_URL || 'http://localhost:3002').replace(/\/$/, '');
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
 const TIMEOUT_MS = 8000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -76,7 +77,10 @@ export async function getCourseById(courseId: string): Promise<CourseBasicInfo |
 
     const res = await fetch(`${COURSE_SERVICE_URL}/internal/courses/${courseId}`, {
       signal: controller.signal,
-      headers: { 'x-internal-call': 'true' },
+      headers: {
+        'x-internal-call': 'learning-service',
+        'x-internal-secret': INTERNAL_SERVICE_SECRET,
+      },
     });
     clearTimeout(timer);
 
@@ -99,7 +103,10 @@ export async function getLessonById(lessonId: string): Promise<LessonBasicInfo |
 
     const res = await fetch(`${COURSE_SERVICE_URL}/internal/lessons/${lessonId}`, {
       signal: controller.signal,
-      headers: { 'x-internal-call': 'true' },
+      headers: {
+        'x-internal-call': 'learning-service',
+        'x-internal-secret': INTERNAL_SERVICE_SECRET,
+      },
     });
     clearTimeout(timer);
 
@@ -125,7 +132,10 @@ export async function getCourseCurriculum(
 
     const res = await fetch(`${COURSE_SERVICE_URL}/internal/courses/${courseId}/curriculum`, {
       signal: controller.signal,
-      headers: { 'x-internal-call': 'true' },
+      headers: {
+        'x-internal-call': 'learning-service',
+        'x-internal-secret': INTERNAL_SERVICE_SECRET,
+      },
     });
     clearTimeout(timer);
 

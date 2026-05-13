@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { logger } from '@lms/logger';
 import { validateCourseServiceEnv } from '@lms/env-validator';
-import type { ApiResponse } from '@lms/types';
+import { createRequireInternal, type ApiResponse } from '@lms/types';
 import {
   listCourses,
   getCourseBySlug,
@@ -59,6 +59,9 @@ validateCourseServiceEnv();
 
 const app = express();
 const PORT = process.env.PORT || 3002;
+const requireInternal = createRequireInternal({
+  internalSecret: process.env.INTERNAL_SERVICE_SECRET || '',
+});
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(helmet());
@@ -87,10 +90,10 @@ app.get('/health', (_req: Request, res: Response) => {
 // Payment-service goi /internal/courses/:id de verify price.
 // Learning-service goi /internal/lessons/:id de verify lesson truoc khi update progress.
 // Learning-service goi /internal/courses/:id/curriculum de lay danh sach chapter + lesson.
-app.get('/internal/courses/:id', getCourseByIdInternal);
-app.get('/internal/courses/:id/curriculum', getCourseCurriculumInternal);
-app.get('/internal/lessons/:id', getLessonByIdInternal);
-app.get('/internal/instructors/:instructorId/courses', getInstructorCourseIdsInternal);
+app.get('/internal/courses/:id', requireInternal, getCourseByIdInternal);
+app.get('/internal/courses/:id/curriculum', requireInternal, getCourseCurriculumInternal);
+app.get('/internal/lessons/:id', requireInternal, getLessonByIdInternal);
+app.get('/internal/instructors/:instructorId/courses', requireInternal, getInstructorCourseIdsInternal);
 
 // ─── Instructor Profile Routes ─────────────────────────────────────────────
 app.get('/api/instructors/profile', ...requireRole('instructor', 'admin'), getMyInstructorProfile);

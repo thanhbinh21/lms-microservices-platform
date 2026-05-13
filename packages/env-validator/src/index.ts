@@ -64,6 +64,7 @@ const vnpayEnvSchema = z.object({
 // Service discovery noi bo (payment -> course de verify price)
 const internalServiceEnvSchema = z.object({
   COURSE_SERVICE_URL: z.string().url('COURSE_SERVICE_URL must be valid URL').optional(),
+  INTERNAL_SERVICE_SECRET: z.string().min(1, 'INTERNAL_SERVICE_SECRET is required'),
 });
 
 // Storage (Phase 6 - media-service)
@@ -116,11 +117,17 @@ export const envSchemas = {
 
 // Helper functions for common service patterns
 export const validateAuthServiceEnv = () =>
-  validateEnv(baseEnvSchema, databaseEnvSchema, redisEnvSchema, jwtEnvSchema);
+  validateEnv(baseEnvSchema, databaseEnvSchema, redisEnvSchema, jwtEnvSchema, internalServiceEnvSchema);
 
 // Course-service: Kafka consumer + Upstash Redis cache
 export const validateCourseServiceEnv = () =>
-  validateEnv(baseEnvSchema, databaseEnvSchema, kafkaEnvSchema.partial(), cacheRedisEnvSchema);
+  validateEnv(
+    baseEnvSchema,
+    databaseEnvSchema,
+    kafkaEnvSchema.partial(),
+    cacheRedisEnvSchema,
+    internalServiceEnvSchema,
+  );
 
 export const validatePaymentServiceEnv = () =>
   validateEnv(
@@ -140,6 +147,7 @@ export const validateNotificationServiceEnv = () =>
     baseEnvSchema,
     databaseEnvSchema,
     kafkaEnvSchema,
+    internalServiceEnvSchema,
     smtpEnvSchema,
     z.object({ AUTH_SERVICE_URL: z.string().url().optional() }),
   );

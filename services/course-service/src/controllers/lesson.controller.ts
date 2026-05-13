@@ -53,6 +53,7 @@ function validateLessonVideoSource(sourceType: 'UPLOAD' | 'YOUTUBE', videoUrl?: 
 }
 
 const LEARNING_SERVICE_URL = (process.env.LEARNING_SERVICE_URL || 'http://localhost:3006').replace(/\/$/, '');
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
 
 async function checkEnrollment(userId: string, courseId: string, traceId: string): Promise<boolean> {
   try {
@@ -60,7 +61,8 @@ async function checkEnrollment(userId: string, courseId: string, traceId: string
       `${LEARNING_SERVICE_URL}/internal/enrollment/check?userId=${userId}&courseId=${courseId}`,
       {
         headers: {
-          'x-internal-call': 'true',
+          'x-internal-call': 'course-service',
+          'x-internal-secret': INTERNAL_SERVICE_SECRET,
           'x-trace-id': traceId,
         },
       },

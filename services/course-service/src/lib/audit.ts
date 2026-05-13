@@ -1,6 +1,7 @@
 import { fetchWithTimeout } from './http';
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3101';
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
 
 export async function writeAuditLog(input: {
   actorId: string;
@@ -18,6 +19,7 @@ export async function writeAuditLog(input: {
       headers: {
         'Content-Type': 'application/json',
         'x-internal-call': 'course-service',
+        'x-internal-secret': INTERNAL_SERVICE_SECRET,
         'x-trace-id': input.traceId || '',
       },
       body: JSON.stringify(input),

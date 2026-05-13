@@ -2,6 +2,7 @@ import { logger } from '@lms/logger';
 
 const LEARNING_SERVICE_URL = (process.env.LEARNING_SERVICE_URL || 'http://localhost:3006').replace(/\/$/, '');
 const COURSE_SERVICE_URL = (process.env.COURSE_SERVICE_URL || 'http://localhost:3002').replace(/\/$/, '');
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
 const TIMEOUT_MS = 5000;
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
@@ -19,7 +20,12 @@ export async function checkEnrollment(userId: string, courseId: string): Promise
   try {
     const res = await fetchWithTimeout(
       `${LEARNING_SERVICE_URL}/internal/enrollment/check?userId=${userId}&courseId=${courseId}`,
-      { headers: { 'x-internal-call': 'true' } },
+      {
+        headers: {
+          'x-internal-call': 'community-service',
+          'x-internal-secret': INTERNAL_SERVICE_SECRET,
+        },
+      },
     );
     if (!res.ok) return false;
     const json = (await res.json()) as any;
@@ -34,7 +40,10 @@ export async function checkEnrollment(userId: string, courseId: string): Promise
 export async function getCourseById(courseId: string): Promise<{ id: string; title: string; slug: string; instructorId?: string } | null> {
   try {
     const res = await fetchWithTimeout(`${COURSE_SERVICE_URL}/internal/courses/${courseId}`, {
-      headers: { 'x-internal-call': 'true' },
+      headers: {
+        'x-internal-call': 'community-service',
+        'x-internal-secret': INTERNAL_SERVICE_SECRET,
+      },
     });
     if (!res.ok) return null;
     const json = (await res.json()) as any;
@@ -49,7 +58,10 @@ export async function getCourseById(courseId: string): Promise<{ id: string; tit
 export async function getLessonById(lessonId: string): Promise<{ id: string; title: string } | null> {
   try {
     const res = await fetchWithTimeout(`${COURSE_SERVICE_URL}/internal/lessons/${lessonId}`, {
-      headers: { 'x-internal-call': 'true' },
+      headers: {
+        'x-internal-call': 'community-service',
+        'x-internal-secret': INTERNAL_SERVICE_SECRET,
+      },
     });
     if (!res.ok) return null;
     const json = (await res.json()) as any;
@@ -64,7 +76,10 @@ export async function getLessonById(lessonId: string): Promise<{ id: string; tit
 export async function getInstructorCourseIds(instructorId: string): Promise<string[]> {
   try {
     const res = await fetchWithTimeout(`${COURSE_SERVICE_URL}/internal/instructors/${instructorId}/courses`, {
-      headers: { 'x-internal-call': 'true' },
+      headers: {
+        'x-internal-call': 'community-service',
+        'x-internal-secret': INTERNAL_SERVICE_SECRET,
+      },
     });
     if (!res.ok) return [];
     const json = (await res.json()) as any;
@@ -101,7 +116,11 @@ export async function resolveUserNames(
   try {
     const res = await fetchWithTimeout(`${AUTH_SERVICE_URL}/internal/users/batch`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-call': 'true' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-call': 'community-service',
+        'x-internal-secret': INTERNAL_SERVICE_SECRET,
+      },
       body: JSON.stringify({ userIds: uncachedIds }),
     });
     if (res.ok) {

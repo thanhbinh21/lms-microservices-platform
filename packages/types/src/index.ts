@@ -119,6 +119,12 @@ export interface RequireAdminMiddlewareOptions {
   traceIdFallback?: string;
 }
 
+export interface RequireInternalMiddlewareOptions {
+  internalSecret: string;
+  forbiddenMessage?: string;
+  traceIdFallback?: string;
+}
+
 type GatewayHeaderValue = string | string[] | undefined;
 
 export interface AdminGuardRequestLike {
@@ -220,6 +226,41 @@ export function createRequireAuth(options: RequireAdminMiddlewareOptions = {}) {
     res.locals.userId = userId;
     // userRole co the co hoac khong, chu yeu la can userId
     res.locals.userRole = readHeaderValue(req.headers['x-user-role']);
+    next();
+  };
+}
+
+/**
+ * Tao middleware cho endpoint /internal/*.
+ * Header x-internal-secret moi la bien xac thuc, x-internal-call chi de trace nguon goi.
+ */
+export function createRequireInternal(options: RequireInternalMiddlewareOptions) {
+  const internalSecret = options.internalSecret;
+  const forbiddenMessage = options.forbiddenMessage || 'Forbidden - invalid internal secret';
+  const traceIdFallback = options.traceIdFallback || 'unknown';
+
+  return function requireInternal(
+    req: AdminGuardRequestLike,
+    res: AdminGuardResponseLike,
+    next: AdminGuardNext,
+  ): void {
+    const providedSecret = readHeaderValue(req.headers['x-internal-secret']);
+    const traceId = readHeaderValue(req.headers['x-trace-id']) || traceIdFallback;
+    const internalCaller = readHeaderValue(req.headers['x-internal-call']);
+
+    if (!internalSecret || !providedSecret || providedSecret !== internalSecret) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: forbiddenMessage,
+        data: null,
+        trace_id: traceId,
+      };
+      res.status(403).json(response);
+      return;
+    }
+
+    res.locals.internalCaller = internalCaller;
     next();
   };
 }

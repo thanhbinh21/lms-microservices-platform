@@ -427,8 +427,6 @@ export async function becomeEducatorAction(): Promise<AuthResponse> {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
-        'x-user-id': payload.userId,
-        'x-user-role': payload.role,
       },
       body: JSON.stringify({}),
     });

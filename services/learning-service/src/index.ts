@@ -1,8 +1,9 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { logger } from '@lms/logger';
 import { requireAuth, requireRole } from './middleware/require-auth.js';
+import { createRequireInternal } from '@lms/types';
 import {
   enrollCourse,
   getMyEnrollments,
@@ -29,7 +30,7 @@ import { startKafkaConsumers } from './lib/kafka-consumer.js';
 import prisma from './lib/prisma.js';
 
 // Validate bien moi truong can thiet
-const requiredEnvVars = ['DATABASE_URL', 'COURSE_SERVICE_URL'] as const;
+const requiredEnvVars = ['DATABASE_URL', 'COURSE_SERVICE_URL', 'INTERNAL_SERVICE_SECRET'] as const;
 for (const key of requiredEnvVars) {
   if (!process.env[key]) {
     logger.error({ key }, '[learning-service] Missing required env var');
@@ -39,6 +40,9 @@ for (const key of requiredEnvVars) {
 
 const PORT = parseInt(process.env.PORT || '3006', 10);
 const app = express();
+const requireInternal = createRequireInternal({
+  internalSecret: process.env.INTERNAL_SERVICE_SECRET || '',
+});
 
 app.use(helmet());
 app.use(cors({
@@ -93,20 +97,11 @@ app.get('/api/certificates/:certificateNumber', requireAuth, getCertificateByNum
 
 // ─── Internal Routes (khong qua Gateway) ────────────────────────────────────
 
-// Middleware guard: chi cho phep internal service goi
-function internalOnly(req: Request, res: Response, next: NextFunction): void {
-  if (req.headers['x-internal-call'] !== 'true') {
-    res.status(403).json({ success: false, message: 'Forbidden' });
-    return;
-  }
-  next();
-}
-
 // Community-service goi de kiem tra enrollment (x-internal-call header)
-app.get('/internal/enrollment/check', internalOnly, internalCheckEnrollment);
+app.get('/internal/enrollment/check', requireInternal, internalCheckEnrollment);
 
 // Course-service goi de kiem tra hoan thanh khoa hoc (x-internal-call header)
-app.get('/internal/courses/:courseId/completion', internalOnly, internalGetCourseCompletion);
+app.get('/internal/courses/:courseId/completion', requireInternal, internalGetCourseCompletion);
 
 // ─── DLQ Admin Routes ────────────────────────────────────────────────────────
 

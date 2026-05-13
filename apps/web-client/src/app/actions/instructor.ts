@@ -390,8 +390,6 @@ export async function callApi<T>(
     }
 
     headers.set('Authorization', `Bearer ${token}`);
-    headers.set('x-user-id', decoded.userId);
-    headers.set('x-user-role', (decoded.role || '').toLowerCase());
   }
 
   let response: Response;
@@ -417,9 +415,14 @@ export async function callApi<T>(
     if (refreshedToken) {
       const decoded = decodeAccessToken(refreshedToken);
       headers.set('Authorization', `Bearer ${refreshedToken}`);
-      if (decoded?.userId) {
-        headers.set('x-user-id', decoded.userId);
-        headers.set('x-user-role', (decoded.role || '').toLowerCase());
+      if (!decoded?.userId) {
+        return {
+          success: false,
+          code: 401,
+          message: 'Invalid access token payload.',
+          data: null,
+          trace_id: '',
+        };
       }
       try {
         response = await fetch(`${baseUrl}${path}`, {

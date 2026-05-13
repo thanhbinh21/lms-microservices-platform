@@ -50,6 +50,7 @@ const reviewBodySchema = z.object({
 });
 
 const LEARNING_SERVICE_URL = (process.env.LEARNING_SERVICE_URL || 'http://localhost:3006').replace(/\/$/, '');
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
 
 // Tao hash ngan tu query params de lam cache key cho list endpoint
 function buildCacheKey(prefix: string, params: Record<string, unknown>): string {
@@ -252,7 +253,8 @@ async function getUserCourseCompletionState(userId: string, courseId: string, tr
       `${LEARNING_SERVICE_URL}/internal/courses/${courseId}/completion?userId=${userId}`,
       {
         headers: {
-          'x-internal-call': 'true',
+          'x-internal-call': 'course-service',
+          'x-internal-secret': INTERNAL_SERVICE_SECRET,
           'x-trace-id': traceId,
         },
       },

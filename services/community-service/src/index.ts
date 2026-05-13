@@ -5,7 +5,7 @@ import { logger } from '@lms/logger';
 import prisma from './lib/prisma.js';
 
 // Validate bien moi truong
-const requiredEnvVars = ['DATABASE_URL', 'LEARNING_SERVICE_URL'] as const;
+const requiredEnvVars = ['DATABASE_URL', 'LEARNING_SERVICE_URL', 'INTERNAL_SERVICE_SECRET'] as const;
 for (const key of requiredEnvVars) {
   if (!process.env[key]) {
     logger.error({ key }, '[community-service] Missing required env var');

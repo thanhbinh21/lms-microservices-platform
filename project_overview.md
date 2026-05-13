@@ -217,6 +217,8 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
   ~4-5 ngay. done - 2026-05-10 - by BINH
 
 - [x] **Phase 35:** Option A Microservices Refactor — Loai bo "God Service" pattern tu course-service. Tach learning-service (Enrollment/Progress/Certificate/DLQ) va community-service (Community/Q&A) thanh service rieng biet. Merge instructor-service vao auth-service. Cap nhat Kong routes, course-service internal API, Kafka consumers, frontend Server Actions. Chi tiet: `service_architecture_analysis.md` + `plan/refactor_option_a_plan.md`. done - 2026-05-12 - by AI AGENT
+- [x] **Phase 35.1:** Internal service auth hardening - chuan hoa guard createRequireInternal, bat buoc x-internal-secret cho toan bo /internal/*, cap nhat internal HTTP clients va env validation lien quan. done - 2026-05-13 - by AI AGENT
+- [x] **Phase 35.2:** Kong JWT boundary hardening - tach luong public/protected bang route policy, bat JWT verify tren protected routes, remove header spoofing tu client (x-user-*), va inject lai user context sau xac thuc tai Gateway. done - 2026-05-13 - by AI AGENT
 
 ### Phase 9.13: DX Hardening ✅ COMPLETED
 - [x] **Phase 9.13:** DX Hardening — `pnpm run setup` bootstrap (install + docker:up + setup:db + seed), `.nvmrc` node version pin, Prisma orchestration vao turbo pipeline. ✅ Completed: Apr 27, 2026

@@ -3,24 +3,7 @@ import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma.js';
 import { logger } from '@lms/logger';
 
-function ensureInternal(req: Request, res: Response): boolean {
-  const hdr = (req.headers['x-internal-call'] as string) || '';
-  if (!hdr) {
-    const response: ApiResponse<null> = {
-      success: false,
-      code: 403,
-      message: 'Internal endpoint',
-      data: null,
-      trace_id: (req.headers['x-trace-id'] as string) || '',
-    };
-    res.status(403).json(response);
-    return false;
-  }
-  return true;
-}
-
 export const getInternalUser = async (req: Request, res: Response): Promise<Response | void> => {
-  if (!ensureInternal(req, res)) return;
   const traceId = (req.headers['x-trace-id'] as string) || '';
   
   try {
@@ -59,7 +42,6 @@ export const getInternalUser = async (req: Request, res: Response): Promise<Resp
 // Batch lookup: tra ve name + username cho danh sach userId
 // Course-service goi de resolve display name trong community posts
 export const getInternalUsersBatch = async (req: Request, res: Response): Promise<Response | void> => {
-  if (!ensureInternal(req, res)) return;
   const traceId = (req.headers['x-trace-id'] as string) || '';
 
   try {
@@ -105,7 +87,6 @@ export const getInternalUsersBatch = async (req: Request, res: Response): Promis
 };
 
 export const getInternalInstructors = async (req: Request, res: Response): Promise<Response | void> => {
-  if (!ensureInternal(req, res)) return;
   const traceId = (req.headers['x-trace-id'] as string) || '';
 
   try {

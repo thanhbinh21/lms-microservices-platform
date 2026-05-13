@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { logger } from '@lms/logger';
-import type { ApiResponse } from '@lms/types';
+import { createRequireInternal, type ApiResponse } from '@lms/types';
 import { initRedis, closeRedis } from './lib/redis.js';
 import { initEnv } from './lib/env.js';
 import prisma from './lib/prisma.js';
@@ -35,6 +35,7 @@ const app = express();
 const PORT = process.env.PORT || 3101;
 let server: ReturnType<typeof app.listen> | null = null;
 let shuttingDown = false;
+const requireInternal = createRequireInternal({ internalSecret: env.INTERNAL_SERVICE_SECRET });
 
 // Middleware bao mat
 app.use(helmet());
@@ -88,10 +89,10 @@ app.put('/admin/instructor/approve/:id', requireAdmin, approveInstructorRequest)
 app.put('/admin/instructor/reject/:id', requireAdmin, rejectInstructorRequest);
 
 // Internal routes (khong qua Gateway)
-app.get('/internal/users/:id', getInternalUser);
-app.post('/internal/users/batch', getInternalUsersBatch);
-app.get('/internal/instructors', getInternalInstructors);
-app.post('/internal/audit-logs', createAuditLog);
+app.get('/internal/users/:id', requireInternal, getInternalUser);
+app.post('/internal/users/batch', requireInternal, getInternalUsersBatch);
+app.get('/internal/instructors', requireInternal, getInternalInstructors);
+app.post('/internal/audit-logs', requireInternal, createAuditLog);
 
 // Admin routes
 app.use('/admin', requireAdmin, adminRouter);

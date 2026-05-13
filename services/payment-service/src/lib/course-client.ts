@@ -7,6 +7,7 @@ import { fetchWithTimeout } from './http';
  */
 
 const COURSE_SERVICE_URL = process.env.COURSE_SERVICE_URL || 'http://localhost:3002';
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
 
 export interface CourseLite {
   id: string;
@@ -32,6 +33,7 @@ export async function fetchCourseById(
         'Content-Type': 'application/json',
         'x-trace-id': traceId || '',
         'x-internal-call': 'payment-service',
+        'x-internal-secret': INTERNAL_SERVICE_SECRET,
       },
     });
 

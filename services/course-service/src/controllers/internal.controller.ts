@@ -10,28 +10,10 @@ import { logger } from '@lms/logger';
  * Payment-service dung endpoint nay de verify price (chong client tampering).
  */
 
-function ensureInternal(req: Request, res: Response): boolean {
-  const hdr = (req.headers['x-internal-call'] as string) || '';
-  if (!hdr) {
-    const response: ApiResponse<null> = {
-      success: false,
-      code: 403,
-      message: 'Internal endpoint',
-      data: null,
-      trace_id: (req.headers['x-trace-id'] as string) || '',
-    };
-    res.status(403).json(response);
-    return false;
-  }
-  return true;
-}
-
 /**
  * GET /internal/courses/:id — tra ve thong tin toi thieu de tinh gia.
  */
 export const getCourseByIdInternal = async (req: Request, res: Response): Promise<Response | void> => {
-  if (!ensureInternal(req, res)) return;
-
   const traceId = (req.headers['x-trace-id'] as string) || '';
   const { id } = req.params;
 
@@ -92,8 +74,6 @@ export const getCourseByIdInternal = async (req: Request, res: Response): Promis
  * Learning-service dung de render trang /learn.
  */
 export const getCourseCurriculumInternal = async (req: Request, res: Response): Promise<Response | void> => {
-  if (!ensureInternal(req, res)) return;
-
   const traceId = (req.headers['x-trace-id'] as string) || '';
   const { id } = req.params;
 
@@ -149,8 +129,6 @@ export const getCourseCurriculumInternal = async (req: Request, res: Response): 
  * Learning-service dung de verify enrollment truoc khi update progress.
  */
 export const getLessonByIdInternal = async (req: Request, res: Response): Promise<Response | void> => {
-  if (!ensureInternal(req, res)) return;
-
   const traceId = (req.headers['x-trace-id'] as string) || '';
   const { id } = req.params;
 
@@ -205,8 +183,6 @@ export const getLessonByIdInternal = async (req: Request, res: Response): Promis
  * Community-service dung de loc cau hoi theo khoa hoc cua giang vien.
  */
 export const getInstructorCourseIdsInternal = async (req: Request, res: Response): Promise<Response | void> => {
-  if (!ensureInternal(req, res)) return;
-
   const traceId = (req.headers['x-trace-id'] as string) || '';
   const { instructorId } = req.params;
 
