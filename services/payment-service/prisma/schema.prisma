@@ -45,6 +45,13 @@ enum PayoutStatus {
   PAID
 }
 
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+  FAILED
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 /// Don hang tao boi user khi mua khoa hoc.
@@ -152,4 +159,25 @@ model Payout {
   @@index([status])
   @@index([createdAt(sort: Desc)])
   @@map("payouts")
+}
+
+/// Transactional outbox de khong mat event sau khi order da hoan tat.
+model OutboxEvent {
+  id            String       @id @default(uuid())
+  topic         String
+  eventKey      String?      @map("event_key")
+  dedupeKey     String       @unique @map("dedupe_key")
+  payload       Json         @db.JsonB
+  traceId       String?      @map("trace_id")
+  status        OutboxStatus @default(PENDING)
+  retryCount    Int          @default(0) @map("retry_count")
+  nextAttemptAt DateTime     @default(now()) @map("next_attempt_at")
+  lastError     String?      @map("last_error") @db.Text
+  publishedAt   DateTime?    @map("published_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@index([status, nextAttemptAt])
+  @@index([topic])
+  @@map("outbox_events")
 }

@@ -5,17 +5,7 @@ import type { ApiResponse } from '@lms/types';
 import { logger } from '@lms/logger';
 import prisma from '../lib/prisma.js';
 import { getCourseById } from '../lib/course-client.js';
-import {
-  createProducer,
-  publishEvent,
-  TOPICS,
-} from '@lms/kafka-client';
-
-let _producer: any = null;
-async function getProducer() {
-  if (!_producer) _producer = await createProducer();
-  return _producer;
-}
+import { enqueueEnrollmentCreatedOutbox } from '../lib/outbox.js';
 
 /** POST /api/courses/:courseId/enroll — Ghi danh khoa hoc mien phi */
 export const enrollCourse = async (req: Request, res: Response): Promise<Response | void> => {
@@ -64,28 +54,23 @@ export const enrollCourse = async (req: Request, res: Response): Promise<Respons
     }
 
     const orderId = `FREE-${randomUUID()}`;
-    const enrollment = await prisma.enrollment.create({
-      data: { userId, courseId, orderId },
-    });
+    await prisma.$transaction(async (tx) => {
+      const enrollment = await tx.enrollment.create({
+        data: { userId, courseId, orderId },
+      });
 
-    // Publish enrollment.created
-    try {
-      const producer = await getProducer();
-      await publishEvent(
-        producer,
-        TOPICS.ENROLLMENT_CREATED,
+      // Enrollment va event phai atomic de downstream khong bi lech counter/notification.
+      await enqueueEnrollmentCreatedOutbox(
+        tx,
         {
           user_id: userId,
           course_id: courseId,
           order_id: orderId,
           enrolled_at: enrollment.enrolledAt.toISOString(),
         },
-        { traceId, key: userId },
+        traceId,
       );
-    } catch (err) {
-      logger.warn({ err, userId, courseId, traceId }, 'Free enrollment: failed to publish event — non-fatal');
-    }
-
+    });
     const response: ApiResponse<null> = {
       success: true, code: 201, message: 'Ghi danh thành công', data: null, trace_id: traceId,
     };

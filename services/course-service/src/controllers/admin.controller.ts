@@ -1,11 +1,9 @@
 import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import type { ApiResponse } from '@lms/types';
-import { TOPICS } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
-import { publishEvent } from '../lib/kafka-producer';
 
 /** GET /api/admin/courses */
 export async function listAdminCourses(req: Request, res: Response) {
@@ -122,15 +120,6 @@ export async function updateCourseStatus(req: Request, res: Response) {
       { courseId: id, previousStatus, status, reopenFromArchive },
       'Admin updated course status',
     );
-
-    await publishEvent(TOPICS.COURSE_CATALOG_STATUS_CHANGED, {
-      courseId: id,
-      previousStatus,
-      newStatus: status,
-      reopenFromArchive,
-      traceId,
-      occurredAt: new Date().toISOString(),
-    });
 
     const response: ApiResponse<unknown> = {
       success: true,

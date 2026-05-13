@@ -3,7 +3,9 @@ import {
   createProducer,
   consumeWithRetry,
   TOPICS,
+  ENROLLMENT_CREATED_RETRY,
   type EnrollmentCreatedEvent,
+  type KafkaTopic,
   validateKafkaEvent,
   EnrollmentCreatedSchema,
 } from '@lms/kafka-client';
@@ -22,18 +24,27 @@ const HANDLER_GROUP = 'course-service.enrollment-count';
 export async function startKafkaConsumers(): Promise<void> {
   const producer = await createProducer();
 
-  const consumer = await createConsumer(HANDLER_GROUP);
-  await consumeWithRetry<EnrollmentCreatedEvent>(consumer, producer, {
-    topic: TOPICS.ENROLLMENT_CREATED,
-    groupId: HANDLER_GROUP,
-    handler: async (event) => {
+  const topics: KafkaTopic[] = [
+    TOPICS.ENROLLMENT_CREATED,
+    TOPICS.ENROLLMENT_CREATED_RETRY_5S,
+    TOPICS.ENROLLMENT_CREATED_RETRY_1M,
+  ];
+
+  await Promise.all(
+    topics.map(async (topic) => {
+      const consumer = await createConsumer(`${HANDLER_GROUP}.${topic}`);
+      await consumeWithRetry<EnrollmentCreatedEvent>(consumer, producer, {
+        topic,
+        groupId: `${HANDLER_GROUP}.${topic}`,
+        retry: ENROLLMENT_CREATED_RETRY,
+        handler: async (event) => {
       const validated = validateKafkaEvent(
         EnrollmentCreatedSchema,
         event.data,
         'learning.enrollment.created',
         logger,
       );
-      if (!validated) return;
+      if (!validated) throw new Error('Invalid learning.enrollment.created payload');
 
       const { order_id, user_id, course_id } = validated;
 
@@ -64,6 +75,9 @@ export async function startKafkaConsumers(): Promise<void> {
         throw err;
       }
     },
-    onError: (err) => logger.error({ err }, '[course-service] Enrollment signal consumer failed'),
-  });
+        onError: (err) => logger.error({ err, topic }, '[course-service] Enrollment signal consumer failed'),
+      });
+      logger.info({ topic }, '[course-service] Enrollment signal consumer running');
+    }),
+  );
 }

@@ -308,11 +308,13 @@ export async function listCourses(req: Request, res: Response) {
     const level = (req.query.level as string)?.toUpperCase() || '';
 
     const where: Prisma.CourseWhereInput = { status: 'PUBLISHED' };
+    const keyword = q || search;
+    const ratingFloor = minRating ?? rating;
 
-    if (q) {
+    if (keyword) {
       where.OR = [
-        { title: { contains: q, mode: 'insensitive' } },
-        { description: { contains: q, mode: 'insensitive' } },
+        { title: { contains: keyword, mode: 'insensitive' } },
+        { description: { contains: keyword, mode: 'insensitive' } },
       ];
     }
     if (categorySlug) {
@@ -324,8 +326,8 @@ export async function listCourses(req: Request, res: Response) {
     if (maxPrice !== undefined && !isNaN(maxPrice)) {
       where.price = { ...(where.price as object), lte: maxPrice };
     }
-    if (minRating !== undefined && !isNaN(minRating)) {
-      where.averageRating = { gte: minRating };
+    if (ratingFloor !== undefined && !isNaN(ratingFloor)) {
+      where.averageRating = { gte: ratingFloor };
     }
     if (level && ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].includes(level)) {
       where.level = level as any;

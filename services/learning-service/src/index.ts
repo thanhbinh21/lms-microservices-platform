@@ -27,6 +27,8 @@ import {
   resolveFailedEvent,
 } from './controllers/dlq.controller.js';
 import { startKafkaConsumers } from './lib/kafka-consumer.js';
+import { startDlqProcessor } from './lib/dlq-processor.js';
+import { startLearningOutboxWorker, stopLearningOutboxWorker } from './lib/outbox.js';
 import prisma from './lib/prisma.js';
 
 // Validate bien moi truong can thiet
@@ -122,6 +124,7 @@ app.use((_req, res) => {
 
 async function gracefulShutdown(signal: string) {
   logger.info({ signal }, '[learning-service] Shutting down...');
+  await stopLearningOutboxWorker();
   await prisma.$disconnect();
   process.exit(0);
 }
@@ -138,8 +141,12 @@ async function start() {
 
     // Kafka consumers bat dau sau khi DB ready
     if (process.env.KAFKA_BROKER) {
+      startLearningOutboxWorker();
       startKafkaConsumers().catch((err) => {
         logger.error({ err }, '[learning-service] Failed to start Kafka consumers');
+      });
+      startDlqProcessor().catch((err) => {
+        logger.error({ err }, '[learning-service] Failed to start DLQ processor');
       });
     } else {
       logger.warn('[learning-service] KAFKA_BROKER not set — skipping Kafka consumers');

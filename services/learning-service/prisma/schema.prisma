@@ -22,6 +22,13 @@ enum FailedEventStatus {
   IGNORED
 }
 
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+  FAILED
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 // Enrollment — source of truth cho access control
@@ -87,6 +94,8 @@ model Certificate {
 model FailedEvent {
   id           String            @id @default(uuid())
   topic        String
+  eventId      String?           @map("event_id")
+  traceId      String?           @map("trace_id")
   originalKey  String?           @map("original_key")
   payload      Json
   errorMessage String            @map("error_message")
@@ -97,5 +106,27 @@ model FailedEvent {
 
   @@index([status])
   @@index([topic])
+  @@unique([topic, eventId])
   @@map("failed_events")
+}
+
+// Transactional outbox giu enrollment va event downstream di cung mot transaction
+model OutboxEvent {
+  id            String       @id @default(uuid())
+  topic         String
+  eventKey      String?      @map("event_key")
+  dedupeKey     String       @unique @map("dedupe_key")
+  payload       Json
+  traceId       String?      @map("trace_id")
+  status        OutboxStatus @default(PENDING)
+  retryCount    Int          @default(0) @map("retry_count")
+  nextAttemptAt DateTime     @default(now()) @map("next_attempt_at")
+  lastError     String?      @map("last_error")
+  publishedAt   DateTime?    @map("published_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@index([status, nextAttemptAt])
+  @@index([topic])
+  @@map("outbox_events")
 }

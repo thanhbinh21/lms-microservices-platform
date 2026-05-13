@@ -42,6 +42,8 @@ export const TOPICS = {
 
   // Enrollment flow (Phase 16)
   ENROLLMENT_CREATED: 'learning.enrollment.created',
+  ENROLLMENT_CREATED_RETRY_5S: 'learning.enrollment.created.retry-5s',
+  ENROLLMENT_CREATED_RETRY_1M: 'learning.enrollment.created.retry-1m',
 
   // Legacy / future
   LESSON_COMPLETED: 'learning.lesson.completed',
@@ -142,6 +144,8 @@ export interface TopicEventMap {
   [TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_5S]: PaymentOrderCompletedEvent;
   [TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_1M]: PaymentOrderCompletedEvent;
   [TOPICS.ENROLLMENT_CREATED]: EnrollmentCreatedEvent;
+  [TOPICS.ENROLLMENT_CREATED_RETRY_5S]: EnrollmentCreatedEvent;
+  [TOPICS.ENROLLMENT_CREATED_RETRY_1M]: EnrollmentCreatedEvent;
   [TOPICS.DEAD_LETTER]: unknown;
   [TOPICS.LESSON_COMPLETED]: unknown;
   [TOPICS.COURSE_COMPLETED]: unknown;
@@ -158,10 +162,10 @@ export async function publishEvent<T extends KafkaTopic>(
   producer: Producer,
   topic: T,
   data: TopicEventMap[T],
-  options: { traceId?: string; key?: string; headers?: Record<string, string> } = {},
+  options: { traceId?: string; key?: string; eventId?: string; headers?: Record<string, string> } = {},
 ): Promise<void> {
   const envelope: KafkaEventEnvelope<TopicEventMap[T]> = {
-    event_id: randomUUID(),
+    event_id: options.eventId || randomUUID(),
     event_type: topic,
     timestamp: new Date().toISOString(),
     trace_id: options.traceId || randomUUID(),
@@ -226,11 +230,26 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function nextOffset(offset: string): string {
+  return (BigInt(offset) + 1n).toString();
+}
+
+async function commitMessage(consumer: Consumer, payload: EachMessagePayload): Promise<void> {
+  await consumer.commitOffsets([
+    {
+      topic: payload.topic,
+      partition: payload.partition,
+      offset: nextOffset(payload.message.offset),
+    },
+  ]);
+}
+
 /**
  * Subscribe mot topic va xu ly retry theo RetryPolicy.
  * Khi handler throw:
  *  - Neu con topic retry ke tiep -> sleep delay + republish sang topic do.
  *  - Neu het -> publish sang dead-letter topic.
+ *  - Commit offset chi sau khi xu ly xong hoac da ban giao sang retry/DLQ.
  */
 export async function consumeWithRetry<T = unknown>(
   consumer: Consumer,
@@ -242,7 +261,7 @@ export async function consumeWithRetry<T = unknown>(
   await consumer.subscribe({ topic, fromBeginning: false });
 
   await consumer.run({
-    autoCommit: true,
+    autoCommit: false,
     eachMessage: async (payload: EachMessagePayload) => {
       const value = payload.message.value?.toString('utf-8') || '{}';
       let envelope: KafkaEventEnvelope<T>;
@@ -264,12 +283,15 @@ export async function consumeWithRetry<T = unknown>(
               },
             ],
           });
+          await commitMessage(consumer, payload);
+          return;
         }
-        return;
+        throw new Error(`Invalid JSON message on ${topic}`);
       }
 
       try {
         await handler(envelope, payload);
+        await commitMessage(consumer, payload);
       } catch (err) {
         onError?.(err, payload);
 
@@ -298,6 +320,7 @@ export async function consumeWithRetry<T = unknown>(
               },
             ],
           });
+          await commitMessage(consumer, payload);
           return;
         }
 
@@ -319,6 +342,7 @@ export async function consumeWithRetry<T = unknown>(
             },
           ],
         });
+        await commitMessage(consumer, payload);
       }
     },
   });
@@ -331,6 +355,15 @@ export const PAYMENT_ORDER_COMPLETED_RETRY: RetryPolicy = {
   retryChain: [
     { topic: TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_5S, delayMs: 5_000 },
     { topic: TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_1M, delayMs: 60_000 },
+  ],
+  deadLetterTopic: TOPICS.DEAD_LETTER,
+};
+
+export const ENROLLMENT_CREATED_RETRY: RetryPolicy = {
+  mainTopic: TOPICS.ENROLLMENT_CREATED,
+  retryChain: [
+    { topic: TOPICS.ENROLLMENT_CREATED_RETRY_5S, delayMs: 5_000 },
+    { topic: TOPICS.ENROLLMENT_CREATED_RETRY_1M, delayMs: 60_000 },
   ],
   deadLetterTopic: TOPICS.DEAD_LETTER,
 };

@@ -4,7 +4,6 @@ import {
   consumeWithRetry,
   TOPICS,
   PAYMENT_ORDER_COMPLETED_RETRY,
-  publishEvent,
   type PaymentOrderCompletedEvent,
   type KafkaTopic,
   validateKafkaEvent,
@@ -12,6 +11,7 @@ import {
 } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
 import prisma from './prisma.js';
+import { enqueueEnrollmentCreatedOutbox } from './outbox.js';
 
 /**
  * Learning-service Kafka consumers (Phase 2 refactor).
@@ -36,7 +36,7 @@ export async function startKafkaConsumers(): Promise<void> {
       'payment.order.completed',
       logger,
     );
-    if (!validated) return;
+    if (!validated) throw new Error('Invalid payment.order.completed payload');
 
     const { order_id, user_id, course_id, paid_at } = validated;
 
@@ -52,34 +52,35 @@ export async function startKafkaConsumers(): Promise<void> {
       return;
     }
 
-    // Tao enrollment moi
-    await prisma.enrollment.create({
-      data: {
-        userId: user_id,
-        courseId: course_id,
-        orderId: order_id,
-        enrolledAt: paid_at ? new Date(paid_at) : new Date(),
-      },
-    });
+    const enrollment = await prisma.$transaction(async (tx) => {
+      const created = await tx.enrollment.create({
+        data: {
+          userId: user_id,
+          courseId: course_id,
+          orderId: order_id,
+          enrolledAt: paid_at ? new Date(paid_at) : new Date(),
+        },
+      });
 
-    logger.info({ orderId: order_id, userId: user_id, courseId: course_id }, '[learning-service] Enrollment created');
-
-    // Publish enrollment.created de downstream consumer (notification + course enrollmentCount)
-    try {
-      await publishEvent(
-        producer,
-        TOPICS.ENROLLMENT_CREATED,
+      // Enrollment paid va downstream event di cung transaction de tranh mat event.
+      await enqueueEnrollmentCreatedOutbox(
+        tx,
         {
           user_id,
           course_id,
           order_id,
-          enrolled_at: new Date().toISOString(),
+          enrolled_at: created.enrolledAt.toISOString(),
         },
-        { traceId: event.trace_id, key: user_id },
+        event.trace_id,
       );
-    } catch (err) {
-      logger.warn({ err }, '[learning-service] Failed to publish enrollment.created — non-fatal');
-    }
+
+      return created;
+    });
+
+    logger.info(
+      { enrollmentId: enrollment.id, orderId: order_id, userId: user_id, courseId: course_id },
+      '[learning-service] Enrollment created',
+    );
   };
 
   // Subscribe main + retry topics

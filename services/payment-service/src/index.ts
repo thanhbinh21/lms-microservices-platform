@@ -21,7 +21,7 @@ import {
 } from './controllers/earnings.controller';
 import { listPayouts, updatePayout } from './controllers/payout.controller';
 import prisma from './lib/prisma';
-import { disconnectProducer } from './lib/kafka-producer';
+import { startPaymentOutboxWorker, stopPaymentOutboxWorker } from './lib/outbox';
 import { createRequireAdmin } from '@lms/types';
 import { startKafkaConsumers } from './lib/kafka-consumer';
 
@@ -116,6 +116,7 @@ const server = app.listen(PORT, () => {
 });
 
 if (process.env.KAFKA_BROKER) {
+  startPaymentOutboxWorker();
   startKafkaConsumers().catch((err) => {
     logger.error({ err }, '[PAYMENT-SERVICE] Kafka consumer failed to start');
   });
@@ -128,7 +129,7 @@ const shutdown = async (signal: string) => {
 
   server.close(async () => {
     try {
-      await disconnectProducer();
+      await stopPaymentOutboxWorker();
       await prisma.$disconnect();
       clearTimeout(forceExit);
       logger.info('payment-service closed');
