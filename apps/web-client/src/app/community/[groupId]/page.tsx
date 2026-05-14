@@ -7,8 +7,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAppSelector } from '@/lib/redux/hooks';
 import {
   getCommunityPostsAction,
+  type CommunityGroupDto,
   type CommunityPostDto,
-  type CommunityPostsResult,
 } from '@/app/actions/community';
 import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { Card } from '@/components/ui/card';
@@ -48,7 +48,7 @@ function renderAuthorName(author: { displayName: string; role?: string; instruct
 function GroupHeader({
   group,
 }: {
-  group: CommunityPostsResult['group'];
+  group: CommunityGroupDto;
 }) {
   const isPublic = group.type === 'PUBLIC';
 
@@ -102,7 +102,7 @@ export default function CommunityGroupPage() {
 
   const { isAuthenticated, isLoading: authLoading } = useAppSelector((state) => state.auth);
 
-  const [group, setGroup] = useState<CommunityPostsResult['group'] | null>(null);
+  const [group, setGroup] = useState<CommunityGroupDto | null>(null);
   const [posts, setPosts] = useState<CommunityPostDto[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,8 +120,8 @@ export default function CommunityGroupPage() {
       setLoading(false);
       return;
     }
-    setGroup(result.data.group);
-    setPosts(result.data.items);
+    setGroup(result.data.group ?? null);
+    setPosts(result.data.items ?? result.data.posts ?? []);
     setNextCursor(result.data.nextCursor);
     setLoading(false);
   }, [groupId]);
@@ -154,7 +154,7 @@ export default function CommunityGroupPage() {
       return;
     }
     const nextData = result.data;
-    setPosts((prev) => [...prev, ...nextData.items]);
+    setPosts((prev) => [...prev, ...(nextData.items ?? nextData.posts ?? [])]);
     setNextCursor(nextData.nextCursor);
   };
 

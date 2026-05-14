@@ -1,23 +1,12 @@
 import { Router, type Router as ExpressRouter, Request, Response } from 'express';
 import { z } from 'zod';
-import type { ApiResponse } from '@lms/types';
+import { createRequireAuth, type ApiResponse } from '@lms/types';
 import { logger } from '@lms/logger';
 import prisma from '../lib/prisma.js';
 import { checkEnrollment, resolveUserNames, getDisplayName } from '../lib/clients.js';
 
 export const communityRouter: ExpressRouter = Router();
-
-function requireAuth(req: Request, res: Response, next: Function): void {
-  if (!res.locals.userId) {
-    const response: ApiResponse<null> = {
-      success: false, code: 401, message: 'Unauthorized', data: null,
-      trace_id: (req.headers['x-trace-id'] as string) || '',
-    };
-    res.status(401).json(response);
-    return;
-  }
-  next();
-}
+const requireAuth = createRequireAuth();
 
 type NameMap = Map<string, { name: string; username: string | null; role?: string }>;
 

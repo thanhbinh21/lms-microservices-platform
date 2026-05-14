@@ -1,13 +1,13 @@
 import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import type { Prisma } from '../generated/prisma-v2/index.js';
+import type { Prisma } from '../generated/prisma/index.js';
 import type { ApiResponse } from '@lms/types';
 import { logger } from '@lms/logger';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
 import { withRetry } from '@lms/db-prisma';
-import { cacheGet } from '@lms/cache';
+import { cacheGet, cacheInvalidate, cacheInvalidatePattern } from '@lms/cache';
 import { fetchWithTimeout } from '../lib/http';
 
 // Schema tao khoa hoc
@@ -51,6 +51,26 @@ const reviewBodySchema = z.object({
 
 const LEARNING_SERVICE_URL = (process.env.LEARNING_SERVICE_URL || 'http://localhost:3006').replace(/\/$/, '');
 const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
+
+interface CourseCacheInvalidationOptions {
+  includePriceRange?: boolean;
+  includeCategories?: boolean;
+}
+
+async function invalidateCourseDiscoveryCaches(options: CourseCacheInvalidationOptions = {}): Promise<void> {
+  const staticKeys: string[] = [];
+  if (options.includePriceRange) {
+    staticKeys.push('cache:courses:price-range');
+  }
+  if (options.includeCategories) {
+    staticKeys.push('cache:categories:all');
+  }
+
+  await Promise.all([
+    cacheInvalidatePattern('cache:courses:list:*'),
+    ...(staticKeys.length > 0 ? [cacheInvalidate(...staticKeys)] : []),
+  ]);
+}
 
 // Tao hash ngan tu query params de lam cache key cho list endpoint
 function buildCacheKey(prefix: string, params: Record<string, unknown>): string {
@@ -727,6 +747,8 @@ export async function upsertCourseReview(req: Request, res: Response) {
       trace_id: traceId,
     };
 
+    await invalidateCourseDiscoveryCaches();
+
     return res.status(200).json(response);
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -1364,6 +1386,9 @@ export async function createCourse(req: Request, res: Response) {
       success: true, code: 201, message: 'Course created successfully',
       data: serializeCourse(course), trace_id: traceId,
     };
+
+    await invalidateCourseDiscoveryCaches();
+
     return res.status(201).json(response);
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -1416,6 +1441,15 @@ export async function updateCourse(req: Request, res: Response) {
     const updated = await prisma.course.update({
       where: { id: req.params.id },
       data: { ...validated, slug },
+    });
+
+    const statusChanged = validated.status !== undefined && validated.status !== course.status;
+    const priceChanged = validated.price !== undefined && Number(validated.price) !== Number(course.price);
+    const categoryChanged = validated.categoryId !== undefined && validated.categoryId !== course.categoryId;
+
+    await invalidateCourseDiscoveryCaches({
+      includePriceRange: statusChanged || priceChanged,
+      includeCategories: statusChanged || categoryChanged,
     });
 
     const response: ApiResponse<unknown> = {
@@ -1504,6 +1538,11 @@ export async function publishCourse(req: Request, res: Response) {
       return updated;
     });
 
+    await invalidateCourseDiscoveryCaches({
+      includePriceRange: true,
+      includeCategories: true,
+    });
+
     const response: ApiResponse<unknown> = {
       success: true,
       code: 200,
@@ -1556,6 +1595,8 @@ export async function deleteCourse(req: Request, res: Response) {
     }
 
     await prisma.course.delete({ where: { id: req.params.id } });
+
+    await invalidateCourseDiscoveryCaches();
 
     const response: ApiResponse<null> = {
       success: true, code: 200, message: 'Course deleted successfully', data: null, trace_id: traceId,

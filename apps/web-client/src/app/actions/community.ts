@@ -69,7 +69,9 @@ export interface CommunityGroupsResult {
 }
 
 export interface CommunityPostsResult {
-  posts: CommunityPostDto[];
+  group?: CommunityGroupDto;
+  items?: CommunityPostDto[];
+  posts?: CommunityPostDto[];
   nextCursor: string | null;
 }
 

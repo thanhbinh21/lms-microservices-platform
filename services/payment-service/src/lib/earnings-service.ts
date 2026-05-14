@@ -1,5 +1,4 @@
 import prisma from '../lib/prisma';
-import { logger } from '@lms/logger';
 import { calculateRevenueSplit } from './revenue-share';
 import type { Decimal } from '@prisma/client/runtime/library';
 
@@ -26,24 +25,4 @@ export async function createInstructorEarning(
     },
     update: {},
   });
-}
-
-export async function createInstructorEarningFromCompletedOrder(orderId: string): Promise<void> {
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    select: {
-      id: true,
-      status: true,
-      instructorId: true,
-      courseId: true,
-      amount: true,
-    },
-  });
-
-  if (!order || order.status !== 'COMPLETED') {
-    logger.warn({ orderId }, 'Skip earning creation: order not completed or missing');
-    return;
-  }
-
-  await createInstructorEarning(order.id, order.instructorId, order.courseId, order.amount);
 }

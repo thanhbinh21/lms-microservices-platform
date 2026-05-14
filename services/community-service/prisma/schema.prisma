@@ -59,6 +59,22 @@ model CommunityMember {
   @@map("community_members")
 }
 
+model CourseEnrollmentPermission {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  courseId   String   @map("course_id")
+  orderId    String?  @map("order_id")
+  enrolledAt DateTime @map("enrolled_at")
+  source     String   @default("kafka")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, courseId])
+  @@index([courseId])
+  @@index([userId])
+  @@map("course_enrollment_permissions")
+}
+
 model CommunityPost {
   id          String   @id @default(uuid())
   groupId     String   @map("group_id")

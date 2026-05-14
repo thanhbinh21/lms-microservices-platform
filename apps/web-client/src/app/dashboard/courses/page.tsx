@@ -8,30 +8,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAppSelector } from '@/lib/redux/hooks';
 import { getMyEnrollmentsAction } from '@/app/actions/student';
+import type { MyCourseSummary } from '@/app/actions/learning';
 
 type Filter = 'all' | 'in-progress' | 'completed';
-
-interface Enrollment {
-  id: string;
-  courseId: string;
-  progress: number;
-  enrolledAt: string;
-  lastAccessedAt?: string | null;
-  course?: {
-    id: string;
-    title: string;
-    slug?: string;
-    thumbnail?: string | null;
-    totalLessons?: number;
-    totalDuration?: number;
-    instructorId?: string;
-  };
-}
 
 export default function MyCoursesPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
-  const [items, setItems] = useState<Enrollment[] | null>(null);
+  const [items, setItems] = useState<MyCourseSummary[] | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +28,7 @@ export default function MyCoursesPage() {
     (async () => {
       const res = await getMyEnrollmentsAction();
       if (res.success && res.data) {
-        setItems(res.data as Enrollment[]);
+        setItems(res.data as MyCourseSummary[]);
       } else {
         setError(res.message || 'Không thể tải danh sách khóa học.');
         setItems([]);

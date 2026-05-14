@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@lms/env-validator": "workspace:*",
+    "@lms/kafka-client": "workspace:*",
     "@lms/logger": "workspace:*",
     "@lms/types": "workspace:*",
     "@prisma/client": "^6.6.0",

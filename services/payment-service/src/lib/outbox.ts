@@ -6,7 +6,7 @@ import {
 } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
 import prisma from './prisma';
-import type { Prisma } from '../generated/prisma-v2';
+import type { Prisma } from '../generated/prisma';
 
 const MAX_ATTEMPTS = Number(process.env.OUTBOX_MAX_ATTEMPTS || 10);
 const POLL_INTERVAL_MS = Number(process.env.OUTBOX_POLL_INTERVAL_MS || 5_000);

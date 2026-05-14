@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { callApi, type ApiResponse } from '@/lib/api-client';
 
 export interface AdminCategoryDto {
@@ -195,11 +196,19 @@ export async function updateAdminCourseStatus(
   courseId: string,
   status: string,
 ): Promise<ApiResponse<any>> {
-  return callApi<any>(
+  const result = await callApi<any>(
     `/course/api/admin/courses/${courseId}/status`,
     { method: 'PATCH', body: JSON.stringify({ status }) },
     true,
   );
+
+  if (result.success) {
+    revalidateTag('courses', 'max');
+    revalidateTag('categories', 'max');
+    revalidatePath('/courses');
+    revalidatePath('/admin/courses');
+  }
+  return result;
 }
 
 export async function getAdminCourseStats(): Promise<ApiResponse<any>> {
@@ -237,26 +246,47 @@ export async function getAdminCategoriesAction(): Promise<ApiResponse<AdminCateg
 }
 
 export async function createAdminCategoryAction(payload: { name: string; slug?: string; order?: number }): Promise<ApiResponse<AdminCategoryDto>> {
-  return callApi<AdminCategoryDto>(
+  const result = await callApi<AdminCategoryDto>(
     `/course/api/admin/categories`,
     { method: 'POST', body: JSON.stringify(payload) },
     true,
   );
+  if (result.success) {
+    revalidateTag('categories', 'max');
+    revalidateTag('courses', 'max');
+    revalidatePath('/courses');
+    revalidatePath('/admin/categories');
+  }
+  return result;
 }
 
 export async function updateAdminCategoryAction(
   categoryId: string,
   payload: { name?: string; slug?: string; order?: number },
 ): Promise<ApiResponse<AdminCategoryDto>> {
-  return callApi<AdminCategoryDto>(
+  const result = await callApi<AdminCategoryDto>(
     `/course/api/admin/categories/${categoryId}`,
     { method: 'PATCH', body: JSON.stringify(payload) },
     true,
   );
+  if (result.success) {
+    revalidateTag('categories', 'max');
+    revalidateTag('courses', 'max');
+    revalidatePath('/courses');
+    revalidatePath('/admin/categories');
+  }
+  return result;
 }
 
 export async function deleteAdminCategoryAction(categoryId: string): Promise<ApiResponse<null>> {
-  return callApi<null>(`/course/api/admin/categories/${categoryId}`, { method: 'DELETE' }, true);
+  const result = await callApi<null>(`/course/api/admin/categories/${categoryId}`, { method: 'DELETE' }, true);
+  if (result.success) {
+    revalidateTag('categories', 'max');
+    revalidateTag('courses', 'max');
+    revalidatePath('/courses');
+    revalidatePath('/admin/categories');
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -288,21 +318,33 @@ export async function flagAdminReview(
   reviewId: string,
   isFlagged: boolean,
 ): Promise<ApiResponse<any>> {
-  return callApi<any>(
+  const result = await callApi<any>(
     `/course/api/admin/reviews/${reviewId}/flag`,
     { method: 'PATCH', body: JSON.stringify({ isFlagged }) },
     true,
   );
+  if (result.success) {
+    revalidateTag('courses', 'max');
+    revalidatePath('/courses');
+    revalidatePath('/admin/reviews');
+  }
+  return result;
 }
 
 export async function deleteAdminReview(
   reviewId: string,
 ): Promise<ApiResponse<any>> {
-  return callApi<any>(
+  const result = await callApi<any>(
     `/course/api/admin/reviews/${reviewId}`,
     { method: 'DELETE' },
     true,
   );
+  if (result.success) {
+    revalidateTag('courses', 'max');
+    revalidatePath('/courses');
+    revalidatePath('/admin/reviews');
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------

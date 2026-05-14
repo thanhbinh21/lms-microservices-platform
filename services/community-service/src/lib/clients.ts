@@ -1,9 +1,13 @@
 import { logger } from '@lms/logger';
+import prisma from './prisma.js';
 
 const LEARNING_SERVICE_URL = (process.env.LEARNING_SERVICE_URL || 'http://localhost:3006').replace(/\/$/, '');
 const COURSE_SERVICE_URL = (process.env.COURSE_SERVICE_URL || 'http://localhost:3002').replace(/\/$/, '');
+const AUTH_SERVICE_URL = (process.env.AUTH_SERVICE_URL || 'http://localhost:3101').replace(/\/$/, '');
 const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
 const TIMEOUT_MS = 5000;
+
+type InternalEnrollmentResponse = { data?: { enrolled?: boolean } };
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
   const controller = new AbortController();
@@ -15,8 +19,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise
   }
 }
 
-// Kiem tra user da enroll khoa hoc chua (goi learning-service internal API)
-export async function checkEnrollment(userId: string, courseId: string): Promise<boolean> {
+async function checkEnrollmentFromLearningService(userId: string, courseId: string): Promise<boolean> {
   try {
     const res = await fetchWithTimeout(
       `${LEARNING_SERVICE_URL}/internal/enrollment/check?userId=${userId}&courseId=${courseId}`,
@@ -28,12 +31,52 @@ export async function checkEnrollment(userId: string, courseId: string): Promise
       },
     );
     if (!res.ok) return false;
-    const json = (await res.json()) as any;
-    return !!json?.data?.enrolled;
+    const json = (await res.json()) as InternalEnrollmentResponse;
+    return Boolean(json?.data?.enrolled);
   } catch (err) {
-    logger.warn({ err, userId, courseId }, '[community-service] checkEnrollment failed — deny access');
+    logger.warn({ err, userId, courseId }, '[community-service] checkEnrollmentFromLearningService failed');
     return false;
   }
+}
+
+async function rememberEnrollmentPermission(
+  userId: string,
+  courseId: string,
+  source: 'kafka' | 'internal-fallback',
+): Promise<void> {
+  try {
+    await prisma.courseEnrollmentPermission.upsert({
+      where: { userId_courseId: { userId, courseId } },
+      create: {
+        userId,
+        courseId,
+        enrolledAt: new Date(),
+        source,
+      },
+      update: { source },
+    });
+  } catch (err) {
+    logger.warn({ err, userId, courseId, source }, '[community-service] rememberEnrollmentPermission failed');
+  }
+}
+
+// Uu tien read model local de giam coupling runtime voi learning-service.
+export async function checkEnrollment(userId: string, courseId: string): Promise<boolean> {
+  try {
+    const localPermission = await prisma.courseEnrollmentPermission.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+      select: { id: true },
+    });
+    if (localPermission) return true;
+  } catch (err) {
+    logger.warn({ err, userId, courseId }, '[community-service] local enrollment permission lookup failed');
+  }
+
+  const enrolled = await checkEnrollmentFromLearningService(userId, courseId);
+  if (enrolled) {
+    await rememberEnrollmentPermission(userId, courseId, 'internal-fallback');
+  }
+  return enrolled;
 }
 
 // Lay thong tin course tu course-service (de lay title, slug, instructorId)
@@ -46,7 +89,7 @@ export async function getCourseById(courseId: string): Promise<{ id: string; tit
       },
     });
     if (!res.ok) return null;
-    const json = (await res.json()) as any;
+    const json = (await res.json()) as { data?: { id: string; title: string; slug: string; instructorId?: string } };
     return json?.data ?? null;
   } catch (err) {
     logger.warn({ err, courseId }, '[community-service] getCourseById failed');
@@ -64,7 +107,7 @@ export async function getLessonById(lessonId: string): Promise<{ id: string; tit
       },
     });
     if (!res.ok) return null;
-    const json = (await res.json()) as any;
+    const json = (await res.json()) as { data?: { id: string; title: string } };
     return json?.data ?? null;
   } catch (err) {
     logger.warn({ err, lessonId }, '[community-service] getLessonById failed');
@@ -82,7 +125,7 @@ export async function getInstructorCourseIds(instructorId: string): Promise<stri
       },
     });
     if (!res.ok) return [];
-    const json = (await res.json()) as any;
+    const json = (await res.json()) as { data?: { courseIds?: string[] } };
     return json?.data?.courseIds ?? [];
   } catch (err) {
     logger.warn({ err, instructorId }, '[community-service] getInstructorCourseIds failed');
@@ -90,8 +133,6 @@ export async function getInstructorCourseIds(instructorId: string): Promise<stri
   }
 }
 
-// Lay thong tin auth-service de hien thi ten nguoi dung (batch)
-const AUTH_SERVICE_URL = (process.env.AUTH_SERVICE_URL || 'http://localhost:3101').replace(/\/$/, '');
 const userNameCache = new Map<string, { name: string; username: string | null; role: string; expiresAt: number }>();
 const USER_CACHE_TTL = 5 * 60 * 1000; // 5 phut
 
@@ -124,17 +165,24 @@ export async function resolveUserNames(
       body: JSON.stringify({ userIds: uncachedIds }),
     });
     if (res.ok) {
-      const json = (await res.json()) as any;
-      const usersMap = json?.data?.users as Record<string, { name: string; username: string | null; role?: string }> | undefined;
+      const json = (await res.json()) as {
+        data?: { users?: Record<string, { name: string; username: string | null; role?: string }> };
+      };
+      const usersMap = json?.data?.users;
       if (usersMap) {
         for (const [id, info] of Object.entries(usersMap)) {
           result.set(id, { name: info.name, username: info.username, role: info.role });
-          userNameCache.set(id, { name: info.name, username: info.username, role: info.role || '', expiresAt: now + USER_CACHE_TTL });
+          userNameCache.set(id, {
+            name: info.name,
+            username: info.username,
+            role: info.role || '',
+            expiresAt: now + USER_CACHE_TTL,
+          });
         }
       }
     }
   } catch (err) {
-    logger.warn({ err }, '[community-service] resolveUserNames failed — fallback');
+    logger.warn({ err }, '[community-service] resolveUserNames failed - fallback');
   }
 
   return result;
@@ -145,5 +193,5 @@ export function getDisplayName(
   nameMap: Map<string, { name: string; username: string | null; role?: string }>,
 ): string {
   const info = nameMap.get(userId);
-  return info?.name || info?.username || `Người dùng #${userId.slice(0, 6)}`;
+  return info?.name || info?.username || `Nguoi dung #${userId.slice(0, 6)}`;
 }

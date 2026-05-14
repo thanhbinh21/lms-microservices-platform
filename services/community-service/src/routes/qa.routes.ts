@@ -1,12 +1,13 @@
 import { Router, type Router as ExpressRouter, Request, Response } from 'express';
 import crypto from 'node:crypto';
 import { z } from 'zod';
-import type { ApiResponse } from '@lms/types';
+import { createRequireAuth, type ApiResponse } from '@lms/types';
 import { logger } from '@lms/logger';
 import prisma from '../lib/prisma.js';
 import { resolveUserNames, getDisplayName, checkEnrollment, getCourseById, getInstructorCourseIds, getLessonById } from '../lib/clients.js';
 
 export const qaRouter: ExpressRouter = Router();
+const requireAuth = createRequireAuth();
 
 // ─── Schemas ────────────────────────────────────────────────────────────────────
 
@@ -41,14 +42,6 @@ const listQuerySchema = z.object({
 });
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
-
-function requireAuth(req: Request, res: Response, next: Function): void {
-  if (!res.locals.userId) {
-    res.status(401).json({ success: false, code: 401, message: 'Unauthorized', data: null, trace_id: '' });
-    return;
-  }
-  next();
-}
 
 function isAdmin(role?: string): boolean {
   return (role || '').toUpperCase() === 'ADMIN';

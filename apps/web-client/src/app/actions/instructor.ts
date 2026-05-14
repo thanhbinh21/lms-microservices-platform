@@ -662,6 +662,8 @@ export async function createCourseCategoryAction(payload: { name: string; slug?:
   );
 
   revalidateTag('categories', 'max');
+  revalidateTag('courses', 'max');
+  revalidatePath('/courses');
   return { success: result.success, message: result.message, data: result.data };
 }
 
