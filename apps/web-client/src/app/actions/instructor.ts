@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { cookies } from 'next/headers';
@@ -87,12 +87,6 @@ export interface CourseDto {
     chapters: number;
     enrollments: number;
   };
-  communityGroups?: Array<{
-    id: string;
-    name: string;
-    slug: string;
-    courseId?: string | null;
-  }>;
 }
 
 export interface ChapterDto {
@@ -176,25 +170,6 @@ export interface CourseCategoryDto {
   id: string;
   name: string;
   slug: string;
-}
-
-export interface InstructorCommunityGroupDto {
-  id: string;
-  type: 'PUBLIC' | 'COURSE_PRIVATE';
-  courseId: string | null;
-  ownerId: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  memberCount: number;
-  postCount: number;
-  createdAt: string;
-  updatedAt: string;
-  course?: {
-    id: string;
-    title: string;
-    slug: string;
-  } | null;
 }
 
 export interface InstructorProfileDto {
@@ -477,7 +452,7 @@ export async function createInstructorRequestAction(data: BecomeInstructorInput)
     success: result.success,
     message:
       result.message ||
-      (result.success ? 'Đã gửi yêu cầu thành công.' : 'Không thể gửi yêu cầu đăng ký giảng viên.'),
+      (result.success ? 'ÄÃ£ gá»­i yÃªu cáº§u thÃ nh cÃ´ng.' : 'KhÃ´ng thá»ƒ gá»­i yÃªu cáº§u Ä‘Äƒng kÃ½ giáº£ng viÃªn.'),
   };
 }
 
@@ -665,55 +640,6 @@ export async function createCourseCategoryAction(payload: { name: string; slug?:
   revalidateTag('courses', 'max');
   revalidatePath('/courses');
   return { success: result.success, message: result.message, data: result.data };
-}
-
-export async function getInstructorCommunityGroupsAction() {
-  return callApi<InstructorCommunityGroupDto[]>(
-    `/course/api/instructor/community/groups`,
-    { method: 'GET' },
-    true,
-  );
-}
-
-export async function createInstructorCommunityGroupAction(payload: {
-  name: string;
-  slug?: string;
-  description?: string;
-}) {
-  return callApi<InstructorCommunityGroupDto>(
-    `/course/api/instructor/community/groups`,
-    {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    },
-    true,
-  );
-}
-
-export async function updateInstructorCommunityGroupAction(groupId: string, payload: {
-  name?: string;
-  slug?: string;
-  description?: string;
-}) {
-  return callApi<InstructorCommunityGroupDto>(
-    `/course/api/instructor/community/groups/${groupId}`,
-    {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    },
-    true,
-  );
-}
-
-export async function assignCommunityGroupToCourseAction(groupId: string, courseId: string | null) {
-  return callApi<InstructorCommunityGroupDto>(
-    `/course/api/instructor/community/groups/${groupId}/assign`,
-    {
-      method: 'PUT',
-      body: JSON.stringify({ courseId }),
-    },
-    true,
-  );
 }
 
 export async function getInstructorCertificateTemplatesAction() {
@@ -1094,7 +1020,7 @@ export async function saveInstructorPayoutProfileAction(payload: {
   );
 }
 
-// ─── Instructor Channel / Profile Actions ──────────────────────────────────
+// â”€â”€â”€ Instructor Channel / Profile Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function getMyInstructorProfileAction() {
   return callApi<InstructorProfileDto>(
@@ -1146,3 +1072,5 @@ export async function listInstructorCoursesBySlugAction(slug: string, page = 1, 
     { method: 'GET' },
   );
 }
+
+

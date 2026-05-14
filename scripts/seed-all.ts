@@ -11,13 +11,13 @@
  *   5. Tạo 15 khóa học mẫu (đa dạng chuyên mục, giá cả, cấp độ)
  *   6. Tạo Enrollment, LessonProgress, Certificate (learning-service)
  *   7. Tạo Enrollments & Thanh toán (Orders)
- *   8. Tạo Community Groups & Posts (community-service)
+ *   8. Tao Community Feed Posts (community-service)
  *   9. Tạo Thông báo (Notifications)
  */
 
-import { PrismaClient as CoursePrisma } from '../services/course-service/src/generated/prisma-v2/index.js';
-import { PrismaClient as AuthPrisma } from '../services/auth-service/src/generated/prisma-v2/index.js';
-import { PrismaClient as PaymentPrisma } from '../services/payment-service/src/generated/prisma-v2/index.js';
+import { PrismaClient as CoursePrisma } from '../services/course-service/src/generated/prisma/index.js';
+import { PrismaClient as AuthPrisma } from '../services/auth-service/src/generated/prisma/index.js';
+import { PrismaClient as PaymentPrisma } from '../services/payment-service/src/generated/prisma/index.js';
 import { PrismaClient as NotificationPrisma } from '../services/notification-service/src/generated/prisma/index.js';
 import { PrismaClient as LearningPrisma } from '../services/learning-service/src/generated/prisma/index.js';
 import { PrismaClient as CommunityPrisma } from '../services/community-service/src/generated/prisma/index.js';
@@ -124,8 +124,6 @@ async function clearOldData() {
     await communityPrisma.answer.deleteMany();
     await communityPrisma.question.deleteMany();
     await communityPrisma.communityPost.deleteMany();
-    await communityPrisma.communityMember.deleteMany();
-    await communityPrisma.communityGroup.deleteMany();
 
     // 4. Learning (learning-service)
     await learningPrisma.lessonProgress.deleteMany();
@@ -345,93 +343,47 @@ async function seedCourses(instructorIds: string[], categoryIds: string[]) {
   return courses;
 }
 
-// ─── Step 6: Community Groups (community-service) ───────────────────────────────
+// Step 6: Global Community Feed (community-service)
 
-async function seedCommunityGroups(courses: any[], instructors: any[]) {
-  console.log('\n💬 BƯỚC 6: TẠO COMMUNITY GROUPS...');
+async function seedCommunityFeed(instructors: any[]) {
+  console.log('\nBUOC 6: TAO COMMUNITY FEED...');
 
-  // Tao global GLOBAL group cho dien dan toan he thong (Global Q&A)
-  const adminUser = instructors[0];
-  const globalGroup = await communityPrisma.communityGroup.create({
+  const author = instructors[0];
+  if (!author) return;
+
+  const welcomePost = await communityPrisma.communityPost.create({
     data: {
-      type: 'GLOBAL',
-      name: 'Global Q&A',
-      slug: 'global-qa',
-      description: 'Nơi giao lưu, trao đổi kiến thức và chia sẻ cùng mọi người.',
-      ownerId: adminUser.id,
-      memberCount: 0,
-    }
-  });
-  console.log(`  ✅ Đã tạo global PUBLIC group: "${globalGroup.name}"`);
-
-  // Sample posts cho global group
-  await communityPrisma.communityPost.create({
-    data: {
-      groupId: globalGroup.id,
-      authorId: adminUser.id,
-      content: 'Chào mừng các bạn đến với Cộng đồng Zync! Đây là nơi mọi người có thể trao đổi kiến thức, chia sẻ kinh nghiệm và kết nối với nhau. Hãy cùng nhau xây dựng một cộng đồng học tập tuyệt vời nhé!',
+      authorId: author.id,
+      content: 'Chao mung moi nguoi den voi cong dong chung cua Zync. Day la noi moi user trong he thong co the chia se kinh nghiem hoc tap, dat chu de thao luan va ket noi voi nhau.',
       likeCount: randomInt(5, 20),
-      replyCount: randomInt(2, 8),
-    }
+    },
   });
+
   await communityPrisma.communityPost.create({
     data: {
-      groupId: globalGroup.id,
-      authorId: adminUser.id,
-      content: 'Chào cả nhà! Mình mới tham gia nền tảng Zync. Cho mình hỏi có group nào dành cho người mới bắt đầu không?',
-      likeCount: randomInt(2, 8),
-      replyCount: randomInt(1, 4),
-    }
+      authorId: author.id,
+      parentId: welcomePost.id,
+      content: 'Hay giu trao doi van minh va tap trung vao viec hoc tap.',
+      likeCount: randomInt(1, 5),
+    },
   });
-  console.log('  ✅ Đã tạo sample posts cho global group.');
 
-  for (const course of courses) {
-    const owner = instructors.find(i => i.id === course.instructorId) || instructors[0];
-    const group = await communityPrisma.communityGroup.create({
-      data: {
-        type: 'COURSE_PRIVATE',
-        name: `Thảo luận: ${course.title}`,
-        slug: `group-${course.slug}`,
-        courseId: course.id,
-        ownerId: owner.id,
-        memberCount: 1,
-      }
-    });
-    await communityPrisma.communityMember.create({
-      data: {
-        groupId: group.id,
-        userId: owner.id
-      }
-    });
+  await communityPrisma.communityPost.update({
+    where: { id: welcomePost.id },
+    data: { replyCount: 1 },
+  });
 
-    // Add a couple of sample posts
-    const post = await communityPrisma.communityPost.create({
-      data: {
-        groupId: group.id,
-        authorId: owner.id,
-        content: `Chào mừng các bạn đến với khóa học ${course.title}! Hãy cùng nhau thảo luận và học hỏi nhé.`,
-        likeCount: randomInt(2, 10),
-        replyCount: randomInt(0, 5),
-      }
-    });
+  await communityPrisma.communityPost.create({
+    data: {
+      authorId: author.id,
+      content: 'Ban dang hoc ky nang gi tuan nay? Chia se muc tieu de cung nhau theo doi tien do nhe.',
+      likeCount: randomInt(2, 8),
+    },
+  });
 
-    // Add a reply
-    if (randomInt(0, 1)) {
-      await communityPrisma.communityPost.create({
-        data: {
-          groupId: group.id,
-          authorId: owner.id,
-          content: 'Cảm ơn thầy! Khóa học rất bổ ích.',
-          parentId: post.id,
-          likeCount: randomInt(1, 5),
-        }
-      });
-    }
-  }
-  console.log('✅ Đã tạo community groups cho 15 khóa học.');
+  console.log('Da tao bai viet mau cho community feed.');
 }
-
-// ─── Step 7: Enrollments, Learning Progress & Certificates ────────────────────
+// Step 7: Enrollments, Learning Progress & Certificates ────────────────────
 
 async function seedLearningData(students: any[], courses: any[]) {
   console.log('\n🚀 BƯỚC 7: TẠO ENROLLMENTS, TIẾN ĐỘ HỌC TẬP & CHỨNG CHỈ...');
@@ -586,7 +538,7 @@ async function main() {
 
     const courses = await seedCourses(instructors.map(i => i.id), categoryIds);
 
-    await seedCommunityGroups(courses, instructors);
+    await seedCommunityFeed(instructors);
 
     await seedLearningData(students, courses);
 

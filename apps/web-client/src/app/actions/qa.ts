@@ -108,7 +108,7 @@ export async function getQuestionDetailAction(id: string) {
 export async function createQuestionAction(payload: {
   title: string;
   content: string;
-  courseId?: string | null;
+  courseId: string;
   lessonId?: string | null;
 }) {
   return callApi<QuestionDetail>(

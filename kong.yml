@@ -1,4 +1,4 @@
-_format_version: "3.0"
+﻿_format_version: "3.0"
 _transform: true
 
 # JWT consumer for access token verification (HS256)
@@ -18,11 +18,7 @@ services:
     routes:
       - name: auth-public-route
         paths:
-          - /auth/login
-          - /auth/register
-          - /auth/refresh
-          - /auth/logout
-          - /auth/health
+          - /auth
         strip_path: true
         methods: [GET, POST, OPTIONS]
         plugins:
@@ -30,6 +26,28 @@ services:
             config:
               minute: 100
               policy: local
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local method = kong.request.get_method()
+                  local path = kong.request.get_path()
+                  if method == "POST" then
+                    if path == "/auth/login"
+                      or path == "/auth/register"
+                      or path == "/auth/refresh"
+                      or path == "/auth/logout"
+                    then
+                      return
+                    end
+                  elseif method == "GET" then
+                    if path == "/auth/health" then
+                      return
+                    end
+                  elseif method == "OPTIONS" then
+                    return
+                  end
+                  return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
           - name: request-transformer
             config:
               remove:
@@ -66,29 +84,15 @@ services:
                   - x-user-id
                   - x-user-role
                   - x-user-email
-              add:
-                headers:
-                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
-                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
-                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
-
-      - name: auth-noauth-route
-        paths:
-          - /auth
-        strip_path: true
-        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-        plugins:
-          - name: request-transformer
+          - name: post-function
             config:
-              remove:
-                headers:
-                  - x-user-id
-                  - x-user-role
-                  - x-user-email
-          - name: request-termination
-            config:
-              status_code: 401
-              message: Unauthorized
+              access:
+                - |
+                  local jwt = kong.ctx.shared.authenticated_jwt_token
+                  local payload = (jwt and jwt.payload) or (jwt and jwt.claims) or kong.ctx.shared.authenticated_jwt_claims or {}
+                  kong.service.request.set_header("x-user-id", payload.userId or payload.user_id or "")
+                  kong.service.request.set_header("x-user-role", payload.role or payload.user_role or "")
+                  kong.service.request.set_header("x-user-email", payload.email or payload.user_email or "")
 
       - name: instructor-protected-route
         paths:
@@ -118,11 +122,15 @@ services:
                   - x-user-id
                   - x-user-role
                   - x-user-email
-              add:
-                headers:
-                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
-                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
-                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
+          - name: post-function
+            config:
+              access:
+                - |
+                  local jwt = kong.ctx.shared.authenticated_jwt_token
+                  local payload = (jwt and jwt.payload) or (jwt and jwt.claims) or kong.ctx.shared.authenticated_jwt_claims or {}
+                  kong.service.request.set_header("x-user-id", payload.userId or payload.user_id or "")
+                  kong.service.request.set_header("x-user-role", payload.role or payload.user_role or "")
+                  kong.service.request.set_header("x-user-email", payload.email or payload.user_email or "")
 
       - name: instructor-noauth-route
         paths:
@@ -173,11 +181,15 @@ services:
                   - x-user-id
                   - x-user-role
                   - x-user-email
-              add:
-                headers:
-                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
-                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
-                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
+          - name: post-function
+            config:
+              access:
+                - |
+                  local jwt = kong.ctx.shared.authenticated_jwt_token
+                  local payload = (jwt and jwt.payload) or (jwt and jwt.claims) or kong.ctx.shared.authenticated_jwt_claims or {}
+                  kong.service.request.set_header("x-user-id", payload.userId or payload.user_id or "")
+                  kong.service.request.set_header("x-user-role", payload.role or payload.user_role or "")
+                  kong.service.request.set_header("x-user-email", payload.email or payload.user_email or "")
 
       - name: course-public-route
         paths:
@@ -249,11 +261,15 @@ services:
                   - x-user-id
                   - x-user-role
                   - x-user-email
-              add:
-                headers:
-                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
-                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
-                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
+          - name: post-function
+            config:
+              access:
+                - |
+                  local jwt = kong.ctx.shared.authenticated_jwt_token
+                  local payload = (jwt and jwt.payload) or (jwt and jwt.claims) or kong.ctx.shared.authenticated_jwt_claims or {}
+                  kong.service.request.set_header("x-user-id", payload.userId or payload.user_id or "")
+                  kong.service.request.set_header("x-user-role", payload.role or payload.user_role or "")
+                  kong.service.request.set_header("x-user-email", payload.email or payload.user_email or "")
 
       - name: learning-public-route
         paths:
@@ -310,11 +326,15 @@ services:
                   - x-user-id
                   - x-user-role
                   - x-user-email
-              add:
-                headers:
-                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
-                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
-                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
+          - name: post-function
+            config:
+              access:
+                - |
+                  local jwt = kong.ctx.shared.authenticated_jwt_token
+                  local payload = (jwt and jwt.payload) or (jwt and jwt.claims) or kong.ctx.shared.authenticated_jwt_claims or {}
+                  kong.service.request.set_header("x-user-id", payload.userId or payload.user_id or "")
+                  kong.service.request.set_header("x-user-role", payload.role or payload.user_role or "")
+                  kong.service.request.set_header("x-user-email", payload.email or payload.user_email or "")
 
       - name: community-public-route
         paths:
@@ -371,11 +391,15 @@ services:
                   - x-user-id
                   - x-user-role
                   - x-user-email
-              add:
-                headers:
-                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
-                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
-                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
+          - name: post-function
+            config:
+              access:
+                - |
+                  local jwt = kong.ctx.shared.authenticated_jwt_token
+                  local payload = (jwt and jwt.payload) or (jwt and jwt.claims) or kong.ctx.shared.authenticated_jwt_claims or {}
+                  kong.service.request.set_header("x-user-id", payload.userId or payload.user_id or "")
+                  kong.service.request.set_header("x-user-role", payload.role or payload.user_role or "")
+                  kong.service.request.set_header("x-user-email", payload.email or payload.user_email or "")
 
       - name: payment-public-route
         paths:
@@ -438,11 +462,15 @@ services:
                   - x-user-id
                   - x-user-role
                   - x-user-email
-              add:
-                headers:
-                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
-                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
-                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
+          - name: post-function
+            config:
+              access:
+                - |
+                  local jwt = kong.ctx.shared.authenticated_jwt_token
+                  local payload = (jwt and jwt.payload) or (jwt and jwt.claims) or kong.ctx.shared.authenticated_jwt_claims or {}
+                  kong.service.request.set_header("x-user-id", payload.userId or payload.user_id or "")
+                  kong.service.request.set_header("x-user-role", payload.role or payload.user_role or "")
+                  kong.service.request.set_header("x-user-email", payload.email or payload.user_email or "")
 
       - name: media-public-route
         paths:
@@ -511,11 +539,15 @@ services:
                   - x-user-id
                   - x-user-role
                   - x-user-email
-              add:
-                headers:
-                  - 'x-user-id:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.userId or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.userId or ""))'
-                  - 'x-user-role:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.role or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.role or ""))'
-                  - 'x-user-email:$(shared.authenticated_jwt_token and (shared.authenticated_jwt_token.payload and shared.authenticated_jwt_token.payload.email or shared.authenticated_jwt_token.claims and shared.authenticated_jwt_token.claims.email or ""))'
+          - name: post-function
+            config:
+              access:
+                - |
+                  local jwt = kong.ctx.shared.authenticated_jwt_token
+                  local payload = (jwt and jwt.payload) or (jwt and jwt.claims) or kong.ctx.shared.authenticated_jwt_claims or {}
+                  kong.service.request.set_header("x-user-id", payload.userId or payload.user_id or "")
+                  kong.service.request.set_header("x-user-role", payload.role or payload.user_role or "")
+                  kong.service.request.set_header("x-user-email", payload.email or payload.user_email or "")
 
       - name: notification-public-route
         paths:
@@ -556,3 +588,8 @@ plugins:
       header_name: x-trace-id
       generator: uuid
       echo_downstream: true
+
+
+
+
+

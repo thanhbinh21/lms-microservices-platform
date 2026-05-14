@@ -124,13 +124,12 @@ export async function getCourseProgressAction(courseId: string) {
 
 export async function updateLessonProgressAction(
   lessonId: string,
-  data: { watchedDuration: number; lastPosition: number },
+  data: { watchedDuration: number; lastPosition: number } | boolean,
+  lastPosition = 0,
 ) {
-  return callApi<LessonProgressDto>(
-    `${LEARNING_API_PREFIX}/lessons/${lessonId}/progress`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
+  const payload = typeof data === 'boolean'
+    ? { isCompleted: data, lastWatched: Math.max(0, Math.floor(lastPosition)) }
+    : {
         lastWatched: Math.max(
           0,
           Math.floor(
@@ -139,7 +138,13 @@ export async function updateLessonProgressAction(
               : data.lastPosition,
           ),
         ),
-      }),
+      };
+
+  return callApi<LessonProgressDto>(
+    `${LEARNING_API_PREFIX}/lessons/${lessonId}/progress`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
     },
     true,
   );

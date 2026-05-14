@@ -1,5 +1,4 @@
 import { logger } from '@lms/logger';
-import prisma from './prisma.js';
 
 const LEARNING_SERVICE_URL = (process.env.LEARNING_SERVICE_URL || 'http://localhost:3006').replace(/\/$/, '');
 const COURSE_SERVICE_URL = (process.env.COURSE_SERVICE_URL || 'http://localhost:3002').replace(/\/$/, '');
@@ -39,44 +38,8 @@ async function checkEnrollmentFromLearningService(userId: string, courseId: stri
   }
 }
 
-async function rememberEnrollmentPermission(
-  userId: string,
-  courseId: string,
-  source: 'kafka' | 'internal-fallback',
-): Promise<void> {
-  try {
-    await prisma.courseEnrollmentPermission.upsert({
-      where: { userId_courseId: { userId, courseId } },
-      create: {
-        userId,
-        courseId,
-        enrolledAt: new Date(),
-        source,
-      },
-      update: { source },
-    });
-  } catch (err) {
-    logger.warn({ err, userId, courseId, source }, '[community-service] rememberEnrollmentPermission failed');
-  }
-}
-
-// Uu tien read model local de giam coupling runtime voi learning-service.
 export async function checkEnrollment(userId: string, courseId: string): Promise<boolean> {
-  try {
-    const localPermission = await prisma.courseEnrollmentPermission.findUnique({
-      where: { userId_courseId: { userId, courseId } },
-      select: { id: true },
-    });
-    if (localPermission) return true;
-  } catch (err) {
-    logger.warn({ err, userId, courseId }, '[community-service] local enrollment permission lookup failed');
-  }
-
-  const enrolled = await checkEnrollmentFromLearningService(userId, courseId);
-  if (enrolled) {
-    await rememberEnrollmentPermission(userId, courseId, 'internal-fallback');
-  }
-  return enrolled;
+  return checkEnrollmentFromLearningService(userId, courseId);
 }
 
 // Lay thong tin course tu course-service (de lay title, slug, instructorId)

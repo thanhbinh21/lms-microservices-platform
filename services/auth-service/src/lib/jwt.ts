@@ -26,6 +26,7 @@ export function generateAccessToken(
 ): string {
   const options: SignOptions = {
     expiresIn: (expiresIn || process.env.JWT_ACCESS_EXPIRY || DEFAULT_ACCESS_EXPIRY) as SignOptions['expiresIn'],
+    notBefore: 0,
     algorithm: 'HS256',
   };
   const token = jwt.sign({ ...payload, type: 'access' }, secret, options);
@@ -41,6 +42,7 @@ export function generateRefreshToken(
 ): string {
   const options: SignOptions = {
     expiresIn: (expiresIn || process.env.JWT_REFRESH_EXPIRY || DEFAULT_REFRESH_EXPIRY) as SignOptions['expiresIn'],
+    notBefore: 0,
     algorithm: 'HS256',
     // Them jwtid de moi refresh token la duy nhat, tranh xung dot unique khi tao nhanh
     jwtid: crypto.randomUUID(),

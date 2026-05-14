@@ -9,12 +9,12 @@ import { resolveUserNames, getDisplayName, checkEnrollment, getCourseById, getIn
 export const qaRouter: ExpressRouter = Router();
 const requireAuth = createRequireAuth();
 
-// ─── Schemas ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Schemas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const createQuestionSchema = z.object({
   title: z.string().trim().min(6).max(200),
   content: z.string().trim().min(10).max(5000),
-  courseId: z.string().uuid().optional().nullable(),
+  courseId: z.string().uuid(),
   lessonId: z.string().uuid().optional().nullable(),
 });
 
@@ -41,7 +41,7 @@ const listQuerySchema = z.object({
   search: z.string().trim().optional(),
 });
 
-// ─── Helpers ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function isAdmin(role?: string): boolean {
   return (role || '').toUpperCase() === 'ADMIN';
@@ -49,6 +49,24 @@ function isAdmin(role?: string): boolean {
 
 function isInstructor(role?: string): boolean {
   return (role || '').toUpperCase() === 'INSTRUCTOR';
+}
+
+async function canInstructorAccessCourse(instructorId: string, courseId: string): Promise<boolean> {
+  const courseIds = await getInstructorCourseIds(instructorId);
+  return courseIds.includes(courseId);
+}
+
+async function canViewQuestion(userId: string, role: string | undefined, question: { authorId: string; courseId: string }): Promise<boolean> {
+  if (isAdmin(role)) return true;
+  if (isInstructor(role)) return canInstructorAccessCourse(userId, question.courseId);
+  if (question.authorId !== userId) return false;
+  return checkEnrollment(userId, question.courseId);
+}
+
+async function canAnswerQuestion(userId: string, role: string | undefined, courseId: string): Promise<boolean> {
+  if (isAdmin(role)) return true;
+  if (!isInstructor(role)) return false;
+  return canInstructorAccessCourse(userId, courseId);
 }
 
 interface EnrichedQuestion {
@@ -60,7 +78,7 @@ interface EnrichedQuestion {
   upvoteCount: number;
   createdAt: Date;
   updatedAt: Date;
-  courseId: string | null;
+  courseId: string;
   lessonId: string | null;
   authorId: string;
   answerCount: number;
@@ -69,7 +87,7 @@ interface EnrichedQuestion {
   author: { id: string; displayName: string; role?: string; instructorSlug?: string | null };
 }
 
-// ─── GET /api/qa/questions ───────────────────────────────────────────────────────
+// â”€â”€â”€ GET /api/qa/questions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.get('/questions', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -80,7 +98,6 @@ qaRouter.get('/questions', requireAuth, async (req: Request, res: Response) => {
     const query = listQuerySchema.parse(req.query);
     const skip = (query.page - 1) * query.limit;
 
-    // Neu la instructor, loc cau hoi theo khoa hoc cua minh
     const instructorCourseIds: string[] | undefined = isInstructor(viewerRole)
       ? await getInstructorCourseIds(viewerId)
       : undefined;
@@ -88,16 +105,30 @@ qaRouter.get('/questions', requireAuth, async (req: Request, res: Response) => {
     const where: any = {};
     if (query.courseId) {
       where.courseId = query.courseId;
+      if (isInstructor(viewerRole) && !instructorCourseIds?.includes(query.courseId)) {
+        return res.status(403).json({ success: false, code: 403, message: 'Forbidden', data: null, trace_id: traceId });
+      }
+      if (!isAdmin(viewerRole) && !isInstructor(viewerRole)) {
+        const enrolled = await checkEnrollment(viewerId, query.courseId);
+        if (!enrolled) {
+          return res.status(403).json({
+            success: false, code: 403, message: 'Ban can ghi danh khoa hoc truoc khi xem hoi dap.', data: null, trace_id: traceId,
+          });
+        }
+        where.authorId = viewerId;
+      }
+    } else if (isAdmin(viewerRole)) {
+      // Admin xem tat ca cau hoi de ho tro quan tri.
     } else if (instructorCourseIds !== undefined) {
-      // Instructor loc theo khoa hoc cua minh, hoac hien thi tat ca neu khong co khoa nao
       where.courseId = instructorCourseIds.length > 0 ? { in: instructorCourseIds } : null;
+    } else {
+      where.authorId = viewerId;
     }
     if (query.lessonId) where.lessonId = query.lessonId;
     if (query.status === 'resolved') where.isResolved = true;
     if (query.status === 'unanswered') where.answers = { none: {} };
     if (query.search) where.title = { contains: query.search, mode: 'insensitive' };
 
-    // Neu instructor khong co khoa hoc, tra ve empty
     if (instructorCourseIds !== undefined && instructorCourseIds.length === 0 && !query.courseId) {
       return res.status(200).json({
         success: true, code: 200, message: 'Questions fetched',
@@ -140,7 +171,7 @@ qaRouter.get('/questions', requireAuth, async (req: Request, res: Response) => {
       const info = nameMap.get(uid);
       return {
         id: uid,
-        displayName: info?.name || info?.username || `Người dùng #${uid.slice(0, 6)}`,
+        displayName: info?.name || info?.username || `NgÆ°á»i dÃ¹ng #${uid.slice(0, 6)}`,
         role: info?.role,
       };
     });
@@ -151,7 +182,7 @@ qaRouter.get('/questions', requireAuth, async (req: Request, res: Response) => {
       data: {
         items: items.map((q) => ({
           ...q,
-          author: authorMap.get(q.authorId) || { id: q.authorId, displayName: `Người dùng #${q.authorId.slice(0, 6)}` },
+          author: authorMap.get(q.authorId) || { id: q.authorId, displayName: `NgÆ°á»i dÃ¹ng #${q.authorId.slice(0, 6)}` },
           answerCount: q._count.answers,
           course: q.courseId ? (courseMap.get(q.courseId) || null) : null,
         })),
@@ -162,11 +193,11 @@ qaRouter.get('/questions', requireAuth, async (req: Request, res: Response) => {
     return res.status(200).json(response);
   } catch (err) {
     logger.error({ err, traceId }, 'listQuestions failed');
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── POST /api/qa/questions ──────────────────────────────────────────────────────
+// â”€â”€â”€ POST /api/qa/questions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.post('/questions', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -174,17 +205,13 @@ qaRouter.post('/questions', requireAuth, async (req: Request, res: Response) => 
 
   try {
     const payload = createQuestionSchema.parse(req.body ?? {});
-
-    // Kiem tra enrollment neu co courseId
-    if (payload.courseId) {
-      const enrolled = await checkEnrollment(userId, payload.courseId);
-      if (!enrolled) {
-        return res.status(403).json({
-          success: false, code: 403,
-          message: 'Bạn cần đăng ký khóa học trước khi đặt câu hỏi.',
-          data: null, trace_id: traceId,
-        });
-      }
+    const enrolled = await checkEnrollment(userId, payload.courseId);
+    if (!enrolled) {
+      return res.status(403).json({
+        success: false, code: 403,
+        message: 'Ban can ghi danh khoa hoc truoc khi dat cau hoi.',
+        data: null, trace_id: traceId,
+      });
     }
 
     const created = await prisma.question.create({
@@ -192,7 +219,7 @@ qaRouter.post('/questions', requireAuth, async (req: Request, res: Response) => 
         authorId: userId,
         title: payload.title,
         content: payload.content,
-        courseId: payload.courseId || null,
+        courseId: payload.courseId,
         lessonId: payload.lessonId || null,
       },
     });
@@ -206,15 +233,16 @@ qaRouter.post('/questions', requireAuth, async (req: Request, res: Response) => 
       return res.status(400).json({ success: false, code: 400, message: err.errors[0]?.message, data: null, trace_id: traceId });
     }
     logger.error({ err, userId, traceId }, 'createQuestion failed');
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── GET /api/qa/questions/:id ─────────────────────────────────────────────────
+// â”€â”€â”€ GET /api/qa/questions/:id â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.get('/questions/:id', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
   const viewerId = (res.locals.userId as string) || '';
+  const viewerRole = res.locals.userRole as string;
 
   try {
     const question = await prisma.question.findUnique({
@@ -228,6 +256,11 @@ qaRouter.get('/questions/:id', requireAuth, async (req: Request, res: Response) 
 
     if (!question) {
       return res.status(404).json({ success: false, code: 404, message: 'Question not found', data: null, trace_id: traceId });
+    }
+
+    const allowed = await canViewQuestion(viewerId, viewerRole, question);
+    if (!allowed) {
+      return res.status(403).json({ success: false, code: 403, message: 'Forbidden', data: null, trace_id: traceId });
     }
 
     await prisma.question.update({ where: { id: question.id }, data: { viewCount: { increment: 1 } } });
@@ -254,7 +287,7 @@ qaRouter.get('/questions/:id', requireAuth, async (req: Request, res: Response) 
       const info = nameMap.get(uid);
       enrichedAuthors[uid] = {
         id: uid,
-        displayName: info?.name || info?.username || `Người dùng #${uid.slice(0, 6)}`,
+        displayName: info?.name || info?.username || `NgÆ°á»i dÃ¹ng #${uid.slice(0, 6)}`,
         role: info?.role,
       };
     }
@@ -284,11 +317,11 @@ qaRouter.get('/questions/:id', requireAuth, async (req: Request, res: Response) 
     return res.status(200).json(response);
   } catch (err) {
     logger.error({ err, traceId }, 'getQuestionDetail failed');
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── PUT /api/qa/questions/:id ─────────────────────────────────────────────────
+// â”€â”€â”€ PUT /api/qa/questions/:id â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.put('/questions/:id', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -308,11 +341,11 @@ qaRouter.put('/questions/:id', requireAuth, async (req: Request, res: Response) 
     });
     return res.status(200).json({ success: true, code: 200, message: 'Updated', data: updated, trace_id: traceId });
   } catch (err) {
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── DELETE /api/qa/questions/:id ───────────────────────────────────────────────
+// â”€â”€â”€ DELETE /api/qa/questions/:id â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.delete('/questions/:id', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -328,20 +361,25 @@ qaRouter.delete('/questions/:id', requireAuth, async (req: Request, res: Respons
     await prisma.question.delete({ where: { id: req.params.id } });
     return res.status(200).json({ success: true, code: 200, message: 'Deleted', data: null, trace_id: traceId });
   } catch (err) {
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── POST /api/qa/questions/:id/answers ─────────────────────────────────────────
+// â”€â”€â”€ POST /api/qa/questions/:id/answers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.post('/questions/:id/answers', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
   const userId = res.locals.userId as string;
+  const role = res.locals.userRole as string;
 
   try {
     const payload = createAnswerSchema.parse(req.body ?? {});
     const q = await prisma.question.findUnique({ where: { id: req.params.id } });
     if (!q) return res.status(404).json({ success: false, code: 404, message: 'Not found', data: null, trace_id: traceId });
+    const allowed = await canAnswerQuestion(userId, role, q.courseId);
+    if (!allowed) {
+      return res.status(403).json({ success: false, code: 403, message: 'Forbidden', data: null, trace_id: traceId });
+    }
 
     const answer = await prisma.answer.create({
       data: { questionId: req.params.id, authorId: userId, content: payload.content },
@@ -349,11 +387,11 @@ qaRouter.post('/questions/:id/answers', requireAuth, async (req: Request, res: R
     return res.status(201).json({ success: true, code: 201, message: 'Answer created', data: answer, trace_id: traceId });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ success: false, code: 400, message: err.errors[0]?.message, data: null, trace_id: traceId });
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── PUT /api/qa/questions/:id/answers/:answerId/accept ────────────────────────
+// â”€â”€â”€ PUT /api/qa/questions/:id/answers/:answerId/accept â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.put('/questions/:id/answers/:answerId/accept', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -372,11 +410,11 @@ qaRouter.put('/questions/:id/answers/:answerId/accept', requireAuth, async (req:
     ]);
     return res.status(200).json({ success: true, code: 200, message: 'Answer accepted', data: { answerId }, trace_id: traceId });
   } catch (err) {
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── POST /api/qa/questions/:id/upvote ────────────────────────────────────────
+// â”€â”€â”€ POST /api/qa/questions/:id/upvote â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.post('/questions/:id/upvote', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -398,11 +436,11 @@ qaRouter.post('/questions/:id/upvote', requireAuth, async (req: Request, res: Re
     ]);
     return res.status(200).json({ success: true, code: 200, message: 'Upvoted', data: { upvoted: true }, trace_id: traceId });
   } catch (err) {
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── POST /api/qa/answers/:id/upvote ────────────────────────────────────────────
+// â”€â”€â”€ POST /api/qa/answers/:id/upvote â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.post('/answers/:id/upvote', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -424,11 +462,11 @@ qaRouter.post('/answers/:id/upvote', requireAuth, async (req: Request, res: Resp
     ]);
     return res.status(200).json({ success: true, code: 200, message: 'Upvoted', data: { upvoted: true }, trace_id: traceId });
   } catch (err) {
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── PUT /api/qa/answers/:id ────────────────────────────────────────────────────
+// â”€â”€â”€ PUT /api/qa/answers/:id â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.put('/answers/:id', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -457,11 +495,11 @@ qaRouter.put('/answers/:id', requireAuth, async (req: Request, res: Response) =>
     if (err instanceof z.ZodError) {
       return res.status(400).json({ success: false, code: 400, message: err.errors[0]?.message, data: null, trace_id: traceId });
     }
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── DELETE /api/qa/answers/:id ─────────────────────────────────────────────────
+// â”€â”€â”€ DELETE /api/qa/answers/:id â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.delete('/answers/:id', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -482,11 +520,11 @@ qaRouter.delete('/answers/:id', requireAuth, async (req: Request, res: Response)
     await prisma.answer.delete({ where: { id: answerId } });
     return res.status(200).json({ success: true, code: 200, message: 'Deleted', data: null, trace_id: traceId });
   } catch (err) {
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── GET /api/qa/count (counter badge cho instructor sidebar) ──────────────────
+// â”€â”€â”€ GET /api/qa/count (counter badge cho instructor sidebar) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.get('/count', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -518,11 +556,11 @@ qaRouter.get('/count', requireAuth, async (req: Request, res: Response) => {
     return res.status(200).json(response);
   } catch (err) {
     logger.error({ err, traceId }, 'qaCount failed');
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── GET /api/qa/instructor/courses (khoa hoc cua instructor hien tai) ──────────
+// â”€â”€â”€ GET /api/qa/instructor/courses (khoa hoc cua instructor hien tai) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 qaRouter.get('/instructor/courses', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
@@ -550,23 +588,35 @@ qaRouter.get('/instructor/courses', requireAuth, async (req: Request, res: Respo
     return res.status(200).json(response);
   } catch (err) {
     logger.error({ err, traceId }, 'getInstructorCourses failed');
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
 
-// ─── GET /api/qa/course/:courseId/questions ────────────────────────────────────
+// â”€â”€â”€ GET /api/qa/course/:courseId/questions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Lay cau hoi theo course (cho trang hoc /learn)
-// Khong phu thuoc enrollment — ai cung xem duoc
 qaRouter.get('/course/:courseId/questions', requireAuth, async (req: Request, res: Response) => {
   const traceId = (req.headers['x-trace-id'] as string) || crypto.randomUUID();
   const { courseId } = req.params;
   const viewerId = res.locals.userId as string;
+  const viewerRole = res.locals.userRole as string;
 
   try {
     const query = listQuerySchema.parse(req.query);
     const skip = (query.page - 1) * query.limit;
 
     const where: any = { courseId };
+    if (isInstructor(viewerRole)) {
+      const allowed = await canInstructorAccessCourse(viewerId, courseId);
+      if (!allowed) {
+        return res.status(403).json({ success: false, code: 403, message: 'Forbidden', data: null, trace_id: traceId });
+      }
+    } else if (!isAdmin(viewerRole)) {
+      const enrolled = await checkEnrollment(viewerId, courseId);
+      if (!enrolled) {
+        return res.status(403).json({ success: false, code: 403, message: 'Ban can ghi danh khoa hoc truoc khi xem hoi dap.', data: null, trace_id: traceId });
+      }
+      where.authorId = viewerId;
+    }
     if (query.status === 'resolved') where.isResolved = true;
     if (query.status === 'unanswered') where.answers = { none: {} };
     if (query.search) where.title = { contains: query.search, mode: 'insensitive' };
@@ -662,6 +712,7 @@ qaRouter.get('/course/:courseId/questions', requireAuth, async (req: Request, re
     return res.status(200).json(response);
   } catch (err) {
     logger.error({ err, traceId }, 'getCourseQuestions failed');
-    return res.status(500).json({ success: false, code: 500, message: 'Lỗi hệ thống', data: null, trace_id: traceId });
+    return res.status(500).json({ success: false, code: 500, message: 'Lá»—i há»‡ thá»‘ng', data: null, trace_id: traceId });
   }
 });
+

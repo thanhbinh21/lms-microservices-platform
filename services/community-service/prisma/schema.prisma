@@ -1,6 +1,6 @@
 // Prisma Schema cho Community Service
 // DB: community_db (Neon Serverless PostgreSQL)
-// Quan ly: CommunityGroup, CommunityPost, Q&A (Question/Answer)
+// Quan ly feed cong dong toan he thong va Q&A theo khoa hoc
 
 generator client {
   provider = "prisma-client-js"
@@ -13,97 +13,30 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ─── Enums ────────────────────────────────────────────────────────────────────
-
-enum GroupType {
-  PUBLIC
-  GLOBAL
-  COURSE_PRIVATE
-}
-
-// ─── Community Models ─────────────────────────────────────────────────────────
-
-model CommunityGroup {
-  id          String      @id @default(uuid())
-  type        GroupType   @default(PUBLIC)
-  // courseId la String thuan — khong co @relation vi Course o DB khac
-  courseId    String?     @unique @map("course_id")
-  ownerId     String      @map("owner_id")
-  name        String
-  slug        String      @unique
-  description String?
-  memberCount Int         @default(0) @map("member_count")
-  postCount   Int         @default(0) @map("post_count")
-  isArchived  Boolean     @default(false) @map("is_archived")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
-
-  members CommunityMember[]
-  posts   CommunityPost[]
-
-  @@index([ownerId])
-  @@index([type])
-  @@map("community_groups")
-}
-
-model CommunityMember {
-  id       String         @id @default(uuid())
-  groupId  String         @map("group_id")
-  userId   String         @map("user_id")
-  joinedAt DateTime       @default(now()) @map("joined_at")
-
-  group CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-
-  @@unique([groupId, userId])
-  @@index([userId])
-  @@map("community_members")
-}
-
-model CourseEnrollmentPermission {
+model CommunityPost {
   id         String   @id @default(uuid())
-  userId     String   @map("user_id")
-  courseId   String   @map("course_id")
-  orderId    String?  @map("order_id")
-  enrolledAt DateTime @map("enrolled_at")
-  source     String   @default("kafka")
+  authorId   String   @map("author_id")
+  content    String
+  imageUrl   String?  @map("image_url")
+  parentId   String?  @map("parent_id")
+  likeCount  Int      @default(0) @map("like_count")
+  likedByIds String[] @default([]) @map("liked_by_ids")
+  replyCount Int      @default(0) @map("reply_count")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  @@unique([userId, courseId])
-  @@index([courseId])
-  @@index([userId])
-  @@map("course_enrollment_permissions")
-}
-
-model CommunityPost {
-  id          String   @id @default(uuid())
-  groupId     String   @map("group_id")
-  authorId    String   @map("author_id")
-  content     String
-  imageUrl    String?  @map("image_url")
-  parentId    String?  @map("parent_id")
-  likeCount   Int      @default(0) @map("like_count")
-  likedByIds  String[] @map("liked_by_ids")
-  replyCount  Int      @default(0) @map("reply_count")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  group  CommunityGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  parent CommunityPost?  @relation("PostReplies", fields: [parentId], references: [id])
+  parent  CommunityPost?  @relation("PostReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies CommunityPost[] @relation("PostReplies")
 
-  @@index([groupId, createdAt(sort: Desc)])
+  @@index([parentId, createdAt])
+  @@index([createdAt(sort: Desc)])
   @@index([authorId])
   @@map("community_posts")
 }
 
-// ─── Q&A Models ───────────────────────────────────────────────────────────────
-
 model Question {
   id          String   @id @default(uuid())
-  // courseId la String thuan — khong co @relation vi Course o DB khac
-  courseId    String?  @map("course_id")
-  // lessonId la String thuan — khong co @relation vi Lesson o DB khac
+  courseId    String   @map("course_id")
   lessonId    String?  @map("lesson_id")
   authorId    String   @map("author_id")
   title       String
@@ -114,8 +47,8 @@ model Question {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  answers   Answer[]
-  upvotes   QuestionUpvote[]
+  answers Answer[]
+  upvotes QuestionUpvote[]
 
   @@index([courseId, createdAt(sort: Desc)])
   @@index([lessonId])
@@ -124,14 +57,14 @@ model Question {
 }
 
 model Answer {
-  id           String   @id @default(uuid())
-  questionId   String   @map("question_id")
-  authorId     String   @map("author_id")
-  content      String
-  isAccepted   Boolean  @default(false) @map("is_accepted")
-  upvoteCount  Int      @default(0) @map("upvote_count")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(uuid())
+  questionId  String   @map("question_id")
+  authorId    String   @map("author_id")
+  content     String
+  isAccepted  Boolean  @default(false) @map("is_accepted")
+  upvoteCount Int      @default(0) @map("upvote_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   question Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
   upvotes  AnswerUpvote[]
