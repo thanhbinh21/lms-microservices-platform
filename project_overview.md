@@ -232,6 +232,9 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 - [x] **Phase 35.8 (Audit Ops DX):** Refresh runbook sau audit + cleanup root scripts - viet lai `RUNCODE_AFTER_PULL_CODE.md` theo workflow hien tai, va toi gian `package.json` scripts (giu nhom run/build/test/migrate/docker/seed can thiet cho dev pull code). done - 2026-05-14 - by AI AGENT
 - [x] **Phase 35.9:** P0 role UX & business logic - them support ticket auth-service, hoan thien instructor payout request/payment admin flow, chuyen admin DLQ sang learning-service, va polish UI admin/instructor support lien quan. done - 2026-05-14 - by AI AGENT
 
+- [x] **Phase P2:** Instructor Studio & Revenue Experience — Fix mojibake instructor layout + course wizard, add loading.tsx for 6 instructor routes, implement pure-SVG earnings bar chart (6-month history from real InstructorEarning data). done - 2026-05-15 - by AI AGENT
+- [x] **Phase P3:** Admin Operations, Governance & Observability — Fix mojibake/ASCII text in system-config + audit-log pages, add loading.tsx for all 6 admin routes, enhance admin overview with real-time stats from DLQ (pending count), support tickets (open/in-progress), and payouts (pending). All sensitive actions fully audited via auth-service. done - 2026-05-15 - by AI AGENT
+
 ### Phase 9.13: DX Hardening âœ… COMPLETED
 - [x] **Phase 9.13:** DX Hardening â€” `pnpm run setup` bootstrap (install + docker:up + setup:db + seed), `.nvmrc` node version pin, Prisma orchestration vao turbo pipeline. âœ… Completed: Apr 27, 2026
 

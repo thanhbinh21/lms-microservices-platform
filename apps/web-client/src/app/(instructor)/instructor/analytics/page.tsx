@@ -1,47 +1,96 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { TrendingUp, Users, BarChart3, Sparkles, Wallet } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { TrendingUp, BarChart3, Sparkles, Wallet } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getInstructorCoursesAction, getInstructorEarningsSummaryAction } from '@/app/actions/instructor';
+import { getInstructorEarningsSummaryAction, getInstructorEarningsAction, type InstructorEarningsSummary, type InstructorEarningDto } from '@/app/actions/instructor';
+
+interface ChartBar {
+  label: string;
+  value: number;
+}
+
+function SimpleBarChart({ data, maxValue }: { data: ChartBar[]; maxValue: number }) {
+  if (data.length === 0 || maxValue === 0) {
+    return (
+      <div className="flex h-44 items-center justify-center rounded-xl bg-gradient-to-br from-primary/5 to-transparent text-sm font-medium text-muted-foreground">
+        Chưa có dữ liệu doanh thu
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-44 items-end gap-3">
+      {data.map((bar, i) => {
+        const heightPct = maxValue > 0 ? Math.max((bar.value / maxValue) * 100, bar.value > 0 ? 8 : 0) : 0;
+        const isHighest = bar.value === maxValue && bar.value > 0;
+        return (
+          <div key={i} className="group relative flex flex-1 flex-col items-center gap-1">
+            <div className="w-full">
+              <div
+                className={`w-full rounded-t-md transition-all ${isHighest ? 'bg-amber-400' : 'bg-primary/70 hover:bg-primary'}`}
+                style={{ height: `${heightPct}%`, minHeight: bar.value > 0 ? '4px' : '0' }}
+              />
+              <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                {bar.value.toLocaleString('vi-VN')}đ
+              </div>
+            </div>
+            <span className="text-[10px] font-semibold text-muted-foreground">{bar.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function InstructorAnalyticsPage() {
-  const [stats, setStats] = useState({
-    views: '—',
-    enrollments: '—',
-    totalEarned: '—',
-    availableBalance: '—',
-  });
+  const [summary, setSummary] = useState<InstructorEarningsSummary | null>(null);
+  const [earnings, setEarnings] = useState<InstructorEarningDto[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadAnalytics() {
-      const coursesRes = await getInstructorCoursesAction();
-      if (!coursesRes.success || !coursesRes.data) {
-        setLoading(false);
-        return;
-      }
-
-      const courses = coursesRes.data;
-      const totalEnrollments = courses.reduce((acc, c) => acc + (c._count?.enrollments || 0), 0);
-
-      const earningsRes = await getInstructorEarningsSummaryAction();
-      const earnings = earningsRes.success && earningsRes.data ? earningsRes.data : null;
-
-      setStats({
-        views: '—',
-        enrollments: totalEnrollments.toLocaleString('vi-VN'),
-        totalEarned: earnings
-          ? (earnings.totalEarned / 1).toLocaleString('vi-VN') + ' đ'
-          : '—',
-        availableBalance: earnings
-          ? (earnings.availableBalance / 1).toLocaleString('vi-VN') + ' đ'
-          : '—',
-      });
+    async function loadEarnings() {
+      const [summaryRes, earningsRes] = await Promise.all([
+        getInstructorEarningsSummaryAction(),
+        getInstructorEarningsAction(),
+      ]);
+      if (summaryRes.success && summaryRes.data) setSummary(summaryRes.data);
+      if (earningsRes.success && earningsRes.data) setEarnings(earningsRes.data);
       setLoading(false);
     }
-    loadAnalytics();
+    void loadEarnings();
   }, []);
+
+  const chartData = useMemo(() => {
+    const now = new Date();
+    const months: ChartBar[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleDateString('vi-VN', { month: 'short', year: '2-digit' });
+      months.push({ label, value: 0 });
+    }
+
+    for (const earning of earnings) {
+      const d = new Date(earning.createdAt);
+      const monthDiff = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+      if (monthDiff >= 0 && monthDiff < 6) {
+        const idx = 5 - monthDiff;
+        if (idx >= 0 && idx < months.length) {
+          months[idx].value += earning.netAmount;
+        }
+      }
+    }
+
+    return months;
+  }, [earnings]);
+
+  const maxValue = useMemo(() => Math.max(...chartData.map((b) => b.value), 0), [chartData]);
+
+  const totalEarned = summary?.totalEarned ?? 0;
+  const availableBalance = summary?.availableBalance ?? 0;
+
+  const isLoading = loading;
 
   return (
     <div className="p-6 md:p-8">
@@ -60,52 +109,62 @@ export default function InstructorAnalyticsPage() {
       {/* Stats row */}
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         {[
-          { label: 'Lượt xem (7 ngày)', value: loading ? '...' : stats.views, icon: TrendingUp },
-          { label: 'Học viên', value: loading ? '...' : stats.enrollments, icon: Users },
-          { label: 'Thu nhập khả dụng', value: loading ? '...' : stats.availableBalance, note: 'Sau khi trừ phí 30%', icon: Wallet },
+          {
+            label: 'Thu nhập khả dụng',
+            value: isLoading ? '...' : (availableBalance > 0 ? availableBalance.toLocaleString('vi-VN') + ' đ' : '0 đ'),
+            note: 'Có thể rút ngay',
+            icon: Wallet,
+            highlight: availableBalance > 0,
+          },
+          {
+            label: 'Tổng thu nhập',
+            value: isLoading ? '...' : (totalEarned > 0 ? totalEarned.toLocaleString('vi-VN') + ' đ' : '0 đ'),
+            note: 'Sau khi trừ phí 30%',
+            icon: TrendingUp,
+          },
+          {
+            label: 'Đơn hàng',
+            value: isLoading ? '...' : (summary?.totalOrders ?? 0).toLocaleString('vi-VN'),
+            note: 'Đơn đã hoàn tất',
+            icon: BarChart3,
+          },
         ].map((row) => (
-          <Card key={row.label} className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
+          <Card
+            key={row.label}
+            className={`rounded-2xl border-white/60 bg-white/50 backdrop-blur-md ${row.highlight ? 'border-amber-200/60' : ''}`}
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardDescription className="text-[11px] font-bold uppercase tracking-[0.15em]">{row.label}</CardDescription>
-              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <div className={`flex size-8 items-center justify-center rounded-lg ${row.highlight ? 'bg-amber-100 text-amber-600' : 'bg-primary/10 text-primary'}`}>
                 <row.icon className="size-4" />
               </div>
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{row.value}</p>
-              {'note' in row && <p className="text-[11px] text-muted-foreground mt-0.5">{row.note}</p>}
+              <p className="text-[11px] text-muted-foreground mt-0.5">{row.note}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Total earnings card */}
-      <Card className="mb-6 rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <div>
-            <CardTitle className="text-base">Tổng thu nhập</CardTitle>
-            <CardDescription className="text-xs">Tất cả giao dịch (sau phí platform)</CardDescription>
-          </div>
-          <div className="flex size-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-            <BarChart3 className="size-5" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-bold">{loading ? '...' : stats.totalEarned}</p>
-          <p className="text-xs text-muted-foreground mt-1">Đã trừ phí platform 30% · NexEdu giữ lại 30%</p>
-        </CardContent>
-      </Card>
-
-      {/* Chart placeholder */}
+      {/* Chart */}
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
-          <CardTitle className="text-base">Biểu đồ doanh thu</CardTitle>
-          <CardDescription className="text-xs">Dữ liệu biểu đồ theo thời gian sẽ sớm được cập nhật.</CardDescription>
+          <CardTitle className="text-base">Doanh thu 6 tháng gần nhất</CardTitle>
+          <CardDescription className="text-xs">
+            {earnings.length > 0
+              ? `Dựa trên ${earnings.length} giao dịch đã hoàn tất. Đã trừ phí platform 30%.`
+              : 'Chưa có giao dịch nào được ghi nhận.'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex h-44 items-center justify-center rounded-xl bg-gradient-to-br from-primary/5 to-transparent text-sm font-medium text-muted-foreground">
-            Chưa có dữ liệu biểu đồ
-          </div>
+          {isLoading ? (
+            <div className="flex h-44 items-center justify-center">
+              <div className="text-sm text-muted-foreground animate-pulse">Đang tải biểu đồ...</div>
+            </div>
+          ) : (
+            <SimpleBarChart data={chartData} maxValue={maxValue} />
+          )}
         </CardContent>
       </Card>
     </div>

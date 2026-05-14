@@ -41,9 +41,9 @@ export default function CertificatePreviewPage() {
   if (!cert) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-4">
-        <p className="text-lg font-semibold text-slate-700">Chung chi khong ton tai</p>
+        <p className="text-lg font-semibold text-slate-700">Chứng chỉ không tồn tại</p>
         <Link href="/dashboard/certificates">
-          <Button variant="outline">Quay lai</Button>
+          <Button variant="outline">Quay lại</Button>
         </Link>
       </div>
     );
@@ -67,13 +67,13 @@ export default function CertificatePreviewPage() {
         <Link href="/dashboard/certificates">
           <Button variant="outline" className="gap-2">
             <ArrowLeft className="size-4" />
-            Quay lai
+            Quay lại
           </Button>
         </Link>
         <div className="flex gap-2">
           <Button variant="outline" onClick={printCertificate} className="gap-2">
             <Printer className="size-4" />
-            In chung chi
+            In chứng chỉ
           </Button>
         </div>
       </div>

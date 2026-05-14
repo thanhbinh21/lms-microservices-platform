@@ -26,7 +26,7 @@ export default function InstructorCoursesPage() {
     const fetchCourses = async () => {
       const result = await getInstructorCoursesAction();
       if (!result.success || !result.data) {
-        setErrorMessage(result.message || 'Khong the tai danh sach khoa hoc.');
+        setErrorMessage(result.message || 'Không thể tải danh sách khóa học.');
         setCourses([]);
         setLoading(false);
         return;

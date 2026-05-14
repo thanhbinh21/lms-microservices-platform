@@ -87,10 +87,14 @@ export function NotificationBell() {
     setOpen(false);
     
     // Simple routing logic based on notification type / metadata
-    if (notification.type === 'PAYMENT_SUCCESS') {
-      router.push('/dashboard?tab=orders');
+    if (notification.type === 'PAYMENT_SUCCESS' && notification.metadata?.orderId) {
+      router.push('/dashboard/orders');
     } else if (notification.type === 'ENROLLMENT_CREATED' && notification.metadata?.courseId) {
       router.push(`/learn/${notification.metadata.courseId}`);
+    } else if (notification.type === 'ENROLLMENT_CREATED') {
+      router.push('/dashboard/courses');
+    } else {
+      router.push('/dashboard/overview');
     }
   };
 

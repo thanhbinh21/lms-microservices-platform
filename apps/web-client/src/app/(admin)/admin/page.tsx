@@ -2,35 +2,60 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Users, BookOpen, GraduationCap, Flag, Sparkles } from 'lucide-react';
+import { Users, BookOpen, GraduationCap, Flag, Sparkles, Headphones, CreditCard, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/admin/StatusBadge';
-import { getAdminUserStats, getAdminCourseStats } from '@/app/actions/admin';
+import {
+  getAdminUserStats,
+  getAdminCourseStats,
+  getAdminFailedEventStats,
+  getAdminPayoutsAction,
+} from '@/app/actions/admin';
+import { getAdminSupportTicketsAction } from '@/app/actions/support';
 
 interface StatCard {
   label: string;
   value: string;
   hint: string;
   icon: React.ReactNode;
+  variant?: 'default' | 'warning' | 'danger';
+  href?: string;
 }
 
 export default function AdminDashboardPage() {
   const [userStats, setUserStats] = useState<any>(null);
   const [courseStats, setCourseStats] = useState<any>(null);
+  const [dlqStats, setDlqStats] = useState<any>(null);
+  const [supportStats, setSupportStats] = useState<{ open: number; inProgress: number }>({ open: 0, inProgress: 0 });
+  const [payoutStats, setPayoutStats] = useState<{ pending: number }>({ pending: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
-      const [userRes, courseRes] = await Promise.all([
+      const [userRes, courseRes, dlqRes, supportOpenRes, supportInProgRes, payoutRes] = await Promise.all([
         getAdminUserStats(),
         getAdminCourseStats(),
+        getAdminFailedEventStats(),
+        getAdminSupportTicketsAction({ page: 1, limit: 1, status: 'OPEN' }),
+        getAdminSupportTicketsAction({ page: 1, limit: 1, status: 'IN_PROGRESS' }),
+        getAdminPayoutsAction({ page: 1, limit: 1, status: 'PENDING' }),
       ]);
       if (userRes.success) setUserStats(userRes.data);
       if (courseRes.success) setCourseStats(courseRes.data);
+      if (dlqRes.success) setDlqStats(dlqRes.data);
+      const open = supportOpenRes.data?.pagination?.total ?? 0;
+      const inProg = supportInProgRes.data?.pagination?.total ?? 0;
+      setSupportStats({ open, inProgress: inProg });
+      const pending = payoutRes.data?.pagination?.total ?? 0;
+      setPayoutStats({ pending });
       setLoading(false);
     };
-    fetchStats();
+    void fetchStats();
   }, []);
+
+  const totalSupport = supportStats.open + supportStats.inProgress;
+  const pendingCount = dlqStats?.pendingCount ?? 0;
+  const flaggedReviews = courseStats?.flaggedReviews ?? 0;
 
   const statCards: StatCard[] = [
     {
@@ -53,11 +78,43 @@ export default function AdminDashboardPage() {
     },
     {
       label: 'Đánh giá bị gắn cờ',
-      value: loading ? '...' : String(courseStats?.flaggedReviews ?? 0),
+      value: loading ? '...' : String(flaggedReviews),
       hint: 'Cần kiểm duyệt',
       icon: <Flag className="size-5" />,
+      variant: flaggedReviews > 0 ? 'warning' : 'default',
+      href: '/admin/reviews',
+    },
+    {
+      label: 'Yêu cầu hỗ trợ',
+      value: loading ? '...' : String(totalSupport),
+      hint: loading ? 'Đang tải' : `${supportStats.open} mới · ${supportStats.inProgress} đang xử lý`,
+      icon: <Headphones className="size-5" />,
+      variant: totalSupport > 0 ? 'warning' : 'default',
+      href: '/admin/support',
+    },
+    {
+      label: 'Yêu cầu rút tiền',
+      value: loading ? '...' : String(payoutStats.pending),
+      hint: 'Chờ duyệt',
+      icon: <CreditCard className="size-5" />,
+      variant: payoutStats.pending > 0 ? 'warning' : 'default',
+      href: '/admin/payouts',
+    },
+    {
+      label: 'Sự kiện thất bại (DLQ)',
+      value: loading ? '...' : String(pendingCount),
+      hint: 'Chờ xử lý lại',
+      icon: <AlertTriangle className="size-5" />,
+      variant: pendingCount > 0 ? 'danger' : 'default',
+      href: '/admin/system',
     },
   ];
+
+  const getCardClass = (variant?: string) => {
+    if (variant === 'danger') return 'border-amber-300 bg-amber-50/30';
+    if (variant === 'warning') return 'border-amber-200 bg-amber-50/20';
+    return 'border-white/60 bg-white/50';
+  };
 
   return (
     <div className="p-6 md:p-8">
@@ -73,22 +130,27 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat) => (
-          <Card key={stat.label} className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardDescription className="text-xs font-semibold uppercase tracking-wide">
-                {stat.label}
-              </CardDescription>
-              <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                {stat.icon}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{stat.value}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{stat.hint}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {statCards.map((stat) => {
+          const Wrapper = stat.href ? Link : 'div';
+          return (
+            <Wrapper key={stat.label} href={stat.href ?? ''}>
+              <Card className={`rounded-2xl ${getCardClass(stat.variant)} transition ${stat.href ? 'hover:shadow-md cursor-pointer' : ''}`}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardDescription className="text-xs font-semibold uppercase tracking-wide">
+                    {stat.label}
+                  </CardDescription>
+                  <div className={`flex size-9 items-center justify-center rounded-lg ${stat.variant === 'danger' ? 'bg-amber-100 text-amber-600' : stat.variant === 'warning' ? 'bg-amber-50 text-amber-500' : 'bg-primary/10 text-primary'}`}>
+                    {stat.icon}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">{stat.value}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{stat.hint}</p>
+                </CardContent>
+              </Card>
+            </Wrapper>
+          );
+        })}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -153,9 +215,9 @@ export default function AdminDashboardPage() {
 
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         {[
-          { href: '/admin/revenue', title: 'Revenue Analytics', desc: 'GMV, fee nen tang, top instructors' },
-          { href: '/admin/notifications', title: 'Notification History', desc: 'Lich su thong bao da gui' },
-          { href: '/admin/system-config', title: 'System Config', desc: 'Quan ly cau hinh he thong co audit' },
+          { href: '/admin/support', title: 'Hỗ trợ & Giải quyết', desc: 'Xử lý yêu cầu hỗ trợ từ học viên và giảng viên' },
+          { href: '/admin/payouts', title: 'Thanh toán & Payout', desc: 'Duyệt yêu cầu rút tiền của giảng viên' },
+          { href: '/admin/system', title: 'DLQ & System Events', desc: 'Giám sát và xử lý các sự kiện thất bại' },
         ].map((item) => (
           <Link key={item.href} href={item.href}>
             <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md transition hover:bg-white/70">

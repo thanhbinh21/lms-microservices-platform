@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Eye, FileEdit, List } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Eye, FileEdit, List, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatusMessage } from '@/components/ui/status-message';
@@ -130,6 +130,55 @@ export default function InstructorCourseDetailPage() {
   }
 
   const totalLessons = lessons.length;
+  const publishedLessons = lessons.filter((l) => l.lesson.isPublished).length;
+  const previewLesson = lessons.find((l) => l.lesson.isFree);
+  const hasChapters = (curriculum?.chapters?.length ?? 0) > 0;
+
+  const checklist = [
+    {
+      label: 'Có tiêu đề khóa học',
+      ok: !!course.title?.trim(),
+      action: !course.title?.trim() ? 'Nhấn "Cấu hình" để thêm tiêu đề' : undefined,
+    },
+    {
+      label: 'Có mô tả khóa học',
+      ok: !!course.description?.trim(),
+      action: !course.description?.trim() ? 'Nhấn "Cấu hình" để thêm mô tả' : undefined,
+    },
+    {
+      label: 'Có thumbnail khóa học',
+      ok: !!course.thumbnail,
+      action: !course.thumbnail ? 'Nhấn "Cấu hình" để tải lên thumbnail' : undefined,
+    },
+    {
+      label: 'Có ít nhất 1 chương',
+      ok: hasChapters,
+      action: !hasChapters ? 'Nhấn "Chương trình" để tạo chương' : undefined,
+    },
+    {
+      label: 'Có ít nhất 1 bài học đã xuất bản',
+      ok: publishedLessons > 0,
+      action: publishedLessons === 0 ? 'Nhấn "Chương trình" để xuất bản bài học' : undefined,
+    },
+    {
+      label: 'Có ít nhất 1 bài học xem trước (free)',
+      ok: !!previewLesson,
+      action: !previewLesson ? 'Nhấn "Chương trình" để đánh dấu 1 bài miễn phí' : undefined,
+    },
+    {
+      label: 'Khóa học có giá hợp lệ',
+      ok: course.price > 0,
+      action: course.price <= 0 ? 'Nhấn "Cấu hình" để đặt giá' : undefined,
+    },
+    {
+      label: 'Có thể xem trước khóa học',
+      ok: !!previewLesson?.lesson.videoUrl || !!previewLesson?.lesson.content?.trim(),
+      action: 'Kiểm tra bài học free có video hoặc nội dung',
+    },
+  ];
+
+  const passCount = checklist.filter((c) => c.ok).length;
+  const allPass = passCount === checklist.length;
 
   return (
     <div className="p-8 space-y-6">
@@ -151,6 +200,55 @@ export default function InstructorCourseDetailPage() {
           <Button variant="outline" onClick={() => router.push(`/instructor/courses/${courseId}?step=3`)}>
             <List className="w-4 h-4 mr-2" /> Chương trình
           </Button>
+        </div>
+      </div>
+
+      <div
+        className={`rounded-2xl border p-5 ${
+          allPass
+            ? 'border-green-200 bg-green-50'
+            : passCount >= checklist.length - 2
+            ? 'border-amber-200 bg-amber-50'
+            : 'border-red-100 bg-red-50/50'
+        }`}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className={`font-bold text-base ${allPass ? 'text-green-800' : 'text-amber-800'}`}>
+              Kiểm tra sẵn sàng xuất bản
+            </h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {passCount}/{checklist.length} điều kiện đã đạt
+            </p>
+          </div>
+          {allPass ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Sẵn sàng
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+              <XCircle className="w-3.5 h-3.5" />
+              Cần bổ sung
+            </span>
+          )}
+        </div>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {checklist.map((item, i) => (
+            <div key={i} className={`flex items-start gap-2 rounded-lg px-3 py-2 text-sm ${item.ok ? 'bg-white/60' : 'bg-white/80'}`}>
+              {item.ok ? (
+                <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+              ) : (
+                <XCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+              )}
+              <span className={item.ok ? 'text-green-800 font-medium' : 'text-red-700'}>
+                {item.label}
+                {item.action && (
+                  <span className="block text-xs text-muted-foreground font-normal mt-0.5">{item.action}</span>
+                )}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
