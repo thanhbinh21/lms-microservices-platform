@@ -1,1 +1,3 @@
-export { requireAdmin } from '../middlewares/requireAdmin.js';
+import { createRequireAdmin } from '@lms/types';
+
+export const requireAdmin = createRequireAdmin();

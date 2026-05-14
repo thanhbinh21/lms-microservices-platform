@@ -9,10 +9,12 @@ export interface UserInternalData {
 
 export async function getUserData(userId: string): Promise<UserInternalData | null> {
   const baseUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3101';
+  const internalSecret = process.env.INTERNAL_SERVICE_SECRET || '';
   try {
     const res = await fetchWithTimeout(`${baseUrl}/internal/users/${userId}`, {
       headers: {
-        'x-internal-call': 'true'
+        'x-internal-call': 'notification-service',
+        'x-internal-secret': internalSecret,
       }
     });
 

@@ -1,0 +1,132 @@
+// Prisma Schema cho Learning Service
+// DB: learning_db (Neon Serverless PostgreSQL)
+// Quan ly: Enrollment, LessonProgress, Certificate, DLQ
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum FailedEventStatus {
+  PENDING
+  RETRIED
+  RESOLVED
+  IGNORED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+  FAILED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+// Enrollment — source of truth cho access control
+// Populated boi Kafka consumer (payment.order.completed) hoac direct (free courses)
+model Enrollment {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  courseId   String   @map("course_id")
+  orderId    String   @unique @map("order_id") // idempotency key hoac FREE-{uuid}
+  enrolledAt DateTime @default(now()) @map("enrolled_at")
+
+  lessonProgresses LessonProgress[]
+  certificates     Certificate[]
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@map("enrollments")
+}
+
+// Tien do hoc tap cua hoc vien tren tung bai hoc
+model LessonProgress {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  lessonId     String   @map("lesson_id")
+  courseId     String   @map("course_id")   // De-normalized: tinh progress nhanh hon
+  enrollmentId String?  @map("enrollment_id")
+  isCompleted  Boolean  @default(false) @map("is_completed")
+  lastWatched  Int      @default(0) @map("last_watched") // giay da xem
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  enrollment Enrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([courseId])
+  @@map("lesson_progress")
+}
+
+// Chung chi hoan thanh khoa hoc
+model Certificate {
+  id                String    @id @default(uuid())
+  certificateNumber String    @unique @map("certificate_number")
+  userId            String    @map("user_id")
+  courseId          String    @map("course_id")
+  enrollmentId      String    @map("enrollment_id")
+  templateId        String?   @map("template_id")
+  issuedAt          DateTime  @default(now()) @map("issued_at")
+  completedAt       DateTime  @map("completed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId, issuedAt(sort: Desc)])
+  @@index([courseId])
+  @@map("certificates")
+}
+
+// DLQ — Dead Letter Queue cho cac Kafka event that bai
+model FailedEvent {
+  id           String            @id @default(uuid())
+  topic        String
+  eventId      String?           @map("event_id")
+  traceId      String?           @map("trace_id")
+  originalKey  String?           @map("original_key")
+  payload      Json
+  errorMessage String            @map("error_message")
+  retryCount   Int               @default(0) @map("retry_count")
+  status       FailedEventStatus @default(PENDING)
+  createdAt    DateTime          @default(now()) @map("created_at")
+  retriedAt    DateTime?         @map("retried_at")
+
+  @@index([status])
+  @@index([topic])
+  @@unique([topic, eventId])
+  @@map("failed_events")
+}
+
+// Transactional outbox giu enrollment va event downstream di cung mot transaction
+model OutboxEvent {
+  id            String       @id @default(uuid())
+  topic         String
+  eventKey      String?      @map("event_key")
+  dedupeKey     String       @unique @map("dedupe_key")
+  payload       Json
+  traceId       String?      @map("trace_id")
+  status        OutboxStatus @default(PENDING)
+  retryCount    Int          @default(0) @map("retry_count")
+  nextAttemptAt DateTime     @default(now()) @map("next_attempt_at")
+  lastError     String?      @map("last_error")
+  publishedAt   DateTime?    @map("published_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@index([status, nextAttemptAt])
+  @@index([topic])
+  @@map("outbox_events")
+}

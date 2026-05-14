@@ -3,7 +3,9 @@
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { callApi } from './instructor';
 
-const COURSE_PREFIX = '/course';
+const LEARNING_PREFIX = process.env.NEXT_PUBLIC_LEARNING_PREFIX || '/learning';
+const LEARNING_API_PREFIX = `${LEARNING_PREFIX}/api`;
+const COURSE_PREFIX = process.env.NEXT_PUBLIC_COURSE_PREFIX || '/course';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -53,10 +55,9 @@ export interface MyCourseReviewDto {
 export async function enrollCourseAction(courseId: string): Promise<ApiResponse<null>> {
   try {
     const res = await callApi<null>(
-      `${COURSE_PREFIX}/api/enrollments`,
+      `${LEARNING_API_PREFIX}/courses/${courseId}/enroll`,
       {
         method: 'POST',
-        body: JSON.stringify({ courseId }),
       },
       true // requireAuth
     );
@@ -76,7 +77,7 @@ export async function enrollCourseAction(courseId: string): Promise<ApiResponse<
 export async function getMyEnrollmentsAction(): Promise<ApiResponse<any>> {
   try {
     const res = await callApi<any[]>(
-      `${COURSE_PREFIX}/api/enrollments/my`,
+      `${LEARNING_API_PREFIX}/my-enrollments`,
       { method: 'GET' },
       true
     );
@@ -89,7 +90,7 @@ export async function getMyEnrollmentsAction(): Promise<ApiResponse<any>> {
 export async function getCourseProgressAction(courseId: string): Promise<ApiResponse<any>> {
   try {
     const res = await callApi<any>(
-      `${COURSE_PREFIX}/api/student/courses/${courseId}/progress`,
+      `${LEARNING_API_PREFIX}/courses/${courseId}/progress`,
       { method: 'GET' },
       true
     );
@@ -106,10 +107,13 @@ export async function updateLessonProgressAction(
 ): Promise<ApiResponse<any>> {
   try {
     const res = await callApi<any>(
-      `${COURSE_PREFIX}/api/lessons/${lessonId}/progress`,
+      `${LEARNING_API_PREFIX}/lessons/${lessonId}/progress`,
       {
-        method: 'PUT',
-        body: JSON.stringify({ isCompleted, lastWatched }),
+        method: 'POST',
+        body: JSON.stringify({
+          lastWatched: Math.max(0, Math.floor(lastWatched ?? 0)),
+          isCompleted,
+        }),
       },
       true
     );

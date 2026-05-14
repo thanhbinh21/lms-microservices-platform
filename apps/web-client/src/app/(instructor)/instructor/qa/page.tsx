@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { MessageSquare, Sparkles } from 'lucide-react';
 import { QaTab } from '@/components/dashboard/qa-tab';
 
@@ -12,15 +11,10 @@ export default function InstructorQaPage() {
         </div>
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Q&A học viên</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Chọn một câu hỏi để vào trang chi tiết và trả lời trực tiếp cho học viên.
+          Trả lời câu hỏi từ học viên. Chọn khóa học để xem câu hỏi cụ thể, hoặc xem toàn bộ.
         </p>
-        <div className="mt-3">
-          <Link href="/dashboard/qa" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">
-            <MessageSquare className="size-4" />
-            Mở Q&A toàn trang
-          </Link>
-        </div>
       </div>
+      {/* QaTab se tu dong load danh sach khoa hoc cua giang vien */}
       <QaTab showFullPageLink={false} />
     </div>
   );

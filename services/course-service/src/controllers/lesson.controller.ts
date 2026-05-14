@@ -2,8 +2,10 @@ import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ApiResponse } from '@lms/types';
+import { logger } from '@lms/logger';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
+import { fetchWithTimeout } from '../lib/http';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -48,6 +50,31 @@ function validateLessonVideoSource(sourceType: 'UPLOAD' | 'YOUTUBE', videoUrl?: 
     }
   }
   return null;
+}
+
+const LEARNING_SERVICE_URL = (process.env.LEARNING_SERVICE_URL || 'http://localhost:3006').replace(/\/$/, '');
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
+
+async function checkEnrollment(userId: string, courseId: string, traceId: string): Promise<boolean> {
+  try {
+    const res = await fetchWithTimeout(
+      `${LEARNING_SERVICE_URL}/internal/enrollment/check?userId=${userId}&courseId=${courseId}`,
+      {
+        headers: {
+          'x-internal-call': 'course-service',
+          'x-internal-secret': INTERNAL_SERVICE_SECRET,
+          'x-trace-id': traceId,
+        },
+      },
+    );
+
+    if (!res.ok) return false;
+    const json = (await res.json()) as { data?: { enrolled?: boolean } };
+    return Boolean(json?.data?.enrolled);
+  } catch (err) {
+    logger.warn({ err, userId, courseId }, 'checkEnrollment failed — deny playback');
+    return false;
+  }
 }
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -283,16 +310,8 @@ export async function getLessonPlayback(req: Request, res: Response) {
         return res.status(401).json(unauthorized);
       }
 
-      const enrollment = await prisma.enrollment.findUnique({
-        where: {
-          userId_courseId: {
-            userId,
-            courseId: lesson.chapter.courseId,
-          },
-        },
-      });
-
-      if (!enrollment) {
+      const enrolled = await checkEnrollment(userId, lesson.chapter.courseId, traceId);
+      if (!enrolled) {
         const forbidden: ApiResponse<null> = {
           success: false, code: 403, message: 'You are not enrolled in this course', data: null, trace_id: traceId,
         };

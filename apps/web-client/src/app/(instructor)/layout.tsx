@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useAppSelector } from '@/lib/redux/hooks';
 import { usePathname, useRouter } from 'next/navigation';
@@ -6,10 +6,11 @@ import { useEffect, useState, type ComponentType } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  LayoutDashboard, BookOpen, Users, Award,
-  BarChart3, Settings, ArrowLeft, Menu, X, UserCircle, MessageSquare,
+  LayoutDashboard, BookOpen, Award,
+  BarChart3, Settings, ArrowLeft, Menu, X, UserCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { QaNavItem } from '@/components/instructor/qa-nav-item';
 
 interface NavLink {
   label: string;
@@ -19,14 +20,13 @@ interface NavLink {
 }
 
 const navLinks: NavLink[] = [
-  { label: 'Tổng quan', description: 'Xem nhanh trạng thái studio', href: '/instructor', icon: LayoutDashboard },
-  { label: 'Khóa học', description: 'Tạo và quản lý nội dung', href: '/instructor/courses', icon: BookOpen },
-  { label: 'Cộng đồng', description: 'Nhóm thảo luận cho học viên', href: '/instructor/communities', icon: Users },
-  { label: 'Q&A', description: 'Trả lời câu hỏi của học viên', href: '/instructor/qa', icon: MessageSquare },
-  { label: 'Chứng chỉ', description: 'Mẫu chứng chỉ hoàn thành', href: '/instructor/certificates', icon: Award },
-  { label: 'Phân tích', description: 'Theo dõi doanh thu và tăng trưởng', href: '/instructor/analytics', icon: BarChart3 },
-  { label: 'Thanh toán', description: 'Doanh thu và nhận tiền', href: '/instructor/settings', icon: Settings },
-  { label: 'Kênh của tôi', description: 'Cấu hình hồ sơ công khai', href: '/instructor/profile', icon: UserCircle },
+  { label: 'Tá»•ng quan', description: 'Xem nhanh tráº¡ng thÃ¡i studio', href: '/instructor', icon: LayoutDashboard },
+  { label: 'KhÃ³a há»c', description: 'Táº¡o vÃ  quáº£n lÃ½ ná»™i dung', href: '/instructor/courses', icon: BookOpen },
+  // Q&A duoc render rieng biet voi badge counter (xem QaNavItem)
+  { label: 'Chá»©ng chá»‰', description: 'Máº«u chá»©ng chá»‰ hoÃ n thÃ nh', href: '/instructor/certificates', icon: Award },
+  { label: 'PhÃ¢n tÃ­ch', description: 'Theo dÃµi doanh thu vÃ  tÄƒng trÆ°á»Ÿng', href: '/instructor/analytics', icon: BarChart3 },
+  { label: 'Thanh toÃ¡n', description: 'Doanh thu vÃ  nháº­n tiá»n', href: '/instructor/settings', icon: Settings },
+  { label: 'KÃªnh cá»§a tÃ´i', description: 'Cáº¥u hÃ¬nh há»“ sÆ¡ cÃ´ng khai', href: '/instructor/profile', icon: UserCircle },
 ];
 
 function normalizePath(p: string) {
@@ -86,7 +86,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Mở menu giảng viên"
+          aria-label="Má»Ÿ menu giáº£ng viÃªn"
           onClick={() => setMobileOpen((prev) => !prev)}
         >
           {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
@@ -114,7 +114,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
 
           <div className="mb-2">
             <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
-              Menu chính
+              Menu chÃ­nh
             </p>
             <div className="space-y-1">
               {navLinks.map((link) => {
@@ -140,12 +140,14 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                   </Link>
                 );
               })}
+              {/* Q&A nav item voi badge counter */}
+              <QaNavItem />
             </div>
           </div>
 
           <div className="mt-auto space-y-4 border-t border-white/20 pt-4">
             <Button variant="outline" className="w-full justify-start gap-2 text-sm font-semibold" onClick={() => router.push('/dashboard')}>
-              <ArrowLeft className="size-4" /> Thoát Studio
+              <ArrowLeft className="size-4" /> ThoÃ¡t Studio
             </Button>
             <div className="flex items-center gap-3 rounded-xl border border-white/30 bg-white/25 p-3">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/20 font-bold text-primary text-sm">
@@ -167,3 +169,4 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
     </div>
   );
 }
+

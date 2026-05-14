@@ -3,7 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma-v2"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -36,11 +36,6 @@ enum FailedEventStatus {
   RETRIED
   RESOLVED
   IGNORED
-}
-
-enum CommunityGroupType {
-  PUBLIC
-  COURSE_PRIVATE
 }
 
 
@@ -79,12 +74,9 @@ model Course {
 
   category    Category?    @relation(fields: [categoryId], references: [id])
   chapters    Chapter[]
-  enrollments Enrollment[]
   reviews     Review[]
-  questions   Question[]
-  certificates Certificate[]
   certificateTemplates CourseCertificateTemplate[]
-  communityGroups CommunityGroup[]
+  enrollmentSignals EnrollmentSignal[]
 
   @@index([instructorId])
   @@index([status])
@@ -132,68 +124,24 @@ model Lesson {
 
   // Relations
   chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  progress LessonProgress[] // 1 Lesson co nhieu tien do cua hoc vien
 
   @@index([chapterId])
   @@map("lessons")
 }
 
-// Luu vet tien do hoc tap cua hoc vien tren tung bai hoc
-model LessonProgress {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")      // User dang ky
-  lessonId    String   @map("lesson_id")
-  isCompleted Boolean  @default(false) @map("is_completed")
-  lastWatched Int      @default(0) @map("last_watched") // so giay (thoi luong da xem)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, lessonId]) // 1 user chi co 1 progress / lesson
-  @@index([userId])
-  @@map("lesson_progress")
-}
-
-// Enrollment — owned by Course Service (source of truth for access control)
-// Populated by Kafka consumer in Phase 12 or by direct Free Enroll
-model Enrollment {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")      // from Kafka event
-  courseId   String   @map("course_id")
-  orderId    String   @unique @map("order_id") // idempotency key hoac dummy_order
-  enrolledAt DateTime @default(now()) @map("enrolled_at")
+// Enrollment signals tu learning-service (idempotent theo orderId)
+model EnrollmentSignal {
+  id        String   @id @default(uuid())
+  orderId   String   @unique @map("order_id")
+  userId    String   @map("user_id")
+  courseId  String   @map("course_id")
+  createdAt DateTime @default(now()) @map("created_at")
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  certificates Certificate[]
 
-  @@unique([userId, courseId])
-  @@index([userId])
-  @@map("enrollments")
-}
-
-model Certificate {
-  id                String   @id @default(uuid())
-  certificateNumber String   @unique @map("certificate_number")
-  userId            String   @map("user_id")
-  courseId          String   @map("course_id")
-  enrollmentId      String   @map("enrollment_id")
-  templateId        String?  @map("template_id")
-  issuedAt          DateTime @default(now()) @map("issued_at")
-  completedAt       DateTime @map("completed_at")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-
-  course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  enrollment  Enrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
-  template    CertificateTemplate? @relation(fields: [templateId], references: [id])
-
-  @@unique([userId, courseId, templateId])
-  @@index([userId, issuedAt(sort: Desc)])
   @@index([courseId])
-  @@index([templateId])
-  @@map("certificates")
+  @@index([userId])
+  @@map("enrollment_signals")
 }
 
 model CertificateTemplate {
@@ -206,7 +154,6 @@ model CertificateTemplate {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   courseLinks CourseCertificateTemplate[]
-  certificates Certificate[]
 
   @@index([instructorId])
   @@map("certificate_templates")
@@ -242,139 +189,6 @@ model Review {
   @@index([courseId])
   @@index([isFlagged])
   @@map("reviews")
-}
-
-model CommunityGroup {
-  id          String             @id @default(uuid())
-  type        CommunityGroupType @default(COURSE_PRIVATE)
-  courseId    String?            @map("course_id")
-  ownerId     String             @map("owner_id")
-  name        String
-  slug        String             @unique
-  description String?
-  memberCount Int                @default(0) @map("member_count")
-  postCount   Int                @default(0) @map("post_count")
-  isArchived  Boolean            @default(false) @map("is_archived")
-  createdAt   DateTime           @default(now()) @map("created_at")
-  updatedAt   DateTime           @updatedAt @map("updated_at")
-
-  course   Course?           @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  members  CommunityMember[]
-  posts    CommunityPost[]
-
-  // Moi khoa hoc chi co toi da 1 private group
-  @@unique([courseId], map: "community_groups_course_id_unique")
-  @@index([type])
-  @@index([ownerId])
-  @@index([createdAt(sort: Desc)])
-  @@map("community_groups")
-}
-
-model CommunityMember {
-  id        String   @id @default(uuid())
-  groupId   String   @map("group_id")
-  userId    String   @map("user_id")
-  joinedAt  DateTime @default(now()) @map("joined_at")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  group CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-
-  @@unique([groupId, userId])
-  @@index([userId])
-  @@index([groupId])
-  @@map("community_members")
-}
-
-model CommunityPost {
-  id        String   @id @default(uuid())
-  groupId   String   @map("group_id")
-  authorId  String   @map("author_id")
-  parentId  String?  @map("parent_id")
-  content      String
-  imageUrl     String?  @map("image_url")
-  likeCount    Int      @default(0) @map("like_count")
-  likedByIds   String[] @default([]) @map("liked_by_ids")
-  isArchived   Boolean  @default(false) @map("is_archived")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  group   CommunityGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  parent  CommunityPost?  @relation("CommunityPostReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies CommunityPost[] @relation("CommunityPostReplies")
-
-  @@index([groupId, createdAt(sort: Desc)])
-  @@index([parentId])
-  @@index([authorId])
-  @@map("community_posts")
-}
-
-model Question {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  title       String
-  content     String
-  courseId    String?  @map("course_id")
-  lessonId    String?  @map("lesson_id")
-  isResolved  Boolean  @default(false) @map("is_resolved")
-  viewCount   Int      @default(0) @map("view_count")
-  upvoteCount Int      @default(0) @map("upvote_count")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  course   Course?          @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  answers  Answer[]
-  upvotes  QuestionUpvote[]
-
-  @@index([userId])
-  @@index([courseId])
-  @@index([isResolved])
-  @@index([createdAt(sort: Desc)])
-  @@map("questions")
-}
-
-model Answer {
-  id          String   @id @default(uuid())
-  questionId  String   @map("question_id")
-  userId      String   @map("user_id")
-  content     String
-  isAccepted  Boolean  @default(false) @map("is_accepted")
-  upvoteCount Int      @default(0) @map("upvote_count")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  question Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  upvotes  AnswerUpvote[]
-
-  @@index([questionId])
-  @@index([userId])
-  @@index([isAccepted])
-  @@map("answers")
-}
-
-model QuestionUpvote {
-  id         String   @id @default(uuid())
-  questionId String   @map("question_id")
-  userId     String   @map("user_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-
-  @@unique([questionId, userId])
-  @@index([userId])
-  @@map("question_upvotes")
-}
-
-model AnswerUpvote {
-  id        String   @id @default(uuid())
-  answerId  String   @map("answer_id")
-  userId    String   @map("user_id")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  answer Answer @relation(fields: [answerId], references: [id], onDelete: Cascade)
-
-  @@unique([answerId, userId])
-  @@index([userId])
-  @@map("answer_upvotes")
 }
 
 model FailedEvent {

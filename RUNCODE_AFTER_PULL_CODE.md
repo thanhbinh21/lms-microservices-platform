@@ -1,38 +1,88 @@
-# Hướng Dẫn Chạy Dự Án Sau Khi `git pull`
+# Huong dan run code sau khi pull
 
-Khi có thành viên khác đẩy code mới (đặc biệt là có thay đổi về database schema, package mới, hoặc kiến trúc cache), bạn hãy làm theo các bước sau để đảm bảo hệ thống chạy mượt mà, không gặp lỗi xung đột:
+Tai lieu nay dung cho dev pull code moi nhat ve may local.
 
-### Bước 1: Cập nhật thư viện (Bắt buộc)
-Do chúng ta vừa tách thêm package `@lms/cache` và `@lms/db-prisma`, bạn cần cài đặt lại toàn bộ dependencies ở thư mục gốc:
+## 1) Dieu kien can co
+
+- Node.js >= 18
+- pnpm >= 8
+- Docker Desktop dang bat
+- Da tao day du `.env` cho cac service
+
+## 2) Lan dau pull ve hoac pull co thay doi DB
+
+Chay theo dung thu tu:
+
 ```bash
 pnpm install
-```
-
-### Bước 2: Đồng bộ Database Schema (Bắt buộc nếu có thay đổi DB)
-Chúng ta vừa thêm các **Composite Indexes** trên Neon Postgres để tối ưu hiệu năng. Bạn cần đồng bộ schema mới nhất xuống database của bạn (nếu dùng chung một database Dev trên Neon thì có thể bỏ qua, nhưng tốt nhất cứ chạy để an toàn):
-```bash
-pnpm db:sync
-```
-*(Lệnh này tự động gọi `prisma db push` và `prisma generate` cho tất cả các microservices).*
-
-### Bước 3: Đảm bảo Docker Containers Đang Chạy (Bắt buộc)
-Hệ thống hiện tại cần **Redis** (cho Session) và **Kafka / Zookeeper** (cho Event-driven). Chạy lệnh sau để khởi động chúng (nếu chưa chạy):
-```bash
 pnpm docker:up
+pnpm setup:db
+pnpm seed
 ```
 
-### Bước 4: Khởi động hệ thống
-Bạn có thể khởi động hệ thống bằng lệnh dev quen thuộc. Lệnh này đã tự động bao gồm việc kill các port bị kẹt và xóa cache lock của Next.js:
+Ghi chu:
+- `pnpm setup:db` se chay `prisma migrate deploy` + `prisma generate` cho tat ca services.
+- Neu da co data test quan trong, can xac nhan truoc khi chay `pnpm seed`.
+
+## 3) Chay he thong de dev
+
+Profile day du (khuyen dung):
+
 ```bash
 pnpm dev:web
 ```
-Hoặc nếu máy yếu, có thể dùng bản rút gọn (chỉ chạy core services):
+
+Profile nhe hon:
+
 ```bash
 pnpm dev:web:lite
 ```
 
----
+Profile full monorepo:
 
-### 🛑 Các Lưu Ý Quan Trọng Gần Đây
-1. **Lỗi Prisma "Closed"**: Nếu bạn thấy log `prisma:error Error in PostgreSQL connection: Error { kind: Closed, cause: None }` xuất hiện thoáng qua, đừng lo lắng. Đây là cơ chế **Cold-start của Neon Postgres**. Hệ thống đã được bọc `withRetry` (Tự động thử lại) nên request vẫn sẽ thành công!
-2. **Next.js Caching**: Nếu bạn thấy giao diện không cập nhật sau khi sửa code Frontend liên quan đến fetch data, hãy thử dừng server và chạy lại lệnh `pnpm dev:web` (để xóa cache). Hệ thống hiện tại đang sử dụng Next.js `unstable_cache` và Redis Cache.
+```bash
+pnpm dev
+```
+
+## 4) Kiem tra nhanh sau khi run
+
+Kiem tra migration status:
+
+```bash
+pnpm prisma:migrate:status:all
+```
+
+Kiem tra build:
+
+```bash
+pnpm build
+```
+
+Kiem tra test:
+
+```bash
+pnpm test
+```
+
+## 5) Script nen dung thuong xuyen
+
+- `pnpm setup`: install + docker up + setup db + seed
+- `pnpm setup:db`: deploy migration + generate prisma client
+- `pnpm docker:up`: bat Kafka/Kong/Zookeeper
+- `pnpm docker:down`: tat docker stack local
+- `pnpm docker:health`: xem trang thai container
+- `pnpm docker:logs`: xem log docker stack
+
+## 6) Loi hay gap
+
+1. `Port already in use`:
+   - Script `dev`, `dev:web`, `dev:web:lite` da tu clear port truoc khi run.
+   - Neu van bi, tat process cu va chay lai.
+
+2. Prisma migration loi:
+   - Chay lai `pnpm prisma:migrate:status:all`.
+   - Neu service nao loi rieng, vao service do va chay `npx prisma migrate status` de xem chi tiet.
+
+3. Neon cold start lam request dau cham:
+   - Day la hanh vi binh thuong voi Neon serverless.
+

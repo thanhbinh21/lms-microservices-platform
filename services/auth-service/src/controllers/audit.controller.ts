@@ -11,22 +11,6 @@ function readHeaderValue(value: string | string[] | undefined): string {
   return value || '';
 }
 
-function ensureInternal(req: Request, res: Response): boolean {
-  const internal = readHeaderValue(req.headers['x-internal-call']);
-  if (!internal) {
-    const response: ApiResponse<null> = {
-      success: false,
-      code: 403,
-      message: 'Internal endpoint',
-      data: null,
-      trace_id: readHeaderValue(req.headers['x-trace-id']),
-    };
-    res.status(403).json(response);
-    return false;
-  }
-  return true;
-}
-
 export async function listAuditLogs(req: Request, res: Response) {
   const traceId = readHeaderValue(req.headers['x-trace-id']) || '';
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -102,7 +86,6 @@ export async function listAuditLogs(req: Request, res: Response) {
 }
 
 export async function createAuditLog(req: Request, res: Response) {
-  if (!ensureInternal(req, res)) return;
   const traceId = readHeaderValue(req.headers['x-trace-id']) || '';
 
   try {

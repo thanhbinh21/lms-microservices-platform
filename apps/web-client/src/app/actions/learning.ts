@@ -2,17 +2,16 @@
 
 import { callApi, type ApiResponse } from '@/lib/api-client';
 
+const LEARNING_PREFIX = process.env.NEXT_PUBLIC_LEARNING_PREFIX || '/learning';
+const LEARNING_API_PREFIX = `${LEARNING_PREFIX}/api`;
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface LessonProgressDto {
-  id: string;
-  userId: string;
   lessonId: string;
-  courseId: string;
   isCompleted: boolean;
-  watchedDuration: number;
-  lastPosition: number;
-  completedAt: string | null;
+  lastWatched: number;
+  updatedAt: string;
 }
 
 export interface LearnLessonDto {
@@ -40,10 +39,11 @@ export interface LearnDataDto {
     id: string;
     title: string;
     slug: string;
-    description: string | null;
     thumbnail: string | null;
     totalLessons: number;
     totalDuration: number;
+    level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+    instructorId: string;
   };
   enrolled: boolean;
   chapters: LearnChapterDto[];
@@ -92,7 +92,7 @@ export interface MyCertificateSummary {
 
 export async function enrollFreeAction(courseId: string) {
   return callApi<unknown>(
-    `/course/api/student/courses/${courseId}/enroll-free`,
+    `${LEARNING_API_PREFIX}/courses/${courseId}/enroll`,
     { method: 'POST' },
     true,
   );
@@ -100,7 +100,7 @@ export async function enrollFreeAction(courseId: string) {
 
 export async function getEnrollmentStatusAction(courseId: string) {
   return callApi<{ enrolled: boolean; enrollment: unknown }>(
-    `/course/api/student/courses/${courseId}/enrollment-status`,
+    `${LEARNING_API_PREFIX}/courses/${courseId}/enrollment-status`,
     { method: 'GET' },
     true,
   );
@@ -108,21 +108,15 @@ export async function getEnrollmentStatusAction(courseId: string) {
 
 export async function getLearnDataAction(courseId: string) {
   return callApi<LearnDataDto>(
-    `/course/api/student/courses/${courseId}/learn-data`,
+    `${LEARNING_API_PREFIX}/learn/${courseId}`,
     { method: 'GET' },
     true,
   );
 }
 
 export async function getCourseProgressAction(courseId: string) {
-  return callApi<{
-    progressPercent: number;
-    completedLessons: number;
-    totalLessons: number;
-    totalWatchedSeconds: number;
-    lessons: LessonProgressDto[];
-  }>(
-    `/course/api/student/courses/${courseId}/progress`,
+  return callApi<LessonProgressDto[]>(
+    `${LEARNING_API_PREFIX}/courses/${courseId}/progress`,
     { method: 'GET' },
     true,
   );
@@ -130,13 +124,12 @@ export async function getCourseProgressAction(courseId: string) {
 
 export async function updateLessonProgressAction(
   lessonId: string,
-  data: { watchedDuration: number; lastPosition: number },
+  data: { watchedDuration: number; lastPosition: number } | boolean,
+  lastPosition = 0,
 ) {
-  return callApi<LessonProgressDto>(
-    `/course/api/student/lessons/${lessonId}/progress`,
-    {
-      method: 'PUT',
-      body: JSON.stringify({
+  const payload = typeof data === 'boolean'
+    ? { isCompleted: data, lastWatched: Math.max(0, Math.floor(lastPosition)) }
+    : {
         lastWatched: Math.max(
           0,
           Math.floor(
@@ -145,7 +138,13 @@ export async function updateLessonProgressAction(
               : data.lastPosition,
           ),
         ),
-      }),
+      };
+
+  return callApi<LessonProgressDto>(
+    `${LEARNING_API_PREFIX}/lessons/${lessonId}/progress`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
     },
     true,
   );
@@ -178,7 +177,7 @@ export async function completeLessonAction(lessonId: string) {
       } | null;
     }>;
   }>(
-    `/course/api/student/lessons/${lessonId}/complete`,
+    `${LEARNING_API_PREFIX}/lessons/${lessonId}/complete`,
     { method: 'POST' },
     true,
   );
@@ -186,7 +185,7 @@ export async function completeLessonAction(lessonId: string) {
 
 export async function getMyCoursesAction() {
   return callApi<MyCourseSummary[]>(
-    `/course/api/student/my-courses`,
+    `${LEARNING_API_PREFIX}/my-enrollments`,
     { method: 'GET' },
     true,
   );
@@ -194,7 +193,7 @@ export async function getMyCoursesAction() {
 
 export async function getMyCertificatesAction() {
   return callApi<MyCertificateSummary[]>(
-    `/course/api/student/certificates`,
+    `${LEARNING_API_PREFIX}/certificates`,
     { method: 'GET' },
     true,
   );
@@ -217,7 +216,7 @@ export interface CertificateDetail {
 
 export async function getCertificateByIdAction(certificateNumber: string): Promise<ApiResponse<CertificateDetail | null>> {
   return callApi<CertificateDetail>(
-    `/course/api/student/certificates/by-number/${encodeURIComponent(certificateNumber)}`,
+    `${LEARNING_API_PREFIX}/certificates/${encodeURIComponent(certificateNumber)}`,
     { method: 'GET' },
     true,
   );

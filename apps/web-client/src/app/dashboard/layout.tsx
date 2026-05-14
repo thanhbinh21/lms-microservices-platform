@@ -4,14 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAppSelector } from '@/lib/redux/hooks';
+import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 
-/**
- * Guard toan bo /dashboard/*:
- * - Chua dang nhap -> /login
- * - Role INSTRUCTOR -> redirect ve trang chu (giang vien dung Studio).
- * - Role ADMIN -> redirect ve trang chu (admin dung Profile > Quan ly don GV).
- * - Chi STUDENT moi duoc vao.
- */
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
@@ -35,7 +29,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [isMounted, isAuthenticated, isLoading, isBlockedRole, router]);
 
-  // Trong qua trinh SSR hoac chua mount client -> render loader de tranh Hydration Mismatch
   if (!isMounted || isLoading || !isAuthenticated || isBlockedRole) {
     return (
       <div className="glass-page flex min-h-screen items-center justify-center">
@@ -44,5 +37,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-  return <>{children}</>;
+  return (
+    <div className="glass-page flex min-h-screen text-foreground">
+      <DashboardNav />
+      <main className="min-h-screen flex-1 overflow-x-hidden pb-20 pt-16 md:pt-0">
+        <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 space-y-6 relative z-10">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
 }

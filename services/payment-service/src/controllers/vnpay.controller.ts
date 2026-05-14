@@ -3,8 +3,33 @@ import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
 import { logger } from '@lms/logger';
 import { loadVNPayConfig, verifyReturn, isSuccessful } from '../lib/vnpay';
-import { publishPaymentCompleted } from '../lib/kafka-producer';
+import { enqueuePaymentCompletedOutbox } from '../lib/outbox';
 import { getInstructorRevenueShareRatio } from '../lib/revenue-share';
+import type { PaymentOrderCompletedEvent } from '@lms/kafka-client';
+
+function buildPaymentCompletedEvent(
+  order: Awaited<ReturnType<typeof prisma.order.findUnique>>,
+  transactionNo: string,
+): PaymentOrderCompletedEvent {
+  if (!order) {
+    throw new Error('Order is required to build payment completed event');
+  }
+
+  return {
+    order_id: order.id,
+    user_id: order.userId,
+    course_id: order.courseId,
+    instructor_id: order.instructorId,
+    amount: order.amount.toNumber(),
+    currency: order.currency,
+    payment_method: 'vnpay',
+    vnp_txn_ref: order.vnpTxnRef,
+    vnp_transaction_no: transactionNo,
+    paid_at: (order.paidAt || new Date()).toISOString(),
+    instructor_share_ratio: getInstructorRevenueShareRatio(),
+    platform_fee_ratio: Number((1 - getInstructorRevenueShareRatio()).toFixed(4)),
+  };
+}
 
 /**
  * GET /api/vnpay-return — user quay ve frontend sau khi thanh toan.
@@ -50,33 +75,24 @@ export const handleVNPayReturn = async (req: Request, res: Response): Promise<Re
     const isDev = process.env.NODE_ENV === 'development';
     if (isDev && order.status === 'PENDING' && isSuccessful(result)) {
       try {
-        const updated = await prisma.order.update({
-          where: { id: order.id },
-          data: {
-            status: 'COMPLETED',
-            vnpTransactionNo: result.transactionNo,
-            vnpBankCode: result.bankCode,
-            vnpResponseCode: result.responseCode,
-            paidAt: new Date(),
-          },
+        const updated = await prisma.$transaction(async (tx) => {
+          const completed = await tx.order.update({
+            where: { id: order.id },
+            data: {
+              status: 'COMPLETED',
+              vnpTransactionNo: result.transactionNo,
+              vnpBankCode: result.bankCode,
+              vnpResponseCode: result.responseCode,
+              paidAt: new Date(),
+            },
+          });
+          await enqueuePaymentCompletedOutbox(
+            tx,
+            buildPaymentCompletedEvent(completed, result.transactionNo),
+            traceId,
+          );
+          return completed;
         });
-        await publishPaymentCompleted(
-          {
-            order_id: updated.id,
-            user_id: updated.userId,
-            course_id: updated.courseId,
-            instructor_id: updated.instructorId,
-            amount: updated.amount.toNumber(),
-            currency: updated.currency,
-            payment_method: 'vnpay',
-            vnp_txn_ref: updated.vnpTxnRef,
-            vnp_transaction_no: result.transactionNo,
-            paid_at: (updated.paidAt || new Date()).toISOString(),
-            instructor_share_ratio: getInstructorRevenueShareRatio(),
-            platform_fee_ratio: Number((1 - getInstructorRevenueShareRatio()).toFixed(4)),
-          },
-          traceId,
-        );
         logger.info({ orderId: updated.id }, '[DEV] Marked COMPLETED via Return URL fallback');
       } catch (err) {
         logger.error({ err, orderId: order.id }, 'Dev fallback update failed');
@@ -187,41 +203,24 @@ export const handleVNPayIPN = async (req: Request, res: Response): Promise<Respo
     return res.status(200).json({ RspCode: '00', Message: 'Confirm Failure' });
   }
 
-  // Happy path: update + publish Kafka.
-  const updated = await prisma.order.update({
-    where: { id: order.id },
-    data: {
-      status: 'COMPLETED',
-      vnpTransactionNo: result.transactionNo,
-      vnpBankCode: result.bankCode,
-      vnpResponseCode: result.responseCode,
-      paidAt: new Date(),
-    },
-  });
-
-  try {
-    await publishPaymentCompleted(
-      {
-        order_id: updated.id,
-        user_id: updated.userId,
-        course_id: updated.courseId,
-        instructor_id: updated.instructorId,
-        amount: updated.amount.toNumber(),
-        currency: updated.currency,
-        payment_method: 'vnpay',
-        vnp_txn_ref: updated.vnpTxnRef,
-        vnp_transaction_no: result.transactionNo,
-        paid_at: (updated.paidAt || new Date()).toISOString(),
-        instructor_share_ratio: getInstructorRevenueShareRatio(),
-        platform_fee_ratio: Number((1 - getInstructorRevenueShareRatio()).toFixed(4)),
+  // Order va outbox phai atomic de Kafka down khong lam mat event business-critical.
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.update({
+      where: { id: order.id },
+      data: {
+        status: 'COMPLETED',
+        vnpTransactionNo: result.transactionNo,
+        vnpBankCode: result.bankCode,
+        vnpResponseCode: result.responseCode,
+        paidAt: new Date(),
       },
+    });
+    await enqueuePaymentCompletedOutbox(
+      tx,
+      buildPaymentCompletedEvent(updated, result.transactionNo),
       traceId,
     );
-  } catch (err) {
-    logger.error({ err, orderId: updated.id }, 'Failed to publish Kafka event');
-    // VNPay can tra OK de khong bi retry lien tuc; ta da luu DB, event se retry boi outbox job
-    // neu sau nay trien khai. De don gian: van tra OK.
-  }
+  });
 
   return res.status(200).json({ RspCode: '00', Message: 'Confirm Success' });
 };

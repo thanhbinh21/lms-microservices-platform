@@ -47,7 +47,7 @@ export async function refresh(req: Request, res: Response) {
 
     if (!payload || payload.type !== 'refresh' || payload.userId !== storedToken.user.id) {
       // Token da bi thay doi secret/du lieu khong khop -> xoa de tranh retry vo han.
-      await prisma.refreshToken.delete({
+      await prisma.refreshToken.deleteMany({
         where: { id: storedToken.id },
       });
 
@@ -64,7 +64,7 @@ export async function refresh(req: Request, res: Response) {
     // Check if token expired
     if (storedToken.expiresAt < new Date()) {
       // Delete expired token
-      await prisma.refreshToken.delete({
+      await prisma.refreshToken.deleteMany({
         where: { id: storedToken.id },
       });
 
@@ -79,29 +79,48 @@ export async function refresh(req: Request, res: Response) {
     }
 
     // Tao cap token moi
-    const newTokens = generateTokenPair(
-      {
-        userId: storedToken.user.id,
-        email: storedToken.user.email,
-        role: storedToken.user.role,
-      },
-      env.JWT_SECRET,
-    );
+    // Xoa token cu va tao token moi trong transaction de tranh race refresh tu nhieu tab.
+    const rotated = await prisma.$transaction(async (tx) => {
+      const deleted = await tx.refreshToken.deleteMany({
+        where: { id: storedToken.id, token: validatedData.refreshToken },
+      });
+      if (deleted.count === 0) {
+        return null;
+      }
 
-    // Xoa token cu va tao token moi trong transaction de tranh mat du lieu
-    const refreshTokenExpiry = new Date();
-    refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + REFRESH_TOKEN_DAYS);
+      const nextTokens = generateTokenPair(
+        {
+          userId: storedToken.user.id,
+          email: storedToken.user.email,
+          role: storedToken.user.role,
+        },
+        env.JWT_SECRET,
+      );
 
-    await prisma.$transaction([
-      prisma.refreshToken.delete({ where: { id: storedToken.id } }),
-      prisma.refreshToken.create({
+      const refreshTokenExpiry = new Date();
+      refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + REFRESH_TOKEN_DAYS);
+
+      await tx.refreshToken.create({
         data: {
-          token: newTokens.refreshToken,
+          token: nextTokens.refreshToken,
           userId: storedToken.user.id,
           expiresAt: refreshTokenExpiry,
         },
-      }),
-    ]);
+      });
+
+      return nextTokens;
+    });
+
+    if (!rotated) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 409,
+        message: 'Refresh token already rotated',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(409).json(response);
+    }
 
     // Update session in Redis
     await setSession(storedToken.user.id, {
@@ -120,8 +139,8 @@ export async function refresh(req: Request, res: Response) {
       code: 200,
       message: 'Token refreshed successfully',
       data: {
-        accessToken: newTokens.accessToken,
-        refreshToken: newTokens.refreshToken,
+        accessToken: rotated.accessToken,
+        refreshToken: rotated.refreshToken,
       },
       trace_id: traceId,
     };

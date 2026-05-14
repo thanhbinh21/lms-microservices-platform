@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
-import { cacheGet, cacheInvalidate } from '@lms/cache';
+import { cacheGet, cacheInvalidate, cacheInvalidatePattern } from '@lms/cache';
 import { writeAuditLog } from '../lib/audit';
 
 const createCategorySchema = z.object({
@@ -29,6 +29,13 @@ function normalizeSlug(input: string): string {
     .replace(/[^a-z0-9-]/g, '')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+async function invalidateCategoryRelatedCaches(): Promise<void> {
+  await Promise.all([
+    cacheInvalidate('cache:categories:all'),
+    cacheInvalidatePattern('cache:courses:list:*'),
+  ]);
 }
 
 async function generateUniqueCategorySlug(name: string): Promise<string> {
@@ -133,8 +140,8 @@ export async function createCategory(req: Request, res: Response) {
       data: category,
       trace_id: traceId,
     };
-    // Xoa cache categories sau khi tao moi
-    await cacheInvalidate('cache:categories:all');
+    // Danh muc thay doi anh huong sidebar + course list filter.
+    await invalidateCategoryRelatedCaches();
     return res.status(201).json(response);
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -208,7 +215,7 @@ export async function updateCategory(req: Request, res: Response) {
       traceId,
     });
 
-    await cacheInvalidate('cache:categories:all');
+    await invalidateCategoryRelatedCaches();
 
     const response: ApiResponse<typeof category> = {
       success: true,
@@ -280,7 +287,7 @@ export async function deleteCategory(req: Request, res: Response) {
       traceId,
     });
 
-    await cacheInvalidate('cache:categories:all');
+    await invalidateCategoryRelatedCaches();
 
     const response: ApiResponse<null> = {
       success: true,

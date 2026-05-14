@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { logger } from '@lms/logger';
 import { validateCourseServiceEnv } from '@lms/env-validator';
-import type { ApiResponse } from '@lms/types';
+import { createRequireInternal, type ApiResponse } from '@lms/types';
 import {
   listCourses,
   getCourseBySlug,
@@ -27,32 +27,6 @@ import {
   updateCourseCertificateTemplates,
 } from './controllers/course.controller';
 import {
-  listCommunityGroups,
-  listCommunityPosts,
-  createCommunityPost,
-  replyCommunityPost,
-  reactCommunityPost,
-  joinCommunityGroup,
-  createPublicCommunityGroup,
-  listInstructorCommunityGroups,
-  createInstructorCommunityGroup,
-  updateInstructorCommunityGroup,
-  assignCommunityGroupToCourse,
-} from './controllers/community.controller';
-import {
-  createQuestion,
-  listQuestions,
-  getQuestionDetail,
-  updateQuestion,
-  deleteQuestion,
-  createAnswer,
-  acceptAnswer,
-  upvoteQuestion,
-  upvoteAnswer,
-  updateAnswer,
-  deleteAnswer,
-} from './controllers/qa.controller';
-import {
   listInstructors,
   getInstructorBySlug,
   listInstructorCoursesBySlug,
@@ -72,10 +46,7 @@ import {
   getLessonPlayback,
 } from './controllers/lesson.controller';
 import { listCategories, createCategory } from './controllers/category.controller';
-import { enrollCourse, getMyEnrollments } from './controllers/enrollment.controller';
-import { getCourseProgress, updateLessonProgress } from './controllers/progress.controller';
-import { getLearnData, getEnrollmentStatus, completeLesson, getMyCourses, getMyCertificates, getCertificateById } from './controllers/learning.controller';
-import { getCourseByIdInternal } from './controllers/internal.controller';
+import { getCourseByIdInternal, getLessonByIdInternal, getCourseCurriculumInternal, getInstructorCourseIdsInternal } from './controllers/internal.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import adminRouter from './routes/admin.routes';
 import prisma from './lib/prisma';
@@ -88,6 +59,9 @@ validateCourseServiceEnv();
 
 const app = express();
 const PORT = process.env.PORT || 3002;
+const requireInternal = createRequireInternal({
+  internalSecret: process.env.INTERNAL_SERVICE_SECRET || '',
+});
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(helmet());
@@ -114,40 +88,12 @@ app.get('/health', (_req: Request, res: Response) => {
 
 // ─── Internal service-to-service routes (KHONG expose qua Kong) ──────────────
 // Payment-service goi /internal/courses/:id de verify price.
-app.get('/internal/courses/:id', getCourseByIdInternal);
-
-// ─── Student Learning Routes (prefix /api/student/ to avoid /:slug conflict) ─
-app.post('/api/student/courses/:courseId/enroll-free', requireAuth, enrollCourse);
-app.get('/api/student/courses/:courseId/learn-data', requireAuth, getLearnData);
-app.get('/api/student/courses/:courseId/progress', requireAuth, getCourseProgress);
-app.get('/api/student/courses/:courseId/enrollment-status', requireAuth, getEnrollmentStatus);
-app.put('/api/student/lessons/:lessonId/progress', requireAuth, updateLessonProgress);
-app.post('/api/student/lessons/:lessonId/complete', requireAuth, completeLesson);
-app.get('/api/student/my-courses', requireAuth, getMyCourses);
-app.get('/api/student/certificates/by-number/:certificateNumber', requireAuth, getCertificateById);
-app.get('/api/student/certificates/:id', requireAuth, getCertificateById);
-app.get('/api/student/certificates', requireAuth, getMyCertificates);
-
-// ─── Community Routes ───────────────────────────────────────────────────────
-app.get('/api/community/groups', requireAuth, listCommunityGroups);
-app.post('/api/community/groups/:groupId/join', requireAuth, joinCommunityGroup);
-app.get('/api/community/groups/:groupId/posts', requireAuth, listCommunityPosts);
-app.post('/api/community/groups/:groupId/posts', requireAuth, createCommunityPost);
-app.post('/api/community/groups/:groupId/posts/:postId/reply', requireAuth, replyCommunityPost);
-app.post('/api/community/groups/:groupId/posts/:postId/react', requireAuth, reactCommunityPost);
-
-// ─── Global Q&A Routes ──────────────────────────────────────────────────────
-app.post('/api/questions', requireAuth, createQuestion);
-app.get('/api/questions', listQuestions);
-app.get('/api/questions/:id', requireAuth, getQuestionDetail);
-app.patch('/api/questions/:id', requireAuth, updateQuestion);
-app.delete('/api/questions/:id', requireAuth, deleteQuestion);
-app.post('/api/questions/:id/answers', requireAuth, createAnswer);
-app.post('/api/questions/:id/accept-answer/:answerId', requireAuth, acceptAnswer);
-app.post('/api/questions/:id/upvote', requireAuth, upvoteQuestion);
-app.post('/api/answers/:id/upvote', requireAuth, upvoteAnswer);
-app.patch('/api/answers/:id', requireAuth, updateAnswer);
-app.delete('/api/answers/:id', requireAuth, deleteAnswer);
+// Learning-service goi /internal/lessons/:id de verify lesson truoc khi update progress.
+// Learning-service goi /internal/courses/:id/curriculum de lay danh sach chapter + lesson.
+app.get('/internal/courses/:id', requireInternal, getCourseByIdInternal);
+app.get('/internal/courses/:id/curriculum', requireInternal, getCourseCurriculumInternal);
+app.get('/internal/lessons/:id', requireInternal, getLessonByIdInternal);
+app.get('/internal/instructors/:instructorId/courses', requireInternal, getInstructorCourseIdsInternal);
 
 // ─── Instructor Profile Routes ─────────────────────────────────────────────
 app.get('/api/instructors/profile', ...requireRole('instructor', 'admin'), getMyInstructorProfile);
@@ -167,7 +113,6 @@ app.get('/api/courses/:slug', getCourseBySlug);
 
 // ─── Admin Routes ─────────────────────────────────────────────────────────────
 app.post('/api/admin/categories', ...requireRole('admin'), createCategory);
-app.post('/api/admin/community/groups', ...requireRole('admin'), createPublicCommunityGroup);
 app.use('/api/admin', ...requireRole('admin'), adminRouter);
 
 // ─── Instructor Routes (Kong injects x-user-id, x-user-role) ─────────────────
@@ -181,10 +126,6 @@ app.get('/api/instructor/certificate-templates', ...requireRole('instructor', 'a
 app.post('/api/instructor/certificate-templates', ...requireRole('instructor', 'admin'), createInstructorCertificateTemplate);
 app.put('/api/instructor/certificate-templates/:id', ...requireRole('instructor', 'admin'), updateInstructorCertificateTemplate);
 app.delete('/api/instructor/certificate-templates/:id', ...requireRole('instructor', 'admin'), deleteInstructorCertificateTemplate);
-app.get('/api/instructor/community/groups', ...requireRole('instructor', 'admin'), listInstructorCommunityGroups);
-app.post('/api/instructor/community/groups', ...requireRole('instructor', 'admin'), createInstructorCommunityGroup);
-app.put('/api/instructor/community/groups/:groupId', ...requireRole('instructor', 'admin'), updateInstructorCommunityGroup);
-app.put('/api/instructor/community/groups/:groupId/assign', ...requireRole('instructor', 'admin'), assignCommunityGroupToCourse);
 app.post('/api/instructor/categories', ...requireRole('instructor', 'admin'), createCategory);
 app.get('/api/courses/:id/curriculum', ...requireRole('instructor', 'admin'), getCourseCurriculum);
 app.post('/api/courses', ...requireRole('instructor', 'admin'), createCourse);
@@ -203,12 +144,6 @@ app.post('/api/courses/:courseId/chapters/:chapterId/lessons', ...requireRole('i
 app.put('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), updateLesson);
 app.delete('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), deleteLesson);
 app.get('/api/lessons/:lessonId/playback', getLessonPlayback);
-
-// ─── Student Learning Routes (Enrollment & Progress) ──────────────────────────
-app.post('/api/enrollments', requireAuth, enrollCourse);
-app.get('/api/enrollments/my', requireAuth, getMyEnrollments);
-// app.get('/api/courses/:courseId/progress', requireAuth, getCourseProgress); // Removed duplicate
-// app.put('/api/lessons/:lessonId/progress', requireAuth, updateLessonProgress); // Removed duplicate
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {
@@ -250,7 +185,7 @@ if (process.env.CACHE_REDIS_URL) {
   logger.warn('CACHE_REDIS_URL chua set — bo qua cache layer');
 }
 
-// Khoi dong Kafka consumer (Phase 16: payment.order.completed -> enrollment).
+// Khoi dong Kafka consumer (Phase 4 cleanup: learning.enrollment.created -> enrollmentCount).
 // Khong block khoi dong HTTP server; neu Kafka chua san, log warning va thu lai.
 if (process.env.KAFKA_BROKER) {
   startKafkaConsumers().catch((err) => {
@@ -262,7 +197,7 @@ if (process.env.KAFKA_BROKER) {
     }, 10_000);
   });
 } else {
-  logger.warn('KAFKA_BROKER chua set — bo qua consumer (flow mua khoa hoc se khong tao enrollment)');
+  logger.warn('KAFKA_BROKER chua set — bo qua consumer (enrollmentCount se khong cap nhat)');
 }
 
 // Tat server an toan

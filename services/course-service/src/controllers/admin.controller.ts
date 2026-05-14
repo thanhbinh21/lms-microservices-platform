@@ -1,11 +1,21 @@
 import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import type { ApiResponse } from '@lms/types';
-import { TOPICS } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
+import { cacheInvalidate, cacheInvalidatePattern } from '@lms/cache';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
-import { publishEvent } from '../lib/kafka-producer';
+
+async function invalidateCourseDiscoveryCachesForStatusChange(): Promise<void> {
+  await Promise.all([
+    cacheInvalidatePattern('cache:courses:list:*'),
+    cacheInvalidate('cache:courses:price-range', 'cache:categories:all'),
+  ]);
+}
+
+async function invalidateCourseDiscoveryCachesForRatingChange(): Promise<void> {
+  await cacheInvalidatePattern('cache:courses:list:*');
+}
 
 /** GET /api/admin/courses */
 export async function listAdminCourses(req: Request, res: Response) {
@@ -123,14 +133,7 @@ export async function updateCourseStatus(req: Request, res: Response) {
       'Admin updated course status',
     );
 
-    await publishEvent(TOPICS.COURSE_CATALOG_STATUS_CHANGED, {
-      courseId: id,
-      previousStatus,
-      newStatus: status,
-      reopenFromArchive,
-      traceId,
-      occurredAt: new Date().toISOString(),
-    });
+    await invalidateCourseDiscoveryCachesForStatusChange();
 
     const response: ApiResponse<unknown> = {
       success: true,
@@ -231,6 +234,8 @@ export async function flagReview(req: Request, res: Response) {
 
     logger.info({ reviewId: id, isFlagged }, 'Admin toggled review flag');
 
+    await invalidateCourseDiscoveryCachesForRatingChange();
+
     const response: ApiResponse<unknown> = {
       success: true,
       code: 200,
@@ -280,6 +285,8 @@ export async function deleteReview(req: Request, res: Response) {
 
     logger.info({ reviewId: id, courseId: review.courseId }, 'Admin deleted review and recalculated rating');
 
+    await invalidateCourseDiscoveryCachesForRatingChange();
+
     const response: ApiResponse<null> = {
       success: true,
       code: 200,
@@ -306,7 +313,7 @@ export async function getAdminStats(req: Request, res: Response) {
     ] = await Promise.all([
       prisma.course.count(),
       prisma.course.groupBy({ by: ['status'], _count: { id: true } }),
-      prisma.enrollment.count(),
+      prisma.enrollmentSignal.count(),
       prisma.review.count(),
       prisma.review.count({ where: { isFlagged: true } }),
     ]);

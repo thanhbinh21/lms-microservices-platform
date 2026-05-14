@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { logger } from '@lms/logger';
-import type { ApiResponse } from '@lms/types';
+import { createRequireInternal, type ApiResponse } from '@lms/types';
 import { initRedis, closeRedis } from './lib/redis.js';
 import { initEnv } from './lib/env.js';
 import prisma from './lib/prisma.js';
@@ -12,11 +12,21 @@ import { refresh } from './controllers/refresh.controller.js';
 import { logout } from './controllers/logout.controller.js';
 import { updateUserRole } from './controllers/update-role.controller.js';
 import { becomeEducator } from './controllers/become-educator.controller.js';
-import { requireAdmin } from './middlewares/requireAdmin.js';
+import { requireAdmin } from './middleware/require-admin.js';
+import { requireAuth } from './middleware/require-auth.js';
 import { getInternalUser, getInternalUsersBatch, getInternalInstructors } from './controllers/internal.controller.js';
 import { createAuditLog } from './controllers/audit.controller.js';
 import adminRouter from './routes/admin.routes.js';
 import { startCleanupJobs } from './jobs/cleanup.js';
+import {
+  createInstructorRequest,
+  getMyInstructorRequest,
+  listInstructorRequests,
+  getInstructorRequestStats,
+  getInstructorRequestById,
+  approveInstructorRequest,
+  rejectInstructorRequest,
+} from './controllers/instructor-request.controller.js';
 
 // Validate bien moi truong khi khoi dong
 const env = initEnv();
@@ -25,6 +35,7 @@ const app = express();
 const PORT = process.env.PORT || 3101;
 let server: ReturnType<typeof app.listen> | null = null;
 let shuttingDown = false;
+const requireInternal = createRequireInternal({ internalSecret: env.INTERNAL_SERVICE_SECRET });
 
 // Middleware bao mat
 app.use(helmet());
@@ -68,11 +79,20 @@ app.post('/logout', logout);
 app.post('/become-educator', becomeEducator);
 app.patch('/users/role', requireAdmin, updateUserRole);
 
+// Routes don xin tro thanh giang vien (merge tu instructor-service)
+app.post('/instructor/request', requireAuth, createInstructorRequest);
+app.get('/instructor/my-request', requireAuth, getMyInstructorRequest);
+app.get('/admin/instructor/requests/stats', requireAdmin, getInstructorRequestStats);
+app.get('/admin/instructor/requests', requireAdmin, listInstructorRequests);
+app.get('/admin/instructor/requests/:id', requireAdmin, getInstructorRequestById);
+app.put('/admin/instructor/approve/:id', requireAdmin, approveInstructorRequest);
+app.put('/admin/instructor/reject/:id', requireAdmin, rejectInstructorRequest);
+
 // Internal routes (khong qua Gateway)
-app.get('/internal/users/:id', getInternalUser);
-app.post('/internal/users/batch', getInternalUsersBatch);
-app.get('/internal/instructors', getInternalInstructors);
-app.post('/internal/audit-logs', createAuditLog);
+app.get('/internal/users/:id', requireInternal, getInternalUser);
+app.post('/internal/users/batch', requireInternal, getInternalUsersBatch);
+app.get('/internal/instructors', requireInternal, getInternalInstructors);
+app.post('/internal/audit-logs', requireInternal, createAuditLog);
 
 // Admin routes
 app.use('/admin', requireAdmin, adminRouter);

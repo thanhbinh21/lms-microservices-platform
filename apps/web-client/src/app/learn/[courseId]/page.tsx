@@ -22,7 +22,7 @@ export default function LearnCoursePage() {
       const allLessons = chapters.flatMap((ch) => ch.lessons);
 
       const lastInProgress = allLessons.find(
-        (l) => l.progress && !l.progress.isCompleted && l.progress.watchedDuration > 0,
+        (l) => l.progress && !l.progress.isCompleted && l.progress.lastWatched > 0,
       );
       const firstIncomplete = allLessons.find((l) => !l.progress?.isCompleted);
       const target = lastInProgress || firstIncomplete || allLessons[0];

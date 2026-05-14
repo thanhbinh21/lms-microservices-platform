@@ -1,12 +1,14 @@
 import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import type { Prisma } from '../generated/prisma-v2/index.js';
+import type { Prisma } from '../generated/prisma/index.js';
 import type { ApiResponse } from '@lms/types';
+import { logger } from '@lms/logger';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
 import { withRetry } from '@lms/db-prisma';
-import { cacheGet } from '@lms/cache';
+import { cacheGet, cacheInvalidate, cacheInvalidatePattern } from '@lms/cache';
+import { fetchWithTimeout } from '../lib/http';
 
 // Schema tao khoa hoc
 const createCourseSchema = z.object({
@@ -46,6 +48,29 @@ const reviewBodySchema = z.object({
   rating: z.number().int().min(1, 'Rating toi thieu 1 sao').max(5, 'Rating toi da 5 sao'),
   comment: z.string().trim().max(1000, 'Comment toi da 1000 ky tu').optional(),
 });
+
+const LEARNING_SERVICE_URL = (process.env.LEARNING_SERVICE_URL || 'http://localhost:3006').replace(/\/$/, '');
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
+
+interface CourseCacheInvalidationOptions {
+  includePriceRange?: boolean;
+  includeCategories?: boolean;
+}
+
+async function invalidateCourseDiscoveryCaches(options: CourseCacheInvalidationOptions = {}): Promise<void> {
+  const staticKeys: string[] = [];
+  if (options.includePriceRange) {
+    staticKeys.push('cache:courses:price-range');
+  }
+  if (options.includeCategories) {
+    staticKeys.push('cache:categories:all');
+  }
+
+  await Promise.all([
+    cacheInvalidatePattern('cache:courses:list:*'),
+    ...(staticKeys.length > 0 ? [cacheInvalidate(...staticKeys)] : []),
+  ]);
+}
 
 // Tao hash ngan tu query params de lam cache key cho list endpoint
 function buildCacheKey(prefix: string, params: Record<string, unknown>): string {
@@ -242,35 +267,36 @@ async function buildCourseReviewStats(courseId: string): Promise<{
   };
 }
 
-async function getUserCourseCompletionState(userId: string, courseId: string) {
-  const [totalLessons, completedLessons] = await prisma.$transaction([
-    prisma.lesson.count({
-      where: {
-        isPublished: true,
-        chapter: { courseId },
-      },
-    }),
-    prisma.lessonProgress.count({
-      where: {
-        userId,
-        isCompleted: true,
-        lesson: {
-          isPublished: true,
-          chapter: { courseId },
+async function getUserCourseCompletionState(userId: string, courseId: string, traceId: string) {
+  try {
+    const res = await fetchWithTimeout(
+      `${LEARNING_SERVICE_URL}/internal/courses/${courseId}/completion?userId=${userId}`,
+      {
+        headers: {
+          'x-internal-call': 'course-service',
+          'x-internal-secret': INTERNAL_SERVICE_SECRET,
+          'x-trace-id': traceId,
         },
       },
-    }),
-  ]);
+    );
 
-  const progressPercent =
-    totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+    if (!res.ok) return null;
 
-  return {
-    totalLessons,
-    completedLessons,
-    progressPercent,
-    completed: totalLessons > 0 && completedLessons >= totalLessons,
-  };
+    const json = (await res.json()) as {
+      data?: {
+        enrolled: boolean;
+        totalLessons: number;
+        completedLessons: number;
+        progressPercent: number;
+        completed: boolean;
+      };
+    };
+
+    return json?.data ?? null;
+  } catch (err) {
+    logger.warn({ err, userId, courseId }, 'getUserCourseCompletionState failed');
+    return null;
+  }
 }
 
 // ─── Controllers ──────────────────────────────────────────────────────────────
@@ -302,11 +328,13 @@ export async function listCourses(req: Request, res: Response) {
     const level = (req.query.level as string)?.toUpperCase() || '';
 
     const where: Prisma.CourseWhereInput = { status: 'PUBLISHED' };
+    const keyword = q || search;
+    const ratingFloor = minRating ?? rating;
 
-    if (q) {
+    if (keyword) {
       where.OR = [
-        { title: { contains: q, mode: 'insensitive' } },
-        { description: { contains: q, mode: 'insensitive' } },
+        { title: { contains: keyword, mode: 'insensitive' } },
+        { description: { contains: keyword, mode: 'insensitive' } },
       ];
     }
     if (categorySlug) {
@@ -318,8 +346,8 @@ export async function listCourses(req: Request, res: Response) {
     if (maxPrice !== undefined && !isNaN(maxPrice)) {
       where.price = { ...(where.price as object), lte: maxPrice };
     }
-    if (minRating !== undefined && !isNaN(minRating)) {
-      where.averageRating = { gte: minRating };
+    if (ratingFloor !== undefined && !isNaN(ratingFloor)) {
+      where.averageRating = { gte: ratingFloor };
     }
     if (level && ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].includes(level)) {
       where.level = level as any;
@@ -417,6 +445,8 @@ export async function listCourseReviews(req: Request, res: Response) {
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
     const skip = (page - 1) * limit;
     const sortBy = (req.query.sortBy as string) || 'newest';
+    const search = (req.query.search as string) || '';
+    const rating = Number(req.query.rating) || 0;
 
     const course = await prisma.course.findUnique({
       where: { id: courseId },
@@ -622,12 +652,19 @@ export async function upsertCourseReview(req: Request, res: Response) {
       return res.status(404).json(notFound);
     }
 
-    const enrollment = await prisma.enrollment.findUnique({
-      where: { userId_courseId: { userId, courseId } },
-      select: { id: true },
-    });
+    const completionState = await getUserCourseCompletionState(userId, courseId, traceId);
+    if (!completionState) {
+      const badGateway: ApiResponse<null> = {
+        success: false,
+        code: 503,
+        message: 'Khong the kiem tra tien do hoc tap. Vui long thu lai sau.',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(503).json(badGateway);
+    }
 
-    if (!enrollment) {
+    if (!completionState.enrolled) {
       const forbidden: ApiResponse<null> = {
         success: false,
         code: 403,
@@ -654,7 +691,6 @@ export async function upsertCourseReview(req: Request, res: Response) {
       return res.status(409).json(conflict);
     }
 
-    const completionState = await getUserCourseCompletionState(userId, courseId);
     if (!completionState.completed) {
       const forbidden: ApiResponse<null> = {
         success: false,
@@ -710,6 +746,8 @@ export async function upsertCourseReview(req: Request, res: Response) {
       },
       trace_id: traceId,
     };
+
+    await invalidateCourseDiscoveryCaches();
 
     return res.status(200).json(response);
   } catch (err) {
@@ -857,10 +895,7 @@ export async function getInstructorCourseById(req: Request, res: Response) {
     const course = await prisma.course.findUnique({
       where: { id: courseId, instructorId },
       include: {
-        _count: { select: { chapters: true, enrollments: true } },
-        communityGroups: {
-          select: { id: true, name: true, slug: true, courseId: true },
-        },
+        _count: { select: { chapters: true } },
       },
     });
 
@@ -1351,6 +1386,9 @@ export async function createCourse(req: Request, res: Response) {
       success: true, code: 201, message: 'Course created successfully',
       data: serializeCourse(course), trace_id: traceId,
     };
+
+    await invalidateCourseDiscoveryCaches();
+
     return res.status(201).json(response);
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -1403,6 +1441,15 @@ export async function updateCourse(req: Request, res: Response) {
     const updated = await prisma.course.update({
       where: { id: req.params.id },
       data: { ...validated, slug },
+    });
+
+    const statusChanged = validated.status !== undefined && validated.status !== course.status;
+    const priceChanged = validated.price !== undefined && Number(validated.price) !== Number(course.price);
+    const categoryChanged = validated.categoryId !== undefined && validated.categoryId !== course.categoryId;
+
+    await invalidateCourseDiscoveryCaches({
+      includePriceRange: statusChanged || priceChanged,
+      includeCategories: statusChanged || categoryChanged,
     });
 
     const response: ApiResponse<unknown> = {
@@ -1491,6 +1538,11 @@ export async function publishCourse(req: Request, res: Response) {
       return updated;
     });
 
+    await invalidateCourseDiscoveryCaches({
+      includePriceRange: true,
+      includeCategories: true,
+    });
+
     const response: ApiResponse<unknown> = {
       success: true,
       code: 200,
@@ -1543,6 +1595,8 @@ export async function deleteCourse(req: Request, res: Response) {
     }
 
     await prisma.course.delete({ where: { id: req.params.id } });
+
+    await invalidateCourseDiscoveryCaches();
 
     const response: ApiResponse<null> = {
       success: true, code: 200, message: 'Course deleted successfully', data: null, trace_id: traceId,

@@ -119,6 +119,12 @@ export interface RequireAdminMiddlewareOptions {
   traceIdFallback?: string;
 }
 
+export interface RequireInternalMiddlewareOptions {
+  internalSecret: string;
+  forbiddenMessage?: string;
+  traceIdFallback?: string;
+}
+
 type GatewayHeaderValue = string | string[] | undefined;
 
 export interface AdminGuardRequestLike {
@@ -141,6 +147,54 @@ function readHeaderValue(value: string | string[] | undefined): string {
   return value || '';
 }
 
+interface GatewayUserContext {
+  userId: string;
+  userRole: string;
+  userEmail: string;
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
+    return typeof payload === 'object' && payload !== null ? payload as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function readUserContextFromHeaders(headers: Record<string, GatewayHeaderValue>): GatewayUserContext {
+  const gatewayUserId = readHeaderValue(headers['x-user-id']);
+  const gatewayUserRole = readHeaderValue(headers['x-user-role']);
+  const gatewayUserEmail = readHeaderValue(headers['x-user-email']);
+
+  if (gatewayUserId) {
+    return {
+      userId: gatewayUserId,
+      userRole: gatewayUserRole,
+      userEmail: gatewayUserEmail,
+    };
+  }
+
+  const authorization = readHeaderValue(headers.authorization);
+  if (!authorization || !authorization.toLowerCase().startsWith('bearer ')) {
+    return { userId: '', userRole: '', userEmail: '' };
+  }
+
+  const token = authorization.slice(7).trim();
+  const payload = decodeJwtPayload(token);
+  if (!payload) {
+    return { userId: '', userRole: '', userEmail: '' };
+  }
+
+  const userId = typeof payload.userId === 'string' ? payload.userId : '';
+  const userRole = typeof payload.role === 'string' ? payload.role : '';
+  const userEmail = typeof payload.email === 'string' ? payload.email : '';
+
+  return { userId, userRole, userEmail };
+}
+
 /**
  * Tao middleware check vai tro ADMIN tu header do Gateway inject.
  * Dung factory de cac service co the tuy bien message theo domain.
@@ -155,8 +209,9 @@ export function createRequireAdmin(options: RequireAdminMiddlewareOptions = {}) 
     res: AdminGuardResponseLike,
     next: AdminGuardNext,
   ): void {
-    const userId = readHeaderValue(req.headers['x-user-id']);
-    const userRole = readHeaderValue(req.headers['x-user-role']).toUpperCase();
+    const context = readUserContextFromHeaders(req.headers);
+    const userId = context.userId;
+    const userRole = context.userRole.toUpperCase();
     const traceId = readHeaderValue(req.headers['x-trace-id']) || traceIdFallback;
 
     if (!userId) {
@@ -185,6 +240,7 @@ export function createRequireAdmin(options: RequireAdminMiddlewareOptions = {}) 
 
     res.locals.userId = userId;
     res.locals.userRole = userRole;
+    res.locals.userEmail = context.userEmail;
     next();
   };
 }
@@ -202,7 +258,8 @@ export function createRequireAuth(options: RequireAdminMiddlewareOptions = {}) {
     res: AdminGuardResponseLike,
     next: AdminGuardNext,
   ): void {
-    const userId = readHeaderValue(req.headers['x-user-id']);
+    const context = readUserContextFromHeaders(req.headers);
+    const userId = context.userId;
     const traceId = readHeaderValue(req.headers['x-trace-id']) || traceIdFallback;
 
     if (!userId) {
@@ -218,8 +275,43 @@ export function createRequireAuth(options: RequireAdminMiddlewareOptions = {}) {
     }
 
     res.locals.userId = userId;
-    // userRole co the co hoac khong, chu yeu la can userId
-    res.locals.userRole = readHeaderValue(req.headers['x-user-role']);
+    res.locals.userRole = context.userRole;
+    res.locals.userEmail = context.userEmail;
+    next();
+  };
+}
+
+/**
+ * Tao middleware cho endpoint /internal/*.
+ * Header x-internal-secret moi la bien xac thuc, x-internal-call chi de trace nguon goi.
+ */
+export function createRequireInternal(options: RequireInternalMiddlewareOptions) {
+  const internalSecret = options.internalSecret;
+  const forbiddenMessage = options.forbiddenMessage || 'Forbidden - invalid internal secret';
+  const traceIdFallback = options.traceIdFallback || 'unknown';
+
+  return function requireInternal(
+    req: AdminGuardRequestLike,
+    res: AdminGuardResponseLike,
+    next: AdminGuardNext,
+  ): void {
+    const providedSecret = readHeaderValue(req.headers['x-internal-secret']);
+    const traceId = readHeaderValue(req.headers['x-trace-id']) || traceIdFallback;
+    const internalCaller = readHeaderValue(req.headers['x-internal-call']);
+
+    if (!internalSecret || !providedSecret || providedSecret !== internalSecret) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 403,
+        message: forbiddenMessage,
+        data: null,
+        trace_id: traceId,
+      };
+      res.status(403).json(response);
+      return;
+    }
+
+    res.locals.internalCaller = internalCaller;
     next();
   };
 }
