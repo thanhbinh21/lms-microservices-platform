@@ -9,6 +9,11 @@ import {
 } from '../controllers/admin.controller.js';
 import { listAuditLogs } from '../controllers/audit.controller.js';
 import { listSystemConfigs, upsertSystemConfig } from '../controllers/system-config.controller.js';
+import {
+  listAdminSupportTickets,
+  replySupportTicket,
+  updateAdminSupportTicket,
+} from '../controllers/support.controller.js';
 
 const router: ExpressRouter = Router();
 
@@ -21,5 +26,8 @@ router.get('/stats', getStats);
 router.get('/audit-logs', listAuditLogs);
 router.get('/system-configs', listSystemConfigs);
 router.put('/system-configs', upsertSystemConfig);
+router.get('/support/tickets', listAdminSupportTickets);
+router.patch('/support/tickets/:id', updateAdminSupportTicket);
+router.post('/support/tickets/:id/replies', replySupportTicket);
 
 export default router;

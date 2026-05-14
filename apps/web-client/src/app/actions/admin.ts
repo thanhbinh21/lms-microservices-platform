@@ -364,7 +364,7 @@ export async function getAdminFailedEvents(params: {
   if (params.topic) query.set('topic', params.topic);
 
   return callApi<{ events: any[]; pagination: any }>(
-    `/course/api/admin/failed-events?${query.toString()}`,
+    `/learning/api/admin/dlq?${query.toString()}`,
     { method: 'GET' },
     true,
   );
@@ -372,7 +372,7 @@ export async function getAdminFailedEvents(params: {
 
 export async function getAdminFailedEventStats(): Promise<ApiResponse<any>> {
   return callApi<any>(
-    `/course/api/admin/failed-events/stats`,
+    `/learning/api/admin/dlq/stats`,
     { method: 'GET' },
     true,
   );
@@ -382,7 +382,7 @@ export async function getAdminFailedEvent(
   eventId: string,
 ): Promise<ApiResponse<any>> {
   return callApi<any>(
-    `/course/api/admin/failed-events/${eventId}`,
+    `/learning/api/admin/dlq/${eventId}`,
     { method: 'GET' },
     true,
   );
@@ -392,7 +392,7 @@ export async function retryAdminFailedEvent(
   eventId: string,
 ): Promise<ApiResponse<any>> {
   return callApi<any>(
-    `/course/api/admin/failed-events/${eventId}/retry`,
+    `/learning/api/admin/dlq/${eventId}/retry`,
     { method: 'POST' },
     true,
   );
@@ -403,7 +403,7 @@ export async function resolveAdminFailedEvent(
   status: string,
 ): Promise<ApiResponse<any>> {
   return callApi<any>(
-    `/course/api/admin/failed-events/${eventId}/resolve`,
+    `/learning/api/admin/dlq/${eventId}/resolve`,
     { method: 'PATCH', body: JSON.stringify({ status }) },
     true,
   );

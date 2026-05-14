@@ -27,6 +27,12 @@ import {
   approveInstructorRequest,
   rejectInstructorRequest,
 } from './controllers/instructor-request.controller.js';
+import {
+  createSupportTicket,
+  getSupportTicket,
+  listMySupportTickets,
+  replySupportTicket,
+} from './controllers/support.controller.js';
 
 // Validate bien moi truong khi khoi dong
 const env = initEnv();
@@ -87,6 +93,12 @@ app.get('/admin/instructor/requests', requireAdmin, listInstructorRequests);
 app.get('/admin/instructor/requests/:id', requireAdmin, getInstructorRequestById);
 app.put('/admin/instructor/approve/:id', requireAdmin, approveInstructorRequest);
 app.put('/admin/instructor/reject/:id', requireAdmin, rejectInstructorRequest);
+
+// Routes ho tro nguoi dung
+app.post('/support/tickets', requireAuth, createSupportTicket);
+app.get('/support/tickets/my', requireAuth, listMySupportTickets);
+app.get('/support/tickets/:id', requireAuth, getSupportTicket);
+app.post('/support/tickets/:id/replies', requireAuth, replySupportTicket);
 
 // Internal routes (khong qua Gateway)
 app.get('/internal/users/:id', requireInternal, getInternalUser);

@@ -18,7 +18,6 @@ export default function AdminPayoutsPage() {
   const [instructorFilter, setInstructorFilter] = useState('');
   const [note, setNote] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
-
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -28,20 +27,20 @@ export default function AdminPayoutsPage() {
     confirmLabel?: string;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, variant: 'default' });
 
-  const fetchPayouts = async () => {
+  async function fetchPayouts() {
     setLoading(true);
-    const res = await getAdminPayoutsAction({
+    const result = await getAdminPayoutsAction({
       page,
       limit: 10,
       status: statusFilter || undefined,
       instructorId: instructorFilter.trim() || undefined,
     });
-    if (res.success && res.data) {
-      setItems(res.data.items);
-      setPagination(res.data.pagination);
+    if (result.success && result.data) {
+      setItems(result.data.items);
+      setPagination(result.data.pagination);
     }
     setLoading(false);
-  };
+  }
 
   useEffect(() => {
     void fetchPayouts();
@@ -51,66 +50,65 @@ export default function AdminPayoutsPage() {
     setPage(1);
   }, [statusFilter, instructorFilter]);
 
-  const handleUpdate = (payout: AdminPayoutDto, nextStatus: 'APPROVED' | 'REJECTED' | 'PAID') => {
+  function handleUpdate(payout: AdminPayoutDto, nextStatus: 'APPROVED' | 'REJECTED' | 'PAID') {
+    if (nextStatus === 'REJECTED' && !note.trim()) {
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Thiếu ghi chú từ chối',
+        message: 'Vui lòng nhập ghi chú admin trước khi từ chối yêu cầu rút tiền.',
+        variant: 'danger',
+        confirmLabel: 'Đã hiểu',
+        onConfirm: () => undefined,
+      });
+      return;
+    }
+
     setConfirmDialog({
       isOpen: true,
-      title: nextStatus === 'REJECTED' ? 'Từ chối payout' : nextStatus === 'PAID' ? 'Đánh dấu đã chi trả' : 'Duyệt payout',
-      message: `Bạn có chắc muốn chuyển payout này sang trạng thái ${nextStatus}?`,
+      title: nextStatus === 'REJECTED' ? 'Từ chối yêu cầu rút tiền' : nextStatus === 'PAID' ? 'Đánh dấu đã chi trả' : 'Duyệt yêu cầu rút tiền',
+      message: `Bạn có chắc muốn chuyển yêu cầu này sang trạng thái ${nextStatus}?`,
       variant: nextStatus === 'REJECTED' ? 'danger' : 'default',
       confirmLabel: nextStatus === 'REJECTED' ? 'Từ chối' : 'Xác nhận',
       onConfirm: async () => {
         setActionLoading(true);
-        const res = await updateAdminPayoutAction(payout.id, nextStatus, note.trim() || undefined);
+        const result = await updateAdminPayoutAction(payout.id, nextStatus, note.trim() || undefined);
         setActionLoading(false);
-        if (res.success) {
+        if (result.success) {
           setNote('');
           await fetchPayouts();
         }
       },
     });
-  };
+  }
 
-  const formatMoney = (value: number) => `${value.toLocaleString('vi-VN')} ₫`;
+  const formatMoney = (value: number) => `${value.toLocaleString('vi-VN')} đ`;
 
   return (
     <div className="p-6 md:p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Quản lý payout</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Quản lý rút tiền</h1>
         <p className="mt-1 text-sm font-medium text-muted-foreground">
-          Duyệt hoặc từ chối các yêu cầu rút tiền của giảng viên.
+          Duyệt, từ chối hoặc xác nhận đã chi trả các yêu cầu rút tiền của giảng viên.
         </p>
       </div>
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <CardTitle className="text-lg">Danh sách payout</CardTitle>
+            <CardTitle className="text-lg">Danh sách yêu cầu rút tiền</CardTitle>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Lọc theo instructorId"
-                  className="pl-9"
-                  value={instructorFilter}
-                  onChange={(e) => setInstructorFilter(e.target.value)}
-                />
+                <Input placeholder="Lọc theo instructorId" className="pl-9" value={instructorFilter} onChange={(event) => setInstructorFilter(event.target.value)} />
               </div>
-              <select
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
+              <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                 <option value="">Tất cả trạng thái</option>
-                <option value="PENDING">Pending</option>
-                <option value="APPROVED">Approved</option>
-                <option value="REJECTED">Rejected</option>
-                <option value="PAID">Paid</option>
+                <option value="PENDING">Chờ xử lý</option>
+                <option value="APPROVED">Đã duyệt</option>
+                <option value="REJECTED">Từ chối</option>
+                <option value="PAID">Đã chi trả</option>
               </select>
-              <Input
-                placeholder="Admin note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-              />
+              <Input placeholder="Ghi chú admin khi từ chối" value={note} onChange={(event) => setNote(event.target.value)} />
             </div>
           </div>
         </CardHeader>
@@ -118,10 +116,10 @@ export default function AdminPayoutsPage() {
           {loading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="mr-2 size-5 animate-spin" />
-              Đang tải payout...
+              Đang tải yêu cầu rút tiền...
             </div>
           ) : items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Chưa có payout nào.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">Chưa có yêu cầu rút tiền nào.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[980px] text-sm">
@@ -151,43 +149,24 @@ export default function AdminPayoutsPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           {payout.status === 'PENDING' && (
                             <>
-                              <Button
-                                size="sm"
-                                className="gap-2 text-xs"
-                                disabled={actionLoading}
-                                onClick={() => handleUpdate(payout, 'APPROVED')}
-                              >
+                              <Button size="sm" className="gap-2 text-xs" disabled={actionLoading} onClick={() => handleUpdate(payout, 'APPROVED')}>
                                 <CheckCircle2 className="size-3" />
                                 Duyệt
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="gap-2 text-xs"
-                                disabled={actionLoading}
-                                onClick={() => handleUpdate(payout, 'REJECTED')}
-                              >
+                              <Button size="sm" variant="destructive" className="gap-2 text-xs" disabled={actionLoading} onClick={() => handleUpdate(payout, 'REJECTED')}>
                                 <XCircle className="size-3" />
                                 Từ chối
                               </Button>
                             </>
                           )}
                           {payout.status === 'APPROVED' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs"
-                              disabled={actionLoading}
-                              onClick={() => handleUpdate(payout, 'PAID')}
-                            >
+                            <Button size="sm" variant="outline" className="text-xs" disabled={actionLoading} onClick={() => handleUpdate(payout, 'PAID')}>
                               Đánh dấu đã chi trả
                             </Button>
                           )}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap py-3 text-muted-foreground">
-                        {new Date(payout.createdAt).toLocaleString('vi-VN')}
-                      </td>
+                      <td className="whitespace-nowrap py-3 text-muted-foreground">{new Date(payout.createdAt).toLocaleString('vi-VN')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -201,15 +180,10 @@ export default function AdminPayoutsPage() {
                 Trang {pagination.page} / {pagination.totalPages} ({pagination.total} kết quả)
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
                   Trước
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= pagination.totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
+                <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((current) => current + 1)}>
                   Sau
                 </Button>
               </div>

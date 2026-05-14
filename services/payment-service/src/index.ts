@@ -19,7 +19,7 @@ import {
   getInstructorPayoutProfile,
   upsertInstructorPayoutProfile,
 } from './controllers/earnings.controller';
-import { listPayouts, updatePayout } from './controllers/payout.controller';
+import { createPayout, listMyPayouts, listPayouts, updatePayout } from './controllers/payout.controller';
 import prisma from './lib/prisma';
 import { startPaymentOutboxWorker, stopPaymentOutboxWorker } from './lib/outbox';
 import { createRequireAdmin } from '@lms/types';
@@ -81,6 +81,8 @@ app.get('/api/instructor/earnings/summary', requireAuth, getInstructorEarningsSu
 app.get('/api/instructor/earnings', requireAuth, getInstructorEarnings);
 app.get('/api/instructor/payout-profile', requireAuth, getInstructorPayoutProfile);
 app.put('/api/instructor/payout-profile', requireAuth, upsertInstructorPayoutProfile);
+app.get('/api/instructor/payouts/my', requireAuth, listMyPayouts);
+app.post('/api/instructor/payouts', requireAuth, createPayout);
 app.get('/api/admin/payouts', requireAdmin, listPayouts);
 app.patch('/api/admin/payouts/:id', requireAdmin, updatePayout);
 
