@@ -87,8 +87,8 @@ export default function AdminSystemEventsPage() {
   function handleRetry(eventId: string) {
     setConfirmDialog({
       isOpen: true,
-      title: 'Thá»­ láº¡i sá»± kiá»‡n',
-      message: 'Báº¡n cÃ³ cháº¯c muá»‘n Ä‘Æ°a sá»± kiá»‡n nÃ y vÃ o luá»“ng xá»­ lÃ½ láº¡i?',
+      title: 'Thử lại sự kiện',
+      message: 'Bạn có chắc muốn đưa sự kiện này vào luồng xử lý lại?',
       variant: 'default',
       onConfirm: async () => {
         const result = await retryAdminFailedEvent(eventId);
@@ -107,9 +107,9 @@ export default function AdminSystemEventsPage() {
   return (
     <div className="workspace-page">
       <div className="workspace-page-header">
-        <h1 className="workspace-page-title">Sá»± kiá»‡n lá»—i há»‡ thá»‘ng</h1>
+        <h1 className="workspace-page-title">Sự kiện lỗi hệ thống</h1>
         <p className="workspace-page-description">
-          Theo dÃµi vÃ  xá»­ lÃ½ cÃ¡c sá»± kiá»‡n tháº¥t báº¡i tá»« learning-service.
+          Theo dõi và xử lý các sự kiện thất bại từ learning-service.
         </p>
       </div>
 
@@ -117,7 +117,7 @@ export default function AdminSystemEventsPage() {
         <div className="mb-6 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
           <AlertTriangle className="size-5 text-amber-600" />
           <p className="text-sm font-medium text-amber-800">
-            CÃ³ <strong>{pendingCount}</strong> sá»± kiá»‡n Ä‘ang chá» xá»­ lÃ½.
+            Có <strong>{pendingCount}</strong> sự kiện đang chờ xử lý.
           </p>
         </div>
       )}
@@ -125,27 +125,27 @@ export default function AdminSystemEventsPage() {
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-lg">Sá»± kiá»‡n tháº¥t báº¡i</CardTitle>
+            <CardTitle className="text-lg">Sự kiện thất bại</CardTitle>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} className="rounded" />
-                Tá»± Ä‘á»™ng lÃ m má»›i (15s)
+                Tự động làm mới (15s)
               </label>
               <Button variant="outline" size="sm" onClick={fetchEvents}>
-                <RefreshCw className="size-4" /> LÃ m má»›i
+                <RefreshCw className="size-4" /> Làm mới
               </Button>
             </div>
           </div>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="">Táº¥t cáº£ tráº¡ng thÃ¡i</option>
-              <option value="PENDING">Chá» xá»­ lÃ½</option>
-              <option value="RETRIED">ÄÃ£ thá»­ láº¡i</option>
-              <option value="RESOLVED">ÄÃ£ xá»­ lÃ½</option>
-              <option value="IGNORED">Bá» qua</option>
+              <option value="">Tất cả trạng thái</option>
+              <option value="PENDING">Chờ xử lý</option>
+              <option value="RETRIED">Đã thử lại</option>
+              <option value="RESOLVED">Đã xử lý</option>
+              <option value="IGNORED">Bỏ qua</option>
             </select>
             <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={topicFilter} onChange={(event) => setTopicFilter(event.target.value)}>
-              <option value="">Táº¥t cáº£ topic</option>
+              <option value="">Tất cả topic</option>
               {TOPIC_OPTIONS.map((topic) => <option key={topic} value={topic}>{topic}</option>)}
             </select>
           </div>
@@ -158,18 +158,18 @@ export default function AdminSystemEventsPage() {
               ))}
             </div>
           ) : events.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">KhÃ´ng cÃ³ sá»± kiá»‡n tháº¥t báº¡i nÃ o.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">Không có sự kiện thất bại nào.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <th className="pb-3 pr-4">Topic</th>
-                    <th className="pb-3 pr-4">Lá»—i</th>
-                    <th className="pb-3 pr-4">Tráº¡ng thÃ¡i</th>
-                    <th className="pb-3 pr-4">Thá»­ láº¡i</th>
-                    <th className="pb-3 pr-4">NgÃ y táº¡o</th>
-                    <th className="pb-3">HÃ nh Ä‘á»™ng</th>
+                    <th className="pb-3 pr-4">Lỗi</th>
+                    <th className="pb-3 pr-4">Trạng thái</th>
+                    <th className="pb-3 pr-4">Thử lại</th>
+                    <th className="pb-3 pr-4">Ngày tạo</th>
+                    <th className="pb-3">Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -192,7 +192,7 @@ export default function AdminSystemEventsPage() {
                           {event.status === 'PENDING' && (
                             <>
                               <Button variant="outline" size="sm" className="text-xs" onClick={() => handleRetry(event.id)}>
-                                <Play className="size-3" /> Thá»­ láº¡i
+                                <Play className="size-3" /> Thử lại
                               </Button>
                               <select
                                 className="rounded-md border border-input bg-background px-2 py-1 text-xs"
@@ -201,9 +201,9 @@ export default function AdminSystemEventsPage() {
                                   if (selectEvent.target.value) void handleResolve(event.id, selectEvent.target.value);
                                 }}
                               >
-                                <option value="">Xá»­ lÃ½...</option>
-                                <option value="RESOLVED">ÄÃ£ xá»­ lÃ½</option>
-                                <option value="IGNORED">Bá» qua</option>
+                                <option value="">Xử lý...</option>
+                                <option value="RESOLVED">Đã xử lý</option>
+                                <option value="IGNORED">Bỏ qua</option>
                               </select>
                             </>
                           )}
@@ -219,11 +219,11 @@ export default function AdminSystemEventsPage() {
           {pagination && pagination.totalPages > 1 && (
             <div className="mt-6 flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Trang {pagination.page} / {pagination.totalPages} ({pagination.total} káº¿t quáº£)
+                Trang {pagination.page} / {pagination.totalPages} ({pagination.total} kết quả)
               </p>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((prev) => prev - 1)}>
-                  <ChevronLeft className="size-4" /> TrÆ°á»›c
+                  <ChevronLeft className="size-4" /> Trước
                 </Button>
                 <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((prev) => prev + 1)}>
                   Sau <ChevronRight className="size-4" />
@@ -238,8 +238,8 @@ export default function AdminSystemEventsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setPayloadModal({ isOpen: false, event: null })}>
           <div className="mx-4 max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-white/60 bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b px-6 py-4">
-              <h3 className="text-lg font-bold">Chi tiáº¿t sá»± kiá»‡n</h3>
-              <button onClick={() => setPayloadModal({ isOpen: false, event: null })} className="rounded-lg p-1 hover:bg-zinc-100" aria-label="ÄÃ³ng">
+              <h3 className="text-lg font-bold">Chi tiết sự kiện</h3>
+              <button onClick={() => setPayloadModal({ isOpen: false, event: null })} className="rounded-lg p-1 hover:bg-zinc-100" aria-label="Đóng">
                 <X className="size-4" />
               </button>
             </div>
@@ -256,21 +256,21 @@ export default function AdminSystemEventsPage() {
                       <code className="text-sm">{payloadModal.event.topic}</code>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase text-muted-foreground">Tráº¡ng thÃ¡i</p>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground">Trạng thái</p>
                       <StatusBadge status={payloadModal.event.status} />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase text-muted-foreground">Láº§n thá»­</p>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground">Lần thử</p>
                       <p>{payloadModal.event.retryCount ?? 0}</p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase text-muted-foreground">NgÃ y táº¡o</p>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground">Ngày tạo</p>
                       <p>{new Date(payloadModal.event.createdAt).toLocaleString('vi-VN')}</p>
                     </div>
                   </div>
                   {payloadModal.event.errorMessage && (
                     <div>
-                      <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Lá»—i</p>
+                      <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Lỗi</p>
                       <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{payloadModal.event.errorMessage}</p>
                     </div>
                   )}
@@ -282,7 +282,7 @@ export default function AdminSystemEventsPage() {
                   </div>
                 </div>
               ) : (
-                <p className="py-8 text-center text-sm text-muted-foreground">KhÃ´ng táº£i Ä‘Æ°á»£c dá»¯ liá»‡u.</p>
+                <p className="py-8 text-center text-sm text-muted-foreground">Không tải được dữ liệu.</p>
               )}
             </div>
           </div>

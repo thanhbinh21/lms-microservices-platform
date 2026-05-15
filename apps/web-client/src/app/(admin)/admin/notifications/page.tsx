@@ -19,7 +19,7 @@ export default function AdminNotificationsPage() {
         setItems(res.data.items);
         setError('');
       } else {
-        setError(res.message || 'KhÃ´ng táº£i Ä‘Æ°á»£c lá»‹ch sá»­ thÃ´ng bÃ¡o.');
+        setError(res.message || 'Không tải được lịch sử thông báo.');
       }
       setLoading(false);
     })();
@@ -29,20 +29,20 @@ export default function AdminNotificationsPage() {
     <div className="workspace-page">
       <Card className="glass-panel rounded-2xl border-white/60">
         <CardHeader>
-          <CardTitle>Lá»‹ch sá»­ thÃ´ng bÃ¡o</CardTitle>
-          <CardDescription>Theo dÃµi toÃ n bá»™ thÃ´ng bÃ¡o há»‡ thá»‘ng Ä‘Ã£ phÃ¡t sinh.</CardDescription>
+          <CardTitle>Lịch sử thông báo</CardTitle>
+          <CardDescription>Theo dõi toàn bộ thông báo hệ thống đã phát sinh.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {loading && <p className="text-sm text-muted-foreground">Äang táº£i...</p>}
+          {loading && <p className="text-sm text-muted-foreground">Đang tải...</p>}
           {!loading && error && <p className="text-sm text-red-600">{error}</p>}
           {!loading && !error && items.length === 0 && (
-            <p className="text-sm text-muted-foreground">ChÆ°a cÃ³ báº£n ghi thÃ´ng bÃ¡o.</p>
+            <p className="text-sm text-muted-foreground">Chưa có bản ghi thông báo.</p>
           )}
           {!loading && !error && items.map((item) => (
             <div key={item.id} className="rounded-xl border p-3">
               <p className="text-sm font-semibold">{item.title}</p>
               <p className="text-xs text-muted-foreground">
-                {item.type} Â· {item.status} Â· {new Date(item.createdAt).toLocaleString('vi-VN')}
+                {item.type} · {item.status} · {new Date(item.createdAt).toLocaleString('vi-VN')}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">{item.body}</p>
             </div>

@@ -10,11 +10,25 @@ export interface BecomeInstructorInput {
   fullName: string;
   phone: string;
   expertise: string;
+  specialization?: string;
   experienceYears: number;
   bio: string;
   courseTitle: string;
   courseCategory: string;
   courseDescription: string;
+  email?: string;
+  dateOfBirth?: string;
+  address?: string;
+  currentJob?: string;
+  github?: string;
+  linkedin?: string;
+  website?: string;
+  youtube?: string;
+  cvFile?: string;
+  certificateFile?: string;
+  identityCard?: string;
+  avatar?: string;
+  targetStudents?: string;
 }
 
 export interface InstructorRequestDto {

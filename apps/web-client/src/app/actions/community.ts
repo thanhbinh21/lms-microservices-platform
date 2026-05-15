@@ -46,7 +46,7 @@ function buildCommunityPath(path: string): string {
 
 export async function getCommunityPostsAction(options?: { limit?: number; cursor?: string | null }) {
   const params = new URLSearchParams();
-  if (options?.limit) params.set('limit', String(options.limit));
+  if (options?.limit) params.set('limit', String(Math.min(Math.max(options.limit, 1), 50)));
   if (options?.cursor) params.set('cursor', options.cursor);
   const query = params.toString();
 

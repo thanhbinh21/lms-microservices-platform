@@ -54,10 +54,10 @@ export default function AdminPayoutsPage() {
     if (nextStatus === 'REJECTED' && !note.trim()) {
       setConfirmDialog({
         isOpen: true,
-        title: 'Thiáº¿u ghi chÃº tá»« chá»‘i',
-        message: 'Vui lÃ²ng nháº­p ghi chÃº admin trÆ°á»›c khi tá»« chá»‘i yÃªu cáº§u rÃºt tiá»n.',
+        title: 'Thiếu ghi chú từ chối',
+        message: 'Vui lòng nhập ghi chú admin trước khi từ chối yêu cầu rút tiền.',
         variant: 'danger',
-        confirmLabel: 'ÄÃ£ hiá»ƒu',
+        confirmLabel: 'Đã hiểu',
         onConfirm: () => undefined,
       });
       return;
@@ -65,10 +65,10 @@ export default function AdminPayoutsPage() {
 
     setConfirmDialog({
       isOpen: true,
-      title: nextStatus === 'REJECTED' ? 'Tá»« chá»‘i yÃªu cáº§u rÃºt tiá»n' : nextStatus === 'PAID' ? 'ÄÃ¡nh dáº¥u Ä‘Ã£ chi tráº£' : 'Duyá»‡t yÃªu cáº§u rÃºt tiá»n',
-      message: `Báº¡n cÃ³ cháº¯c muá»‘n chuyá»ƒn yÃªu cáº§u nÃ y sang tráº¡ng thÃ¡i ${nextStatus}?`,
+      title: nextStatus === 'REJECTED' ? 'Từ chối yêu cầu rút tiền' : nextStatus === 'PAID' ? 'Đánh dấu đã chi trả' : 'Duyệt yêu cầu rút tiền',
+      message: `Bạn có chắc muốn chuyển yêu cầu này sang trạng thái ${nextStatus}?`,
       variant: nextStatus === 'REJECTED' ? 'danger' : 'default',
-      confirmLabel: nextStatus === 'REJECTED' ? 'Tá»« chá»‘i' : 'XÃ¡c nháº­n',
+      confirmLabel: nextStatus === 'REJECTED' ? 'Từ chối' : 'Xác nhận',
       onConfirm: async () => {
         setActionLoading(true);
         const result = await updateAdminPayoutAction(payout.id, nextStatus, note.trim() || undefined);
@@ -81,34 +81,34 @@ export default function AdminPayoutsPage() {
     });
   }
 
-  const formatMoney = (value: number) => `${value.toLocaleString('vi-VN')} Ä‘`;
+  const formatMoney = (value: number) => `${value.toLocaleString('vi-VN')} đ`;
 
   return (
     <div className="workspace-page">
       <div className="workspace-page-header">
-        <h1 className="workspace-page-title">Quáº£n lÃ½ rÃºt tiá»n</h1>
+        <h1 className="workspace-page-title">Quản lý rút tiền</h1>
         <p className="workspace-page-description">
-          Duyá»‡t, tá»« chá»‘i hoáº·c xÃ¡c nháº­n Ä‘Ã£ chi tráº£ cÃ¡c yÃªu cáº§u rÃºt tiá»n cá»§a giáº£ng viÃªn.
+          Duyệt, từ chối hoặc xác nhận đã chi trả các yêu cầu rút tiền của giảng viên.
         </p>
       </div>
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <CardTitle className="text-lg">Danh sÃ¡ch yÃªu cáº§u rÃºt tiá»n</CardTitle>
+            <CardTitle className="text-lg">Danh sách yêu cầu rút tiền</CardTitle>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Lá»c theo instructorId" className="pl-9" value={instructorFilter} onChange={(event) => setInstructorFilter(event.target.value)} />
+                <Input placeholder="Lọc theo instructorId" className="pl-9" value={instructorFilter} onChange={(event) => setInstructorFilter(event.target.value)} />
               </div>
               <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                <option value="">Táº¥t cáº£ tráº¡ng thÃ¡i</option>
-                <option value="PENDING">Chá» xá»­ lÃ½</option>
-                <option value="APPROVED">ÄÃ£ duyá»‡t</option>
-                <option value="REJECTED">Tá»« chá»‘i</option>
-                <option value="PAID">ÄÃ£ chi tráº£</option>
+                <option value="">Tất cả trạng thái</option>
+                <option value="PENDING">Chờ xử lý</option>
+                <option value="APPROVED">Đã duyệt</option>
+                <option value="REJECTED">Từ chối</option>
+                <option value="PAID">Đã chi trả</option>
               </select>
-              <Input placeholder="Ghi chÃº admin khi tá»« chá»‘i" value={note} onChange={(event) => setNote(event.target.value)} />
+              <Input placeholder="Ghi chú admin khi từ chối" value={note} onChange={(event) => setNote(event.target.value)} />
             </div>
           </div>
         </CardHeader>
@@ -116,21 +116,21 @@ export default function AdminPayoutsPage() {
           {loading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="mr-2 size-5 animate-spin" />
-              Äang táº£i yÃªu cáº§u rÃºt tiá»n...
+              Đang tải yêu cầu rút tiền...
             </div>
           ) : items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">ChÆ°a cÃ³ yÃªu cáº§u rÃºt tiá»n nÃ o.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">Chưa có yêu cầu rút tiền nào.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[980px] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <th className="pb-3 pr-4">Giáº£ng viÃªn</th>
-                    <th className="pb-3 pr-4">Sá»‘ tiá»n</th>
-                    <th className="pb-3 pr-4">TÃ i khoáº£n</th>
-                    <th className="pb-3 pr-4">Tráº¡ng thÃ¡i</th>
-                    <th className="pb-3 pr-4">Xá»­ lÃ½</th>
-                    <th className="pb-3">NgÃ y táº¡o</th>
+                    <th className="pb-3 pr-4">Giảng viên</th>
+                    <th className="pb-3 pr-4">Số tiền</th>
+                    <th className="pb-3 pr-4">Tài khoản</th>
+                    <th className="pb-3 pr-4">Trạng thái</th>
+                    <th className="pb-3 pr-4">Xử lý</th>
+                    <th className="pb-3">Ngày tạo</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -151,17 +151,17 @@ export default function AdminPayoutsPage() {
                             <>
                               <Button size="sm" className="gap-2 text-xs" disabled={actionLoading} onClick={() => handleUpdate(payout, 'APPROVED')}>
                                 <CheckCircle2 className="size-3" />
-                                Duyá»‡t
+                                Duyệt
                               </Button>
                               <Button size="sm" variant="destructive" className="gap-2 text-xs" disabled={actionLoading} onClick={() => handleUpdate(payout, 'REJECTED')}>
                                 <XCircle className="size-3" />
-                                Tá»« chá»‘i
+                                Từ chối
                               </Button>
                             </>
                           )}
                           {payout.status === 'APPROVED' && (
                             <Button size="sm" variant="outline" className="text-xs" disabled={actionLoading} onClick={() => handleUpdate(payout, 'PAID')}>
-                              ÄÃ¡nh dáº¥u Ä‘Ã£ chi tráº£
+                              Đánh dấu đã chi trả
                             </Button>
                           )}
                         </div>
@@ -177,11 +177,11 @@ export default function AdminPayoutsPage() {
           {pagination && pagination.totalPages > 1 && (
             <div className="mt-6 flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Trang {pagination.page} / {pagination.totalPages} ({pagination.total} káº¿t quáº£)
+                Trang {pagination.page} / {pagination.totalPages} ({pagination.total} kết quả)
               </p>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
-                  TrÆ°á»›c
+                  Trước
                 </Button>
                 <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((current) => current + 1)}>
                   Sau

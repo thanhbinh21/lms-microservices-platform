@@ -16,18 +16,18 @@ import {
 } from '@/app/actions/support';
 
 const STATUS_LABEL: Record<SupportTicketStatus, string> = {
-  OPEN: 'Má»›i',
-  IN_PROGRESS: 'Äang xá»­ lÃ½',
-  RESOLVED: 'ÄÃ£ giáº£i quyáº¿t',
-  CLOSED: 'ÄÃ£ Ä‘Ã³ng',
+  OPEN: 'Mới',
+  IN_PROGRESS: 'Đang xử lý',
+  RESOLVED: 'Đã giải quyết',
+  CLOSED: 'Đã đóng',
 };
 
 const CATEGORY_LABEL: Record<SupportTicketCategory, string> = {
-  PAYMENT: 'Thanh toÃ¡n',
-  COURSE: 'KhÃ³a há»c',
-  ACCOUNT: 'TÃ i khoáº£n',
-  SYSTEM: 'Lá»—i há»‡ thá»‘ng',
-  OTHER: 'KhÃ¡c',
+  PAYMENT: 'Thanh toán',
+  COURSE: 'Khóa học',
+  ACCOUNT: 'Tài khoản',
+  SYSTEM: 'Lỗi hệ thống',
+  OTHER: 'Khác',
 };
 
 export default function AdminSupportPage() {
@@ -54,7 +54,7 @@ export default function AdminSupportPage() {
       setTickets(data.items);
       setSelectedId((current) => current || data.items[0]?.id || '');
     } else {
-      setMessage({ type: 'error', text: result.message || 'KhÃ´ng thá»ƒ táº£i danh sÃ¡ch há»— trá»£.' });
+      setMessage({ type: 'error', text: result.message || 'Không thể tải danh sách hỗ trợ.' });
     }
     setLoading(false);
   }
@@ -73,9 +73,9 @@ export default function AdminSupportPage() {
     const result = await updateAdminSupportTicketAction(selectedTicket.id, { status });
     if (result.success && result.data) {
       setTickets((items) => items.map((item) => (item.id === result.data?.id ? result.data : item)));
-      setMessage({ type: 'success', text: 'ÄÃ£ cáº­p nháº­t tráº¡ng thÃ¡i ticket.' });
+      setMessage({ type: 'success', text: 'Đã cập nhật trạng thái ticket.' });
     } else {
-      setMessage({ type: 'error', text: result.message || 'KhÃ´ng thá»ƒ cáº­p nháº­t ticket.' });
+      setMessage({ type: 'error', text: result.message || 'Không thể cập nhật ticket.' });
     }
   }
 
@@ -85,9 +85,9 @@ export default function AdminSupportPage() {
     if (result.success && result.data) {
       setReplyMessage('');
       setTickets((items) => items.map((item) => (item.id === result.data?.id ? result.data : item)));
-      setMessage({ type: 'success', text: 'ÄÃ£ gá»­i pháº£n há»“i cho ngÆ°á»i dÃ¹ng.' });
+      setMessage({ type: 'success', text: 'Đã gửi phản hồi cho người dùng.' });
     } else {
-      setMessage({ type: 'error', text: result.message || 'KhÃ´ng thá»ƒ gá»­i pháº£n há»“i.' });
+      setMessage({ type: 'error', text: result.message || 'Không thể gửi phản hồi.' });
     }
   }
 
@@ -96,11 +96,11 @@ export default function AdminSupportPage() {
       <div className="workspace-page-header">
         <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
           <Headphones className="size-3.5" />
-          Há»— trá»£
+          Hỗ trợ
         </div>
-        <h1 className="workspace-page-title">Quáº£n lÃ½ há»— trá»£</h1>
+        <h1 className="workspace-page-title">Quản lý hỗ trợ</h1>
         <p className="workspace-page-description">
-          Theo dÃµi vÃ  pháº£n há»“i cÃ¡c yÃªu cáº§u há»— trá»£ tá»« há»c viÃªn vÃ  giáº£ng viÃªn.
+          Theo dõi và phản hồi các yêu cầu hỗ trợ từ học viên và giảng viên.
         </p>
       </div>
 
@@ -108,32 +108,32 @@ export default function AdminSupportPage() {
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
-          <CardTitle className="text-lg">Danh sÃ¡ch ticket</CardTitle>
-          <CardDescription>Lá»c theo tráº¡ng thÃ¡i, nhÃ³m váº¥n Ä‘á» hoáº·c ná»™i dung tÃ¬m kiáº¿m.</CardDescription>
+          <CardTitle className="text-lg">Danh sách ticket</CardTitle>
+          <CardDescription>Lọc theo trạng thái, nhóm vấn đề hoặc nội dung tìm kiếm.</CardDescription>
           <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_180px_180px_auto]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="TÃ¬m theo tiÃªu Ä‘á» hoáº·c mÃ´ táº£..." className="pl-9" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo tiêu đề hoặc mô tả..." className="pl-9" />
             </div>
             <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="">Táº¥t cáº£ tráº¡ng thÃ¡i</option>
+              <option value="">Tất cả trạng thái</option>
               {Object.entries(STATUS_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
             <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-              <option value="">Táº¥t cáº£ nhÃ³m</option>
+              <option value="">Tất cả nhóm</option>
               {Object.entries(CATEGORY_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <Button variant="outline" onClick={loadTickets}>TÃ¬m kiáº¿m</Button>
+            <Button variant="outline" onClick={loadTickets}>Tìm kiếm</Button>
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground">
               <Loader2 className="mr-2 size-5 animate-spin" />
-              Äang táº£i...
+              Đang tải...
             </div>
           ) : tickets.length === 0 ? (
-            <p className="py-16 text-center text-sm text-muted-foreground">KhÃ´ng cÃ³ ticket phÃ¹ há»£p.</p>
+            <p className="py-16 text-center text-sm text-muted-foreground">Không có ticket phù hợp.</p>
           ) : (
             <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
               <div className="space-y-2">
@@ -183,7 +183,7 @@ export default function AdminSupportPage() {
                     {selectedTicket.replies.map((reply) => (
                       <div key={reply.id} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
                         <p className="text-xs font-bold text-muted-foreground">
-                          {reply.authorRole === 'ADMIN' ? 'Admin' : reply.authorName || reply.authorEmail || 'NgÆ°á»i dÃ¹ng'} - {new Date(reply.createdAt).toLocaleString('vi-VN')}
+                          {reply.authorRole === 'ADMIN' ? 'Admin' : reply.authorName || reply.authorEmail || 'Người dùng'} - {new Date(reply.createdAt).toLocaleString('vi-VN')}
                         </p>
                         <p className="mt-1 whitespace-pre-wrap text-sm">{reply.message}</p>
                       </div>
@@ -192,7 +192,7 @@ export default function AdminSupportPage() {
 
                   {selectedTicket.status !== 'CLOSED' && (
                     <div className="space-y-2">
-                      <label htmlFor="admin-support-reply" className="text-sm font-semibold">Pháº£n há»“i</label>
+                      <label htmlFor="admin-support-reply" className="text-sm font-semibold">Phản hồi</label>
                       <textarea
                         id="admin-support-reply"
                         className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -201,7 +201,7 @@ export default function AdminSupportPage() {
                       />
                       <Button className="rounded-xl font-bold" disabled={replyMessage.trim().length < 2} onClick={submitReply}>
                         <Send className="mr-2 size-4" />
-                        Gá»­i pháº£n há»“i
+                        Gửi phản hồi
                       </Button>
                     </div>
                   )}

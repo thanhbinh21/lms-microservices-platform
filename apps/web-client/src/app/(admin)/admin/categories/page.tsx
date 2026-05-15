@@ -95,8 +95,8 @@ export default function AdminCategoriesPage() {
   const handleDelete = (category: AdminCategoryDto) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'XÃ³a danh má»¥c',
-      message: `Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a danh má»¥c "${category.name}"? HÃ nh Ä‘á»™ng nÃ y chá»‰ thá»±c hiá»‡n khi danh má»¥c chÆ°a cÃ³ khÃ³a há»c.`,
+      title: 'Xóa danh mục',
+      message: `Bạn có chắc muốn xóa danh mục "${category.name}"? Hành động này chỉ thực hiện khi danh mục chưa có khóa học.`,
       variant: 'danger',
       onConfirm: async () => {
         const res = await deleteAdminCategoryAction(category.id);
@@ -112,15 +112,15 @@ export default function AdminCategoriesPage() {
     <div className="workspace-page">
       <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="workspace-page-title">Quáº£n lÃ½ danh má»¥c</h1>
+          <h1 className="workspace-page-title">Quản lý danh mục</h1>
           <p className="workspace-page-description">
-            Táº¡o, cáº­p nháº­t vÃ  xÃ³a danh má»¥c khÃ³a há»c Ä‘á»ƒ giá»¯ há»‡ thá»‘ng discovery Ä‘á»“ng bá»™.
+            Tạo, cập nhật và xóa danh mục khóa học để giữ hệ thống discovery đồng bộ.
           </p>
         </div>
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="TÃ¬m danh má»¥c..."
+            placeholder="Tìm danh mục..."
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -131,11 +131,11 @@ export default function AdminCategoriesPage() {
       <div className="grid gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
         <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
           <CardHeader>
-            <CardTitle className="text-lg">{editingId ? 'Cáº­p nháº­t danh má»¥c' : 'Táº¡o danh má»¥c'}</CardTitle>
+            <CardTitle className="text-lg">{editingId ? 'Cập nhật danh mục' : 'Tạo danh mục'}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">TÃªn</label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tên</label>
               <Input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
             </div>
             <div className="space-y-2">
@@ -147,7 +147,7 @@ export default function AdminCategoriesPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Thá»© tá»±</label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Thứ tự</label>
               <Input
                 type="number"
                 min={0}
@@ -158,11 +158,11 @@ export default function AdminCategoriesPage() {
             <div className="flex gap-3 pt-2">
               <Button className="flex-1 gap-2 font-bold" disabled={saving || !form.name.trim()} onClick={handleSubmit}>
                 <Plus className="size-4" />
-                {saving ? 'Äang lÆ°u...' : editingId ? 'Cáº­p nháº­t' : 'Táº¡o má»›i'}
+                {saving ? 'Đang lưu...' : editingId ? 'Cập nhật' : 'Tạo mới'}
               </Button>
               {editingId && (
                 <Button variant="outline" className="font-bold" onClick={resetForm}>
-                  Há»§y
+                  Hủy
                 </Button>
               )}
             </div>
@@ -171,7 +171,7 @@ export default function AdminCategoriesPage() {
 
         <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
           <CardHeader>
-            <CardTitle className="text-lg">Danh sÃ¡ch danh má»¥c</CardTitle>
+            <CardTitle className="text-lg">Danh sách danh mục</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -181,17 +181,17 @@ export default function AdminCategoriesPage() {
                 ))}
               </div>
             ) : filtered.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">KhÃ´ng tÃ¬m tháº¥y danh má»¥c nÃ o.</p>
+              <p className="py-8 text-center text-sm text-muted-foreground">Không tìm thấy danh mục nào.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      <th className="pb-3 pr-4">TÃªn</th>
+                      <th className="pb-3 pr-4">Tên</th>
                       <th className="pb-3 pr-4">Slug</th>
-                      <th className="pb-3 pr-4">Thá»© tá»±</th>
-                      <th className="pb-3 pr-4">KhÃ³a há»c</th>
-                      <th className="pb-3">Thao tÃ¡c</th>
+                      <th className="pb-3 pr-4">Thứ tự</th>
+                      <th className="pb-3 pr-4">Khóa học</th>
+                      <th className="pb-3">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -205,11 +205,11 @@ export default function AdminCategoriesPage() {
                           <div className="flex items-center gap-2">
                             <Button variant="outline" size="sm" className="gap-2 text-xs" onClick={() => handleEdit(category)}>
                               <Edit3 className="size-3" />
-                              Sá»­a
+                              Sửa
                             </Button>
                             <Button variant="destructive" size="sm" className="gap-2 text-xs" onClick={() => handleDelete(category)}>
                               <Trash2 className="size-3" />
-                              XÃ³a
+                              Xóa
                             </Button>
                           </div>
                         </td>

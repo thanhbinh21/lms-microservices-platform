@@ -75,11 +75,11 @@ export default function AdminUsersPage() {
 
   const handleStatusToggle = (userId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'ACTIVE' ? 'BANNED' : 'ACTIVE';
-    const label = newStatus === 'BANNED' ? 'Cáº¥m' : 'KÃ­ch hoáº¡t';
+    const label = newStatus === 'BANNED' ? 'Cấm' : 'Kích hoạt';
     setConfirmDialog({
       isOpen: true,
-      title: `${label} ngÆ°á»i dÃ¹ng`,
-      message: `Báº¡n cÃ³ cháº¯c muá»‘n ${label.toLowerCase()} ngÆ°á»i dÃ¹ng nÃ y?`,
+      title: `${label} người dùng`,
+      message: `Bạn có chắc muốn ${label.toLowerCase()} người dùng này?`,
       variant: newStatus === 'BANNED' ? 'danger' : 'default',
       onConfirm: async () => {
         const res = await updateAdminUserStatus(userId, newStatus);
@@ -104,8 +104,8 @@ export default function AdminUsersPage() {
   const showCannotEditAdmin = () => {
     setConfirmDialog({
       isOpen: true,
-      title: 'KhÃ´ng thá»ƒ chá»‰nh sá»­a Admin',
-      message: 'KhÃ´ng Ä‘Æ°á»£c chá»‰nh sá»­a tÃ i khoáº£n cÃ³ vai trÃ² Admin.',
+      title: 'Không thể chỉnh sửa Admin',
+      message: 'Không được chỉnh sửa tài khoản có vai trò Admin.',
       variant: 'default',
       onConfirm: () => {},
     });
@@ -116,11 +116,11 @@ export default function AdminUsersPage() {
     setPasswordError(null);
 
     if (newPassword.length < 8) {
-      setPasswordError('Máº­t kháº©u tá»‘i thiá»ƒu 8 kÃ½ tá»±.');
+      setPasswordError('Mật khẩu tối thiểu 8 ký tự.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError('Máº­t kháº©u xÃ¡c nháº­n khÃ´ng khá»›p.');
+      setPasswordError('Mật khẩu xác nhận không khớp.');
       return;
     }
 
@@ -129,7 +129,7 @@ export default function AdminUsersPage() {
     setPasswordSaving(false);
 
     if (!res.success) {
-      setPasswordError(res.message || 'Äá»•i máº­t kháº©u tháº¥t báº¡i.');
+      setPasswordError(res.message || 'Đổi mật khẩu thất bại.');
       toast('error', 'Đổi mật khẩu thất bại', res.message || 'Vui lòng thử lại.');
       return;
     }
@@ -141,20 +141,20 @@ export default function AdminUsersPage() {
   return (
     <div className="workspace-page">
       <div className="workspace-page-header">
-        <h1 className="workspace-page-title">Quáº£n lÃ½ ngÆ°á»i dÃ¹ng</h1>
+        <h1 className="workspace-page-title">Quản lý người dùng</h1>
         <p className="workspace-page-description">
-          Xem, tÃ¬m kiáº¿m, phÃ¢n quyá»n vÃ  quáº£n lÃ½ tráº¡ng thÃ¡i ngÆ°á»i dÃ¹ng.
+          Xem, tìm kiếm, phân quyền và quản lý trạng thái người dùng.
         </p>
       </div>
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
-          <CardTitle className="text-lg">Danh sÃ¡ch ngÆ°á»i dÃ¹ng</CardTitle>
+          <CardTitle className="text-lg">Danh sách người dùng</CardTitle>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="TÃ¬m theo tÃªn hoáº·c email..."
+                placeholder="Tìm theo tên hoặc email..."
                 className="pl-9"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -165,7 +165,7 @@ export default function AdminUsersPage() {
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
             >
-              <option value="">Táº¥t cáº£ vai trÃ²</option>
+              <option value="">Tất cả vai trò</option>
               <option value="STUDENT">Student</option>
               <option value="INSTRUCTOR">Instructor</option>
               <option value="ADMIN">Admin</option>
@@ -175,7 +175,7 @@ export default function AdminUsersPage() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="">Táº¥t cáº£ tráº¡ng thÃ¡i</option>
+              <option value="">Tất cả trạng thái</option>
               <option value="ACTIVE">Active</option>
               <option value="BANNED">Banned</option>
               <option value="SUSPENDED">Suspended</option>
@@ -190,18 +190,18 @@ export default function AdminUsersPage() {
               ))}
             </div>
           ) : users.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">KhÃ´ng tÃ¬m tháº¥y ngÆ°á»i dÃ¹ng nÃ o.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">Không tìm thấy người dùng nào.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <th className="pb-3 pr-4">TÃªn</th>
+                    <th className="pb-3 pr-4">Tên</th>
                     <th className="pb-3 pr-4">Email</th>
-                    <th className="pb-3 pr-4">Vai trÃ²</th>
-                    <th className="pb-3 pr-4">Tráº¡ng thÃ¡i</th>
-                    <th className="pb-3 pr-4">NgÃ y táº¡o</th>
-                    <th className="pb-3">HÃ nh Ä‘á»™ng</th>
+                    <th className="pb-3 pr-4">Vai trò</th>
+                    <th className="pb-3 pr-4">Trạng thái</th>
+                    <th className="pb-3 pr-4">Ngày tạo</th>
+                    <th className="pb-3">Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -252,7 +252,7 @@ export default function AdminUsersPage() {
                             disabled={u.role === 'ADMIN'}
                           >
                             <KeyRound className="mr-1 size-4" />
-                            Äá»•i MK
+                            Đổi MK
                           </Button>
                           <Button
                             variant={u.status === 'ACTIVE' ? 'destructive' : 'default'}
@@ -263,7 +263,7 @@ export default function AdminUsersPage() {
                             }
                             disabled={u.role === 'ADMIN'}
                           >
-                            {u.status === 'ACTIVE' ? 'Cáº¥m' : 'KÃ­ch hoáº¡t'}
+                            {u.status === 'ACTIVE' ? 'Cấm' : 'Kích hoạt'}
                           </Button>
                         </div>
                       </td>
@@ -277,7 +277,7 @@ export default function AdminUsersPage() {
           {pagination && pagination.totalPages > 1 && (
             <div className="mt-6 flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Trang {pagination.page} / {pagination.totalPages} ({pagination.total} káº¿t quáº£)
+                Trang {pagination.page} / {pagination.totalPages} ({pagination.total} kết quả)
               </p>
               <div className="flex gap-2">
                 <Button
@@ -286,7 +286,7 @@ export default function AdminUsersPage() {
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  <ChevronLeft className="size-4" /> TrÆ°á»›c
+                  <ChevronLeft className="size-4" /> Trước
                 </Button>
                 <Button
                   variant="outline"
@@ -328,7 +328,7 @@ export default function AdminUsersPage() {
                   <KeyRound className="size-5 text-zinc-700" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold">Äá»•i máº­t kháº©u</h3>
+                  <h3 className="text-lg font-bold">Đổi mật khẩu</h3>
                   <p className="text-xs text-muted-foreground">{passwordTarget.email}</p>
                 </div>
               </div>
@@ -342,21 +342,21 @@ export default function AdminUsersPage() {
 
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Máº­t kháº©u má»›i</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Mật khẩu mới</label>
                 <Input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Tá»‘i thiá»ƒu 8 kÃ½ tá»±"
+                  placeholder="Tối thiểu 8 ký tự"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-muted-foreground">XÃ¡c nháº­n máº­t kháº©u</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Xác nhận mật khẩu</label>
                 <Input
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Nháº­p láº¡i máº­t kháº©u"
+                  placeholder="Nhập lại mật khẩu"
                 />
               </div>
               {passwordError && (
@@ -370,10 +370,10 @@ export default function AdminUsersPage() {
                 onClick={() => setPasswordDialogOpen(false)}
                 disabled={passwordSaving}
               >
-                Há»§y
+                Hủy
               </Button>
               <Button onClick={submitPasswordChange} disabled={passwordSaving}>
-                {passwordSaving ? 'Äang lÆ°u...' : 'LÆ°u'}
+                {passwordSaving ? 'Đang lưu...' : 'Lưu'}
               </Button>
             </div>
           </div>

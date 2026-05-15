@@ -78,15 +78,15 @@ export default function AdminCoursesPage() {
   ) {
     const meta =
       flow === 'archive'
-        ? { title: 'LÆ°u trá»¯ khÃ³a há»c', verb: 'lÆ°u trá»¯', variant: 'danger' as const, confirmLabel: 'LÆ°u trá»¯' }
+        ? { title: 'Lưu trữ khóa học', verb: 'lưu trữ', variant: 'danger' as const, confirmLabel: 'Lưu trữ' }
         : flow === 'reopen'
-          ? { title: 'Má»Ÿ láº¡i khÃ³a há»c', verb: 'má»Ÿ láº¡i', variant: 'default' as const, confirmLabel: 'Má»Ÿ láº¡i' }
-          : { title: 'Duyá»‡t xuáº¥t báº£n khÃ³a há»c', verb: 'duyá»‡t xuáº¥t báº£n', variant: 'default' as const, confirmLabel: 'Duyá»‡t' };
+          ? { title: 'Mở lại khóa học', verb: 'mở lại', variant: 'default' as const, confirmLabel: 'Mở lại' }
+          : { title: 'Duyệt xuất bản khóa học', verb: 'duyệt xuất bản', variant: 'default' as const, confirmLabel: 'Duyệt' };
 
     setConfirmDialog({
       isOpen: true,
       title: meta.title,
-      message: `Báº¡n cÃ³ cháº¯c muá»‘n ${meta.verb} khÃ³a há»c "${courseTitle}"?`,
+      message: `Bạn có chắc muốn ${meta.verb} khóa học "${courseTitle}"?`,
       variant: meta.variant,
       confirmLabel: meta.confirmLabel,
       onConfirm: async () => {
@@ -100,10 +100,10 @@ export default function AdminCoursesPage() {
     if (selectedCourseIds.length === 0) return;
     setConfirmDialog({
       isOpen: true,
-      title: nextStatus === 'PUBLISHED' ? 'Duyá»‡t nhiá»u khÃ³a há»c' : 'LÆ°u trá»¯ nhiá»u khÃ³a há»c',
-      message: `Báº¡n cÃ³ cháº¯c muá»‘n ${actionLabel} ${selectedCourseIds.length} khÃ³a há»c Ä‘Ã£ chá»n?`,
+      title: nextStatus === 'PUBLISHED' ? 'Duyệt nhiều khóa học' : 'Lưu trữ nhiều khóa học',
+      message: `Bạn có chắc muốn ${actionLabel} ${selectedCourseIds.length} khóa học đã chọn?`,
       variant: nextStatus === 'ARCHIVED' ? 'danger' : 'default',
-      confirmLabel: nextStatus === 'ARCHIVED' ? 'LÆ°u trá»¯' : 'Duyá»‡t',
+      confirmLabel: nextStatus === 'ARCHIVED' ? 'Lưu trữ' : 'Duyệt',
       onConfirm: async () => {
         setBulkLoading(true);
         try {
@@ -118,34 +118,34 @@ export default function AdminCoursesPage() {
   }
 
   function formatPrice(price: number | null | undefined) {
-    if (!price || price === 0) return 'Miá»…n phÃ­';
-    return `${price.toLocaleString('vi-VN')} Ä‘`;
+    if (!price || price === 0) return 'Miễn phí';
+    return `${price.toLocaleString('vi-VN')} đ`;
   }
 
   return (
     <div className="workspace-page">
       <div className="workspace-page-header">
-        <h1 className="workspace-page-title">Quáº£n lÃ½ khÃ³a há»c</h1>
+        <h1 className="workspace-page-title">Quản lý khóa học</h1>
         <p className="workspace-page-description">
-          Duyá»‡t, kiá»ƒm duyá»‡t vÃ  quáº£n lÃ½ tráº¡ng thÃ¡i táº¥t cáº£ khÃ³a há»c trÃªn há»‡ thá»‘ng.
+          Duyệt, kiểm duyệt và quản lý trạng thái tất cả khóa học trên hệ thống.
         </p>
       </div>
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <CardTitle className="text-lg">Danh sÃ¡ch khÃ³a há»c</CardTitle>
+            <CardTitle className="text-lg">Danh sách khóa học</CardTitle>
             {selectedCourseIds.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-muted-foreground">ÄÃ£ chá»n {selectedCourseIds.length}</span>
-                <Button size="sm" variant="outline" className="text-xs" disabled={bulkLoading} onClick={() => handleBulkAction('PUBLISHED', 'duyá»‡t')}>
-                  Duyá»‡t Ä‘Ã£ chá»n
+                <span className="text-sm text-muted-foreground">Đã chọn {selectedCourseIds.length}</span>
+                <Button size="sm" variant="outline" className="text-xs" disabled={bulkLoading} onClick={() => handleBulkAction('PUBLISHED', 'duyệt')}>
+                  Duyệt đã chọn
                 </Button>
-                <Button size="sm" variant="destructive" className="text-xs" disabled={bulkLoading} onClick={() => handleBulkAction('ARCHIVED', 'lÆ°u trá»¯')}>
-                  LÆ°u trá»¯ Ä‘Ã£ chá»n
+                <Button size="sm" variant="destructive" className="text-xs" disabled={bulkLoading} onClick={() => handleBulkAction('ARCHIVED', 'lưu trữ')}>
+                  Lưu trữ đã chọn
                 </Button>
                 <Button size="sm" variant="ghost" className="text-xs" onClick={clearSelection}>
-                  Bá» chá»n
+                  Bỏ chọn
                 </Button>
               </div>
             )}
@@ -153,13 +153,13 @@ export default function AdminCoursesPage() {
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="TÃ¬m theo tÃªn khÃ³a há»c..." className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} />
+              <Input placeholder="Tìm theo tên khóa học..." className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} />
             </div>
             <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="">Táº¥t cáº£ tráº¡ng thÃ¡i</option>
-              <option value="DRAFT">Báº£n nhÃ¡p</option>
-              <option value="PUBLISHED">ÄÃ£ xuáº¥t báº£n</option>
-              <option value="ARCHIVED">ÄÃ£ lÆ°u trá»¯</option>
+              <option value="">Tất cả trạng thái</option>
+              <option value="DRAFT">Bản nháp</option>
+              <option value="PUBLISHED">Đã xuất bản</option>
+              <option value="ARCHIVED">Đã lưu trữ</option>
             </select>
           </div>
         </CardHeader>
@@ -171,7 +171,7 @@ export default function AdminCoursesPage() {
               ))}
             </div>
           ) : courses.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">KhÃ´ng tÃ¬m tháº¥y khÃ³a há»c nÃ o.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">Không tìm thấy khóa học nào.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -182,16 +182,16 @@ export default function AdminCoursesPage() {
                         type="checkbox"
                         checked={courses.length > 0 && selectedCourseIds.length === courses.length}
                         onChange={toggleSelectAll}
-                        aria-label="Chá»n táº¥t cáº£ khÃ³a há»c"
+                        aria-label="Chọn tất cả khóa học"
                       />
                     </th>
-                    <th className="pb-3 pr-4">TiÃªu Ä‘á»</th>
-                    <th className="pb-3 pr-4">Danh má»¥c</th>
-                    <th className="pb-3 pr-4">Tráº¡ng thÃ¡i</th>
-                    <th className="pb-3 pr-4">GiÃ¡</th>
+                    <th className="pb-3 pr-4">Tiêu đề</th>
+                    <th className="pb-3 pr-4">Danh mục</th>
+                    <th className="pb-3 pr-4">Trạng thái</th>
+                    <th className="pb-3 pr-4">Giá</th>
                     <th className="pb-3 pr-4">Ghi danh</th>
-                    <th className="pb-3 pr-4">NgÃ y táº¡o</th>
-                    <th className="pb-3">HÃ nh Ä‘á»™ng</th>
+                    <th className="pb-3 pr-4">Ngày tạo</th>
+                    <th className="pb-3">Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -202,7 +202,7 @@ export default function AdminCoursesPage() {
                           type="checkbox"
                           checked={selectedCourseIds.includes(course.id)}
                           onChange={() => toggleCourseSelection(course.id)}
-                          aria-label={`Chá»n khÃ³a há»c ${course.title}`}
+                          aria-label={`Chọn khóa học ${course.title}`}
                         />
                       </td>
                       <td className="max-w-50 truncate py-3 pr-4 font-medium">{course.title}</td>
@@ -215,17 +215,17 @@ export default function AdminCoursesPage() {
                         <div className="flex items-center gap-2">
                           {course.status === 'DRAFT' && (
                             <Button size="sm" className="text-xs" onClick={() => handleStatusChange(course.id, 'PUBLISHED', course.title, 'approve')}>
-                              Duyá»‡t
+                              Duyệt
                             </Button>
                           )}
                           {course.status === 'ARCHIVED' && (
                             <Button size="sm" className="text-xs" onClick={() => handleStatusChange(course.id, 'PUBLISHED', course.title, 'reopen')}>
-                              Má»Ÿ láº¡i
+                              Mở lại
                             </Button>
                           )}
                           {course.status !== 'ARCHIVED' && (
                             <Button variant="destructive" size="sm" className="text-xs" onClick={() => handleStatusChange(course.id, 'ARCHIVED', course.title, 'archive')}>
-                              LÆ°u trá»¯
+                              Lưu trữ
                             </Button>
                           )}
                         </div>
@@ -240,11 +240,11 @@ export default function AdminCoursesPage() {
           {pagination && pagination.totalPages > 1 && (
             <div className="mt-6 flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Trang {pagination.page} / {pagination.totalPages} ({pagination.total} káº¿t quáº£)
+                Trang {pagination.page} / {pagination.totalPages} ({pagination.total} kết quả)
               </p>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
-                  <ChevronLeft className="size-4" /> TrÆ°á»›c
+                  <ChevronLeft className="size-4" /> Trước
                 </Button>
                 <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((current) => current + 1)}>
                   Sau <ChevronRight className="size-4" />

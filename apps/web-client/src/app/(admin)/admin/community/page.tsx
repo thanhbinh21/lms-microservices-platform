@@ -17,12 +17,12 @@ function formatDateTime(value: string) {
 function formatRelativeTime(value: string) {
   const target = new Date(value).getTime();
   const diffMinutes = Math.floor((Date.now() - target) / 60000);
-  if (diffMinutes < 1) return 'Vá»«a xong';
-  if (diffMinutes < 60) return `${diffMinutes} phÃºt trÆ°á»›c`;
+  if (diffMinutes < 1) return 'Vừa xong';
+  if (diffMinutes < 60) return `${diffMinutes} phút trước`;
   const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours} giá» trÆ°á»›c`;
+  if (diffHours < 24) return `${diffHours} giờ trước`;
   const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} ngÃ y trÆ°á»›c`;
+  return `${diffDays} ngày trước`;
 }
 
 function getInitials(name: string) {
@@ -39,10 +39,10 @@ function getInitials(name: string) {
 
 function getRoleLabel(role?: string) {
   const normalized = (role || '').toUpperCase();
-  if (normalized === 'INSTRUCTOR') return 'Giáº£ng viÃªn';
-  if (normalized === 'ADMIN') return 'Quáº£n trá»‹ viÃªn';
-  if (normalized === 'STUDENT') return 'Há»c viÃªn';
-  return 'NgÆ°á»i dÃ¹ng';
+  if (normalized === 'INSTRUCTOR') return 'Giảng viên';
+  if (normalized === 'ADMIN') return 'Quản trị viên';
+  if (normalized === 'STUDENT') return 'Học viên';
+  return 'Người dùng';
 }
 
 export default function AdminCommunityPage() {
@@ -55,9 +55,9 @@ export default function AdminCommunityPage() {
 
   useEffect(() => {
     (async () => {
-      const result = await getCommunityPostsAction({ limit: 80 });
+      const result = await getCommunityPostsAction({ limit: 50 });
       if (!result.success || !result.data) {
-        setError(result.message || 'KhÃ´ng táº£i Ä‘Æ°á»£c dá»¯ liá»‡u cá»™ng Ä‘á»“ng.');
+        setError(result.message || 'Không tải được dữ liệu cộng đồng.');
         setLoading(false);
         return;
       }
@@ -101,9 +101,9 @@ export default function AdminCommunityPage() {
   return (
     <div className="workspace-page space-y-6">
       <div>
-        <h1 className="workspace-page-title">Quáº£n trá»‹ cá»™ng Ä‘á»“ng</h1>
+        <h1 className="workspace-page-title">Quản trị cộng đồng</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Theo dÃµi bÃ i viáº¿t cá»™ng Ä‘á»“ng theo thá»i gian thá»±c, lá»c theo vai trÃ² vÃ  phÃ¡t hiá»‡n ná»™i dung ná»•i báº­t.
+          Theo dõi bài viết cộng đồng theo thời gian thực, lọc theo vai trò và phát hiện nội dung nổi bật.
         </p>
       </div>
 
@@ -112,25 +112,25 @@ export default function AdminCommunityPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="glass-panel rounded-2xl border-white/60">
           <CardHeader className="pb-2">
-            <CardDescription>Tá»•ng bÃ i viáº¿t</CardDescription>
+            <CardDescription>Tổng bài viết</CardDescription>
             <CardTitle className="text-3xl">{loading ? '...' : summary.total}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="glass-panel rounded-2xl border-white/60">
           <CardHeader className="pb-2">
-            <CardDescription>Tá»•ng bÃ¬nh luáº­n</CardDescription>
+            <CardDescription>Tổng bình luận</CardDescription>
             <CardTitle className="text-3xl">{loading ? '...' : summary.totalComments}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="glass-panel rounded-2xl border-white/60">
           <CardHeader className="pb-2">
-            <CardDescription>Tá»•ng lÆ°á»£t thÃ­ch</CardDescription>
+            <CardDescription>Tổng lượt thích</CardDescription>
             <CardTitle className="text-3xl">{loading ? '...' : summary.totalLikes}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="glass-panel rounded-2xl border-white/60">
           <CardHeader className="pb-2">
-            <CardDescription>BÃ i viáº¿t cÃ³ áº£nh</CardDescription>
+            <CardDescription>Bài viết có ảnh</CardDescription>
             <CardTitle className="text-3xl">{loading ? '...' : summary.withImages}</CardTitle>
           </CardHeader>
         </Card>
@@ -138,8 +138,8 @@ export default function AdminCommunityPage() {
 
       <Card className="glass-panel rounded-2xl border-white/60">
         <CardHeader>
-          <CardTitle className="text-lg">Bá»™ lá»c</CardTitle>
-          <CardDescription>Lá»c dá»¯ liá»‡u Ä‘á»ƒ rÃ  soÃ¡t ná»™i dung nhanh hÆ¡n.</CardDescription>
+          <CardTitle className="text-lg">Bộ lọc</CardTitle>
+          <CardDescription>Lọc dữ liệu để rà soát nội dung nhanh hơn.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
           <div className="relative md:col-span-1">
@@ -147,7 +147,7 @@ export default function AdminCommunityPage() {
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="TÃ¬m theo tÃ¡c giáº£ hoáº·c ná»™i dung..."
+              placeholder="Tìm theo tác giả hoặc nội dung..."
               className="pl-9"
             />
           </div>
@@ -157,10 +157,10 @@ export default function AdminCommunityPage() {
             onChange={(event) => setRoleFilter(event.target.value as RoleFilter)}
             className="h-10 rounded-md border border-input bg-background px-3 text-sm"
           >
-            <option value="ALL">Táº¥t cáº£ vai trÃ²</option>
-            <option value="STUDENT">Há»c viÃªn</option>
-            <option value="INSTRUCTOR">Giáº£ng viÃªn</option>
-            <option value="ADMIN">Quáº£n trá»‹ viÃªn</option>
+            <option value="ALL">Tất cả vai trò</option>
+            <option value="STUDENT">Học viên</option>
+            <option value="INSTRUCTOR">Giảng viên</option>
+            <option value="ADMIN">Quản trị viên</option>
           </select>
 
           <select
@@ -168,17 +168,17 @@ export default function AdminCommunityPage() {
             onChange={(event) => setSortMode(event.target.value as SortMode)}
             className="h-10 rounded-md border border-input bg-background px-3 text-sm"
           >
-            <option value="LATEST">Má»›i nháº¥t</option>
-            <option value="POPULAR">Phá»• biáº¿n</option>
+            <option value="LATEST">Mới nhất</option>
+            <option value="POPULAR">Phổ biến</option>
           </select>
         </CardContent>
       </Card>
 
       <Card className="glass-panel rounded-2xl border-white/60">
         <CardHeader>
-          <CardTitle className="text-lg">Danh sÃ¡ch bÃ i viáº¿t</CardTitle>
+          <CardTitle className="text-lg">Danh sách bài viết</CardTitle>
           <CardDescription>
-            {loading ? 'Äang táº£i dá»¯ liá»‡u...' : `Hiá»ƒn thá»‹ ${filteredPosts.length} / ${posts.length} bÃ i viáº¿t`}
+            {loading ? 'Đang tải dữ liệu...' : `Hiển thị ${filteredPosts.length} / ${posts.length} bài viết`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -192,7 +192,7 @@ export default function AdminCommunityPage() {
 
           {!loading && !error && filteredPosts.length === 0 && (
             <div className="rounded-xl border border-dashed border-white/60 bg-white/30 p-8 text-center text-sm text-muted-foreground">
-              KhÃ´ng cÃ³ bÃ i viáº¿t phÃ¹ há»£p vá»›i bá»™ lá»c hiá»‡n táº¡i.
+              Không có bài viết phù hợp với bộ lọc hiện tại.
             </div>
           )}
 
@@ -219,11 +219,11 @@ export default function AdminCommunityPage() {
                     <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         <TrendingUp className="size-3.5" />
-                        {likeCount} lÆ°á»£t thÃ­ch
+                        {likeCount} lượt thích
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <MessageSquare className="size-3.5" />
-                        {replyCount} bÃ¬nh luáº­n
+                        {replyCount} bình luận
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <Clock3 className="size-3.5" />
@@ -232,7 +232,7 @@ export default function AdminCommunityPage() {
                       {post.imageUrl && (
                         <span className="inline-flex items-center gap-1 text-blue-700">
                           <ImageIcon className="size-3.5" />
-                          CÃ³ áº£nh Ä‘Ã­nh kÃ¨m
+                          Có ảnh đính kèm
                         </span>
                       )}
                     </div>

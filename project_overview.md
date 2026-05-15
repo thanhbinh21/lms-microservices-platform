@@ -290,3 +290,7 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 ### 2026-05-14 - Community Global Feed Refactor
 - [x] Refactor `/community` thanh feed chung toan he thong, xoa legacy community group/member/group post schema, va chuyen Q&A thanh course-specific. done 2026-05-14
 
+
+### 2026-05-15 - UI Hotfix Admin And Instructor Request
+- [x] Restore become-instructor application form, clamp admin community feed limit to 50, and repair Vietnamese UI text in admin/become-instructor scope. done 2026-05-15
+
