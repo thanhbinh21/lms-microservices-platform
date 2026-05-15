@@ -131,10 +131,30 @@ export default function AdminDashboardPage() {
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => {
-          const Wrapper = stat.href ? Link : 'div';
+          if (stat.href) {
+            return (
+              <Link key={stat.label} href={stat.href}>
+                <Card className={`rounded-2xl ${getCardClass(stat.variant)} transition hover:shadow-md cursor-pointer`}>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardDescription className="text-xs font-semibold uppercase tracking-wide">
+                      {stat.label}
+                    </CardDescription>
+                    <div className={`flex size-9 items-center justify-center rounded-lg ${stat.variant === 'danger' ? 'bg-amber-100 text-amber-600' : stat.variant === 'warning' ? 'bg-amber-50 text-amber-500' : 'bg-primary/10 text-primary'}`}>
+                      {stat.icon}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-bold">{stat.value}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{stat.hint}</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          }
+
           return (
-            <Wrapper key={stat.label} href={stat.href ?? ''}>
-              <Card className={`rounded-2xl ${getCardClass(stat.variant)} transition ${stat.href ? 'hover:shadow-md cursor-pointer' : ''}`}>
+            <div key={stat.label}>
+              <Card className={`rounded-2xl ${getCardClass(stat.variant)} transition`}>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardDescription className="text-xs font-semibold uppercase tracking-wide">
                     {stat.label}
@@ -148,7 +168,7 @@ export default function AdminDashboardPage() {
                   <p className="mt-1 text-xs text-muted-foreground">{stat.hint}</p>
                 </CardContent>
               </Card>
-            </Wrapper>
+            </div>
           );
         })}
       </div>

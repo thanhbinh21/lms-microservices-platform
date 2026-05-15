@@ -16,7 +16,7 @@ const kafkaEnvSchema = z.object({
   KAFKA_BROKER: z.string().min(1, 'KAFKA_BROKER is required'),
 });
 
-// Redis (auth-service session store — Docker Redis)
+// Redis (auth-service session store — Upstash/cloud Redis)
 const redisEnvSchema = z.object({
   REDIS_URL: z.string().url('REDIS_URL must be valid URL'),
 });

@@ -23,7 +23,7 @@ Database: PostgreSQL via Neon Serverless (Database-per-Service)
 Message Broker: Apache Kafka  
 Payment: VNPay  
 Media Storage: Cloudinary (Free tier) + local fallback  
-Infra: Docker (Kafka/Redis/Kong), Turborepo  
+Infra: Docker (Kafka/Zookeeper/Kong), Upstash Redis, Turborepo  
 API Gateway: Kong Gateway (Declarative, DB-less mode)  
 
 ## Architecture Principles
@@ -98,7 +98,7 @@ pnpm prisma migrate dev
 Dá»± Ã¡n Ä‘Æ°á»£c chia thÃ nh nhiá»u giai Ä‘oáº¡n (Phases) theo chuáº©n "Vertical Slice Architecture".
 
 ### Phase 1-4: Foundation (Ná»n táº£ng) âœ… COMPLETED
-- [x] **Phase 1:** Setup Monorepo (Turborepo), Docker Compose (Kafka, Redis) + Neon Serverless PostgreSQL. âœ… Completed: Jan 21, 2026
+- [x] **Phase 1:** Setup Monorepo (Turborepo), Docker Compose (Kafka/Zookeeper) + Neon Serverless PostgreSQL. âœ… Completed: Jan 21, 2026
 - [x] **Phase 2:** Setup API Gateway (Kong DB-less) & Shared Packages (Logger, Types, Env Validator). âœ… Completed: Jan 21, 2026
 - [x] **Phase 3:** Build **Auth Service** (Login, Register, JWT pair, Session Redis, Refresh Token rotation). âœ… Completed: Jan 25, 2026
 - [x] **Phase 4:** Build Frontend Base (Next.js 15, Shadcn UI, Redux, Login/Register Forms, Be Vietnam Pro font). âœ… Completed: Jan 25, 2026 âœ… **VERIFIED: Production-Ready**
@@ -131,6 +131,7 @@ Dá»± Ã¡n Ä‘Æ°á»£c chia thÃ nh nhiá»u giai Ä‘oáº¡n (Phas
 - [x] **Hotfix:** Seed script Prisma import path sync (prisma-v2 -> prisma). done - 2026-05-14
 - [x] **Hotfix:** Restore protected API auth after audit (JWT nbf claim + middleware fallback decode payload khi x-user-id chua duoc inject). done - 2026-05-14
 - [x] **Hotfix:** Community page khong con treo loading khi user chua co group kha dung. done - 2026-05-14
+- [x] **Hotfix:** Admin dashboard stat card empty href guard. done - 2026-05-15 - by BINH
 - [ ] **Phase 9.13:** DX Hardening â€” `pnpm run setup` bootstrap (install + docker:up + setup:db + seed), `.nvmrc` node version pin, Prisma orchestration vao turbo pipeline, cleanup test files.
 - [x] **Phase 9.14:** Become Educator Security Refactor (Audit Phase 9.5). âœ… Completed: Apr 21, 2026
   - Van de: `PATCH /users/role` hien tai la generic endpoint, nhan `userId` + `role` tu request body â€” bat ky ai co access deu co the nang cap role bat ky user khac thanh ADMIN.
@@ -234,6 +235,8 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 - [x] **Phase P2:** Instructor Studio & Revenue Experience — Fix mojibake instructor layout + course wizard, add loading.tsx for 6 instructor routes, implement pure-SVG earnings bar chart (6-month history from real InstructorEarning data). done - 2026-05-15 - by AI AGENT
 - [x] **Phase P3:** Admin Operations, Governance & Observability — Fix mojibake/ASCII text in system-config + audit-log pages, add loading.tsx for all 6 admin routes, enhance admin overview with real-time stats from DLQ (pending count), support tickets (open/in-progress), and payouts (pending). All sensitive actions fully audited via auth-service. done - 2026-05-15 - by AI AGENT
+- [x] **Phase DX:** Prisma Neon setup hardening - root Prisma CLI, per-service migrate retry, Neon warmup, and pooled/direct env examples. done - 2026-05-15 - by AI AGENT
+- [x] **Phase DX:** Remove local Redis runtime - Docker stack chi con Kafka/Zookeeper/Kong, Redis dung Upstash/cloud qua env. done - 2026-05-15 - by AI AGENT
 
 ### Phase 9.13: DX Hardening âœ… COMPLETED
 - [x] **Phase 9.13:** DX Hardening â€” `pnpm run setup` bootstrap (install + docker:up + setup:db + seed), `.nvmrc` node version pin, Prisma orchestration vao turbo pipeline. âœ… Completed: Apr 27, 2026

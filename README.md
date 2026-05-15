@@ -275,7 +275,7 @@ olms-microservices/
 │   └── env-validator/            # Zod environment validation
 │       └── src/index.ts          # T3 Env pattern implementation
 │
-├── docker-compose.yml            # Kafka, Zookeeper, Redis, Kong
+├── docker-compose.yml            # Kafka, Zookeeper, Kong
 ├── kong.yml                      # Kong declarative config
 ├── turbo.json                    # Turborepo pipeline config
 ├── pnpm-workspace.yaml           # PNPM workspace definition
@@ -667,12 +667,12 @@ cp services/media-service/.env.example services/media-service/.env
 **Critical Configuration:**
 - `JWT_SECRET` must match between Kong Gateway and Auth Service
 - All `DATABASE_URL` values must point to Neon PostgreSQL instances
-- `REDIS_URL` must point to Redis instance (local or cloud)
+- `REDIS_URL` must point to Upstash/cloud Redis (`rediss://`)
 
 #### 4. Start Infrastructure Services
 
 ```bash
-# Start Kafka, Zookeeper, Redis, Kong Gateway
+# Start Kafka, Zookeeper, Kong Gateway
 docker-compose up -d
 
 # Verify all containers are running
@@ -686,7 +686,6 @@ docker-compose logs -f kong
 Expected containers:
 - `kafka` (Port 9092)
 - `zookeeper` (Port 2181)
-- `redis` (Port 6379)
 - `kong` (Port 8000)
 
 #### 5. Run Database Migrations
@@ -1032,7 +1031,6 @@ docker-compose logs -f
 
 # Specific service
 docker-compose logs -f kafka
-docker-compose logs -f redis
 docker-compose logs -f kong
 ```
 
@@ -1091,11 +1089,10 @@ All API responses include `trace_id`. Search logs by trace ID:
 docker-compose logs | grep "550e8400-e29b-41d4-a716-446655440000"
 ```
 
-**Inspect Redis sessions:**
+**Inspect Redis sessions (Upstash/cloud Redis):**
 ```bash
-docker exec -it redis redis-cli
-> KEYS session:*
-> GET session:user_123
+redis-cli -u "$REDIS_URL" --scan --pattern "session:*"
+redis-cli -u "$REDIS_URL" GET "session:user_123"
 ```
 
 **Check Kafka topics:**
@@ -1263,7 +1260,7 @@ Course Worker checks order ID before creating enrollment to prevent duplicate en
 Package `env-validator` uses Zod to validate environment variables at runtime. Application crashes with clear error if required variables are missing.
 
 **Environment File Locations:**
-- Root `.env`: Shared infrastructure (Kafka, Redis)
+- Root `.env`: Shared infrastructure (Kafka, Upstash/cloud Redis)
 - `services/<service>/.env`: Service-specific config
 - `apps/web-client/.env.local`: Next.js config for server actions (`GATEWAY_URL`) and optional public prefix (`NEXT_PUBLIC_AUTH_PREFIX`)
 
