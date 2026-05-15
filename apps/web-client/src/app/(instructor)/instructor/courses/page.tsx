@@ -26,7 +26,7 @@ export default function InstructorCoursesPage() {
     const fetchCourses = async () => {
       const result = await getInstructorCoursesAction();
       if (!result.success || !result.data) {
-        setErrorMessage(result.message || 'Khong the tai danh sach khoa hoc.');
+        setErrorMessage(result.message || 'KhÃ´ng thá»ƒ táº£i danh sÃ¡ch khÃ³a há»c.');
         setCourses([]);
         setLoading(false);
         return;
@@ -50,7 +50,7 @@ export default function InstructorCoursesPage() {
   }, []);
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="workspace-page">
       {/* Page header */}
       <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
@@ -58,14 +58,14 @@ export default function InstructorCoursesPage() {
             <Sparkles className="size-3.5" />
             NexEdu Studio
           </div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Khóa học</h1>
-          <p className="mt-1 text-sm font-medium text-muted-foreground">
-            Tạo, chỉnh sửa và xuất bản khóa học của bạn.
+          <h1 className="workspace-page-title">KhÃ³a há»c</h1>
+          <p className="workspace-page-description">
+            Táº¡o, chá»‰nh sá»­a vÃ  xuáº¥t báº£n khÃ³a há»c cá»§a báº¡n.
           </p>
         </div>
         <Button onClick={() => router.push('/instructor/courses/create')} className="rounded-xl font-bold shadow-md md:w-auto w-full">
           <PlusCircle className="mr-2 size-4" />
-          Tạo khóa học mới
+          Táº¡o khÃ³a há»c má»›i
         </Button>
       </div>
 
@@ -78,20 +78,20 @@ export default function InstructorCoursesPage() {
         )}
         {loading && (
           <div className="rounded-2xl border border-dashed border-border bg-white/30 py-16 text-center">
-            <p className="text-sm text-muted-foreground">Đang tải danh sách khóa học...</p>
+            <p className="text-sm text-muted-foreground">Äang táº£i danh sÃ¡ch khÃ³a há»c...</p>
           </div>
         )}
 
         {!loading && courses.length === 0 && (
           <div className="rounded-3xl border border-dashed border-border bg-white/30 py-16 text-center">
             <BookOpen className="mx-auto mb-4 size-10 text-muted-foreground/40" />
-            <h3 className="text-lg font-bold">Chưa có khóa học nào</h3>
+            <h3 className="text-lg font-bold">ChÆ°a cÃ³ khÃ³a há»c nÃ o</h3>
             <p className="text-muted-foreground mt-1 mb-6 text-sm font-medium">
-              Bắt đầu hành trình giảng dạy bằng cách tạo khóa học đầu tiên.
+              Báº¯t Ä‘áº§u hÃ nh trÃ¬nh giáº£ng dáº¡y báº±ng cÃ¡ch táº¡o khÃ³a há»c Ä‘áº§u tiÃªn.
             </p>
             <Button onClick={() => router.push('/instructor/courses/create')} className="rounded-xl font-bold shadow-md">
               <PlusCircle className="mr-2 size-4" />
-              Tạo khóa học mới
+              Táº¡o khÃ³a há»c má»›i
             </Button>
           </div>
         )}
@@ -112,9 +112,9 @@ export default function InstructorCoursesPage() {
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-4 text-xs text-muted-foreground font-medium">
-                  <span>Giá: {course.price.toLocaleString('vi-VN')} đ</span>
-                  <span>Học viên: {course.enrollments}</span>
-                  <span>Cập nhật: {course.updatedAt}</span>
+                  <span>GiÃ¡: {course.price.toLocaleString('vi-VN')} Ä‘</span>
+                  <span>Há»c viÃªn: {course.enrollments}</span>
+                  <span>Cáº­p nháº­t: {course.updatedAt}</span>
                 </div>
               </div>
 
@@ -123,19 +123,19 @@ export default function InstructorCoursesPage() {
                   event.stopPropagation();
                   router.push(`/instructor/courses/${course.id}/detail`);
                 }}>
-                  <Eye className="mr-1.5 size-3.5" /> Chi tiết
+                  <Eye className="mr-1.5 size-3.5" /> Chi tiáº¿t
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-xl font-semibold text-xs h-8" onClick={(event) => {
                   event.stopPropagation();
                   router.push(`/instructor/courses/${course.id}?step=1`);
                 }}>
-                  <FileEdit className="mr-1.5 size-3.5" /> Cấu hình
+                  <FileEdit className="mr-1.5 size-3.5" /> Cáº¥u hÃ¬nh
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-xl font-semibold text-xs h-8" onClick={(event) => {
                   event.stopPropagation();
                   router.push(`/instructor/courses/${course.id}?step=3`);
                 }}>
-                  Chương trình
+                  ChÆ°Æ¡ng trÃ¬nh
                 </Button>
                 <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground" onClick={(event) => event.stopPropagation()}>
                   <MoreHorizontal className="size-4" />
@@ -148,4 +148,6 @@ export default function InstructorCoursesPage() {
     </div>
   );
 }
+
+
 

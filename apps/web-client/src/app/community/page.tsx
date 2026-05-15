@@ -1,9 +1,9 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Send, ThumbsUp, MessageSquare, Image as ImageIcon, X, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Loader2, Send, ThumbsUp, MessageSquare, Image as ImageIcon, X, MoreHorizontal, Pencil, Trash2, SlidersHorizontal, TrendingUp, Clock } from 'lucide-react';
 import { useAppSelector } from '@/lib/redux/hooks';
 import {
   createCommunityPostAction,
@@ -209,7 +209,20 @@ export default function CommunityPage() {
   const [imageUrl, setImageUrl] = useState('');
   const [posting, setPosting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [sortMode, setSortMode] = useState<'latest' | 'popular'>('latest');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const sortedPosts = useMemo(() => {
+    const arr = [...posts];
+    if (sortMode === 'popular') {
+      arr.sort((a, b) => {
+        const scoreA = (a.likeCount ?? 0) + (a.replyCount ?? 0) * 2;
+        const scoreB = (b.likeCount ?? 0) + (b.replyCount ?? 0) * 2;
+        return scoreB - scoreA;
+      });
+    }
+    return arr;
+  }, [posts, sortMode]);
 
   const loadPosts = useCallback(async (cursor?: string | null) => {
     if (cursor) setLoadingMore(true);
@@ -297,6 +310,28 @@ export default function CommunityPage() {
           <p className="mt-2 text-sm text-muted-foreground">Mọi học viên, giảng viên và quản trị viên có thể chia sẻ, bình luận và tương tác tại đây.</p>
         </div>
 
+        {/* Sort bar */}
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="size-4 text-muted-foreground shrink-0" />
+          <span className="text-sm font-medium text-muted-foreground">Sắp xếp:</span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setSortMode('latest')}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${sortMode === 'latest' ? 'bg-primary text-white shadow-sm' : 'bg-white border border-border text-muted-foreground hover:bg-slate-50'}`}
+            >
+              <Clock className="size-3.5" />
+              Mới nhất
+            </button>
+            <button
+              onClick={() => setSortMode('popular')}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${sortMode === 'popular' ? 'bg-primary text-white shadow-sm' : 'bg-white border border-border text-muted-foreground hover:bg-slate-50'}`}
+            >
+              <TrendingUp className="size-3.5" />
+              Phổ biến
+            </button>
+          </div>
+        </div>
+
         {error ? (
           <div className="mb-4 flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             <span>{error}</span>
@@ -337,7 +372,7 @@ export default function CommunityPage() {
             <Loader2 className="mx-auto mb-3 size-6 animate-spin text-primary" />
             Đang tải cộng đồng...
           </Card>
-        ) : posts.length === 0 ? (
+        ) : sortedPosts.length === 0 ? (
           <Card className="rounded-2xl border-dashed border-slate-300 bg-white p-10 text-center">
             <MessageSquare className="mx-auto mb-3 size-10 text-slate-300" />
             <h2 className="text-lg font-bold text-slate-800">Chưa có bài viết nào</h2>
@@ -345,7 +380,7 @@ export default function CommunityPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {posts.map((post) => (
+            {sortedPosts.map((post) => (
               <PostCard key={post.id} post={post} currentUserId={user?.id ?? ''} onPatch={patchPost} onDelete={deletePost} />
             ))}
           </div>

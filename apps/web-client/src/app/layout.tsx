@@ -1,5 +1,6 @@
 import StoreProvider from '@/lib/redux/StoreProvider';
 import AuthSessionBootstrap from '@/components/auth/AuthSessionBootstrap';
+import { ToastContainer } from '@/components/ui/toast';
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -32,6 +33,7 @@ export default function RootLayout({
       >
         <StoreProvider>
           <AuthSessionBootstrap />
+          <ToastContainer />
           {children}
         </StoreProvider>
       </body>

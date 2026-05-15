@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +18,6 @@ export default function AdminCoursesPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
-
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -30,37 +29,23 @@ export default function AdminCoursesPage() {
 
   const clearSelection = () => setSelectedCourseIds([]);
 
-  const toggleCourseSelection = (courseId: string) => {
-    setSelectedCourseIds((prev) =>
-      prev.includes(courseId) ? prev.filter((id) => id !== courseId) : [...prev, courseId],
-    );
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedCourseIds.length === courses.length) {
-      clearSelection();
-      return;
-    }
-    setSelectedCourseIds(courses.map((course) => course.id));
-  };
-
   const fetchCourses = useCallback(async () => {
     setLoading(true);
-    const res = await getAdminCourses({
+    const result = await getAdminCourses({
       page,
       limit: 10,
       search: search || undefined,
       status: statusFilter || undefined,
     });
-    if (res.success && res.data) {
-      setCourses(res.data.courses);
-      setPagination(res.data.pagination);
+    if (result.success && result.data) {
+      setCourses(result.data.courses);
+      setPagination(result.data.pagination);
     }
     setLoading(false);
   }, [page, search, statusFilter]);
 
   useEffect(() => {
-    fetchCourses();
+    void fetchCourses();
   }, [fetchCourses]);
 
   useEffect(() => {
@@ -71,45 +56,48 @@ export default function AdminCoursesPage() {
     clearSelection();
   }, [page, search, statusFilter]);
 
-  const handleStatusChange = (
+  function toggleCourseSelection(courseId: string) {
+    setSelectedCourseIds((current) =>
+      current.includes(courseId) ? current.filter((id) => id !== courseId) : [...current, courseId],
+    );
+  }
+
+  function toggleSelectAll() {
+    if (selectedCourseIds.length === courses.length) {
+      clearSelection();
+      return;
+    }
+    setSelectedCourseIds(courses.map((course) => course.id));
+  }
+
+  function handleStatusChange(
     courseId: string,
-    newStatus: string,
+    nextStatus: string,
     courseTitle: string,
-    flow: 'approve' | 'archive' | 'reopen' = newStatus === 'ARCHIVED' ? 'archive' : 'approve',
-  ) => {
+    flow: 'approve' | 'archive' | 'reopen' = nextStatus === 'ARCHIVED' ? 'archive' : 'approve',
+  ) {
     const meta =
       flow === 'archive'
-        ? { title: 'Lưu trữ khóa học', messageVerb: 'lưu trữ', variant: 'danger' as const, confirmLabel: 'Lưu trữ' }
+        ? { title: 'Lưu trữ khóa học', verb: 'lưu trữ', variant: 'danger' as const, confirmLabel: 'Lưu trữ' }
         : flow === 'reopen'
-          ? {
-              title: 'Mở lại khóa học',
-              messageVerb: 'đưa trở lại trạng thái Xuất bản (đã lưu trữ trước đó)',
-              variant: 'default' as const,
-              confirmLabel: 'Mở lại',
-            }
-          : {
-              title: 'Duyệt xuất bản khóa học',
-              messageVerb: 'duyệt xuất bản',
-              variant: 'default' as const,
-              confirmLabel: 'Duyệt',
-            };
+          ? { title: 'Mở lại khóa học', verb: 'mở lại', variant: 'default' as const, confirmLabel: 'Mở lại' }
+          : { title: 'Duyệt xuất bản khóa học', verb: 'duyệt xuất bản', variant: 'default' as const, confirmLabel: 'Duyệt' };
 
     setConfirmDialog({
       isOpen: true,
       title: meta.title,
-      message: `Bạn có chắc muốn ${meta.messageVerb} khóa học "${courseTitle}"?`,
+      message: `Bạn có chắc muốn ${meta.verb} khóa học "${courseTitle}"?`,
       variant: meta.variant,
       confirmLabel: meta.confirmLabel,
       onConfirm: async () => {
-        const res = await updateAdminCourseStatus(courseId, newStatus);
-        if (res.success) fetchCourses();
+        const result = await updateAdminCourseStatus(courseId, nextStatus);
+        if (result.success) void fetchCourses();
       },
     });
-  };
+  }
 
-  const handleBulkAction = (nextStatus: 'PUBLISHED' | 'ARCHIVED', actionLabel: string) => {
+  function handleBulkAction(nextStatus: 'PUBLISHED' | 'ARCHIVED', actionLabel: string) {
     if (selectedCourseIds.length === 0) return;
-
     setConfirmDialog({
       isOpen: true,
       title: nextStatus === 'PUBLISHED' ? 'Duyệt nhiều khóa học' : 'Lưu trữ nhiều khóa học',
@@ -119,9 +107,7 @@ export default function AdminCoursesPage() {
       onConfirm: async () => {
         setBulkLoading(true);
         try {
-          await Promise.all(
-            selectedCourseIds.map((courseId) => updateAdminCourseStatus(courseId, nextStatus)),
-          );
+          await Promise.all(selectedCourseIds.map((courseId) => updateAdminCourseStatus(courseId, nextStatus)));
           clearSelection();
           await fetchCourses();
         } finally {
@@ -129,18 +115,18 @@ export default function AdminCoursesPage() {
         }
       },
     });
-  };
+  }
 
-  const formatPrice = (price: number | null | undefined) => {
+  function formatPrice(price: number | null | undefined) {
     if (!price || price === 0) return 'Miễn phí';
-    return price.toLocaleString('vi-VN') + ' ₫';
-  };
+    return `${price.toLocaleString('vi-VN')} đ`;
+  }
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Quản lý khóa học</h1>
-        <p className="mt-1 text-sm font-medium text-muted-foreground">
+    <div className="workspace-page">
+      <div className="workspace-page-header">
+        <h1 className="workspace-page-title">Quản lý khóa học</h1>
+        <p className="workspace-page-description">
           Duyệt, kiểm duyệt và quản lý trạng thái tất cả khóa học trên hệ thống.
         </p>
       </div>
@@ -152,22 +138,10 @@ export default function AdminCoursesPage() {
             {selectedCourseIds.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground">Đã chọn {selectedCourseIds.length}</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs"
-                  disabled={bulkLoading}
-                  onClick={() => handleBulkAction('PUBLISHED', 'duyệt')}
-                >
+                <Button size="sm" variant="outline" className="text-xs" disabled={bulkLoading} onClick={() => handleBulkAction('PUBLISHED', 'duyệt')}>
                   Duyệt đã chọn
                 </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="text-xs"
-                  disabled={bulkLoading}
-                  onClick={() => handleBulkAction('ARCHIVED', 'lưu trữ')}
-                >
+                <Button size="sm" variant="destructive" className="text-xs" disabled={bulkLoading} onClick={() => handleBulkAction('ARCHIVED', 'lưu trữ')}>
                   Lưu trữ đã chọn
                 </Button>
                 <Button size="sm" variant="ghost" className="text-xs" onClick={clearSelection}>
@@ -179,30 +153,21 @@ export default function AdminCoursesPage() {
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Tìm theo tên khóa học..."
-                className="pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <Input placeholder="Tìm theo tên khóa học..." className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} />
             </div>
-            <select
-              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
+            <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="">Tất cả trạng thái</option>
-              <option value="DRAFT">Draft</option>
-              <option value="PUBLISHED">Published</option>
-              <option value="ARCHIVED">Archived</option>
+              <option value="DRAFT">Bản nháp</option>
+              <option value="PUBLISHED">Đã xuất bản</option>
+              <option value="ARCHIVED">Đã lưu trữ</option>
             </select>
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-12 animate-pulse rounded-lg bg-zinc-100" />
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="h-12 animate-pulse rounded-lg bg-zinc-100" />
               ))}
             </div>
           ) : courses.length === 0 ? (
@@ -230,53 +195,36 @@ export default function AdminCoursesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {courses.map((c) => (
-                    <tr key={c.id} className="border-b border-zinc-100 transition-colors hover:bg-zinc-50/50">
+                  {courses.map((course) => (
+                    <tr key={course.id} className="border-b border-zinc-100 transition-colors hover:bg-zinc-50/50">
                       <td className="py-3 pr-4 align-top">
                         <input
                           type="checkbox"
-                          checked={selectedCourseIds.includes(c.id)}
-                          onChange={() => toggleCourseSelection(c.id)}
-                          aria-label={`Chọn khóa học ${c.title}`}
+                          checked={selectedCourseIds.includes(course.id)}
+                          onChange={() => toggleCourseSelection(course.id)}
+                          aria-label={`Chọn khóa học ${course.title}`}
                         />
                       </td>
-                      <td className="max-w-50 truncate py-3 pr-4 font-medium">{c.title}</td>
-                      <td className="py-3 pr-4 text-muted-foreground">{c.category || '—'}</td>
-                      <td className="py-3 pr-4">
-                        <StatusBadge status={c.status || 'DRAFT'} />
-                      </td>
-                      <td className="py-3 pr-4 text-muted-foreground">{formatPrice(c.price)}</td>
-                      <td className="py-3 pr-4 text-muted-foreground">{c._count?.enrollments ?? c.enrollmentCount ?? 0}</td>
-                      <td className="py-3 pr-4 text-muted-foreground">
-                        {new Date(c.createdAt).toLocaleDateString('vi-VN')}
-                      </td>
+                      <td className="max-w-50 truncate py-3 pr-4 font-medium">{course.title}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">{typeof course.category === 'string' ? course.category : course.category?.name ?? '-'}</td>
+                      <td className="py-3 pr-4"><StatusBadge status={course.status || 'DRAFT'} /></td>
+                      <td className="py-3 pr-4 text-muted-foreground">{formatPrice(course.price)}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">{course._count?.enrollments ?? course.enrollmentCount ?? 0}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">{new Date(course.createdAt).toLocaleDateString('vi-VN')}</td>
                       <td className="py-3">
                         <div className="flex items-center gap-2">
-                          {c.status === 'DRAFT' && (
-                            <Button
-                              size="sm"
-                              className="text-xs"
-                              onClick={() => handleStatusChange(c.id, 'PUBLISHED', c.title, 'approve')}
-                            >
+                          {course.status === 'DRAFT' && (
+                            <Button size="sm" className="text-xs" onClick={() => handleStatusChange(course.id, 'PUBLISHED', course.title, 'approve')}>
                               Duyệt
                             </Button>
                           )}
-                          {c.status === 'ARCHIVED' && (
-                            <Button
-                              size="sm"
-                              className="text-xs"
-                              onClick={() => handleStatusChange(c.id, 'PUBLISHED', c.title, 'reopen')}
-                            >
+                          {course.status === 'ARCHIVED' && (
+                            <Button size="sm" className="text-xs" onClick={() => handleStatusChange(course.id, 'PUBLISHED', course.title, 'reopen')}>
                               Mở lại
                             </Button>
                           )}
-                          {c.status !== 'ARCHIVED' && (
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              className="text-xs"
-                              onClick={() => handleStatusChange(c.id, 'ARCHIVED', c.title, 'archive')}
-                            >
+                          {course.status !== 'ARCHIVED' && (
+                            <Button variant="destructive" size="sm" className="text-xs" onClick={() => handleStatusChange(course.id, 'ARCHIVED', course.title, 'archive')}>
                               Lưu trữ
                             </Button>
                           )}
@@ -295,20 +243,10 @@ export default function AdminCoursesPage() {
                 Trang {pagination.page} / {pagination.totalPages} ({pagination.total} kết quả)
               </p>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
                   <ChevronLeft className="size-4" /> Trước
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= pagination.totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
+                <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((current) => current + 1)}>
                   Sau <ChevronRight className="size-4" />
                 </Button>
               </div>
@@ -319,9 +257,7 @@ export default function AdminCoursesPage() {
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
-        onClose={() => {
-          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        }}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
         onConfirm={async () => {
           await confirmDialog.onConfirm();
         }}
@@ -333,3 +269,5 @@ export default function AdminCoursesPage() {
     </div>
   );
 }
+
+

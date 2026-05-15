@@ -109,11 +109,11 @@ export default function AdminCategoriesPage() {
   };
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="workspace-page">
       <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Quản lý danh mục</h1>
-          <p className="mt-1 text-sm font-medium text-muted-foreground">
+          <h1 className="workspace-page-title">Quản lý danh mục</h1>
+          <p className="workspace-page-description">
             Tạo, cập nhật và xóa danh mục khóa học để giữ hệ thống discovery đồng bộ.
           </p>
         </div>
@@ -234,3 +234,5 @@ export default function AdminCategoriesPage() {
     </div>
   );
 }
+
+

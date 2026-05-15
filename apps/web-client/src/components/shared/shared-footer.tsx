@@ -27,8 +27,8 @@ export function SharedFooter() {
         <div>
           <p className="mb-4 text-base font-medium text-foreground">Hỗ trợ</p>
           <ul className="space-y-3 text-sm text-muted-foreground font-medium">
-            <li><Link href="/help" className="hover:text-primary transition-colors">Trung tâm trợ giúp</Link></li>
-            <li><Link href="/help" className="hover:text-primary transition-colors">Liên hệ tư vấn</Link></li>
+            <li><Link href="/support" className="hover:text-primary transition-colors">Trung tâm trợ giúp</Link></li>
+            <li><Link href="/support" className="hover:text-primary transition-colors">Liên hệ tư vấn</Link></li>
             <li><Link href="/terms" className="hover:text-primary transition-colors">Điều khoản sử dụng</Link></li>
           </ul>
         </div>

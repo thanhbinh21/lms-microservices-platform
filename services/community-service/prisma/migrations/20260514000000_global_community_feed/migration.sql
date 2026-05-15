@@ -1,4 +1,4 @@
-﻿-- Refactor community thanh feed toan he thong.
+-- Refactor community thanh feed toan he thong.
 -- Chu truong nghiep vu: xoa sach du lieu community group/post/member cu.
 
 DROP TABLE IF EXISTS "community_posts" CASCADE;

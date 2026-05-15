@@ -1,22 +1,34 @@
-﻿'use server';
+'use server';
 
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { cookies } from 'next/headers';
 
 const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:8000';
 const AUTH_PREFIX = process.env.NEXT_PUBLIC_AUTH_PREFIX || '/auth';
-/** Goi thang auth-service (vd: http://localhost:3101) de tranh Kong khi dev / Kong chua co route. */
-const INSTRUCTOR_SERVICE_URL = process.env.INSTRUCTOR_SERVICE_URL?.trim() || '';
 
 export interface BecomeInstructorInput {
   fullName: string;
   phone: string;
   expertise: string;
+  specialization?: string;
   experienceYears: number;
   bio: string;
   courseTitle: string;
   courseCategory: string;
   courseDescription: string;
+  email?: string;
+  dateOfBirth?: string;
+  address?: string;
+  currentJob?: string;
+  github?: string;
+  linkedin?: string;
+  website?: string;
+  youtube?: string;
+  cvFile?: string;
+  certificateFile?: string;
+  identityCard?: string;
+  avatar?: string;
+  targetStudents?: string;
 }
 
 export interface InstructorRequestDto {
@@ -433,26 +445,23 @@ export async function callApi<T>(
   return result;
 }
 
-function instructorBaseUrl() {
-  return INSTRUCTOR_SERVICE_URL || GATEWAY_URL;
-}
-
 export async function createInstructorRequestAction(data: BecomeInstructorInput): Promise<{ success: boolean; message: string }> {
   const result = await callApi<unknown>(
-    '/instructor/request',
+    '/auth/instructor/request',
     {
       method: 'POST',
       body: JSON.stringify(data),
     },
     true,
-    instructorBaseUrl(),
   );
 
   return {
     success: result.success,
     message:
       result.message ||
-      (result.success ? 'ÄÃ£ gá»­i yÃªu cáº§u thÃ nh cÃ´ng.' : 'KhÃ´ng thá»ƒ gá»­i yÃªu cáº§u Ä‘Äƒng kÃ½ giáº£ng viÃªn.'),
+      (result.success
+        ? 'Da gui ho so thanh cong. Admin se xem xet trong thoi gian som nhat.'
+        : 'Khong the gui ho so ung tuyen giang vien.'),
   };
 }
 
@@ -462,10 +471,9 @@ export async function getMyPendingInstructorRequestAction(): Promise<{
   request: InstructorRequestDto | null;
 }> {
   const result = await callApi<{ request: InstructorRequestDto | null }>(
-    '/instructor/my-request',
+    '/auth/instructor/my-request',
     { method: 'GET' },
     true,
-    instructorBaseUrl(),
   );
 
   return {
@@ -481,10 +489,9 @@ export async function getInstructorRequestStatsAction(): Promise<{
   stats: InstructorRequestStatsDto | null;
 }> {
   const result = await callApi<InstructorRequestStatsDto>(
-    '/instructor/requests/stats',
+    '/auth/admin/instructor/requests/stats',
     { method: 'GET' },
     true,
-    instructorBaseUrl(),
   );
 
   return {
@@ -500,10 +507,9 @@ export async function listInstructorRequestsAdminAction(): Promise<{
   requests: InstructorRequestDto[];
 }> {
   const result = await callApi<InstructorRequestDto[]>(
-    '/instructor/requests',
+    '/auth/admin/instructor/requests',
     { method: 'GET' },
     true,
-    instructorBaseUrl(),
   );
 
   return {
@@ -518,7 +524,7 @@ export async function getInstructorRequestByIdAdminAction(id: string): Promise<{
   message: string;
   request: InstructorRequestDto | null;
 }> {
-  const result = await callApi<InstructorRequestDto>(`/instructor/requests/${id}`, { method: 'GET' }, true, instructorBaseUrl());
+  const result = await callApi<InstructorRequestDto>(`/auth/admin/instructor/requests/${id}`, { method: 'GET' }, true);
 
   return {
     success: result.success,
@@ -528,7 +534,7 @@ export async function getInstructorRequestByIdAdminAction(id: string): Promise<{
 }
 
 export async function approveInstructorRequestAction(id: string): Promise<{ success: boolean; message: string }> {
-  const result = await callApi<unknown>(`/instructor/approve/${id}`, { method: 'PUT' }, true, instructorBaseUrl());
+  const result = await callApi<unknown>(`/auth/admin/instructor/approve/${id}`, { method: 'PUT' }, true);
   if (result.success) {
     revalidatePath('/profile');
     revalidatePath('/admin/instructor-requests');
@@ -537,8 +543,15 @@ export async function approveInstructorRequestAction(id: string): Promise<{ succ
   return { success: result.success, message: result.message };
 }
 
-export async function rejectInstructorRequestAction(id: string): Promise<{ success: boolean; message: string }> {
-  const result = await callApi<unknown>(`/instructor/reject/${id}`, { method: 'PUT' }, true, instructorBaseUrl());
+export async function rejectInstructorRequestAction(id: string, reason: string): Promise<{ success: boolean; message: string }> {
+  const result = await callApi<unknown>(
+    `/auth/admin/instructor/reject/${id}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ reason }),
+    },
+    true,
+  );
   if (result.success) {
     revalidatePath('/profile');
     revalidatePath('/admin/instructor-requests');
@@ -997,6 +1010,18 @@ export interface InstructorPayoutProfileDto {
   updatedAt: string;
 }
 
+export interface InstructorPayoutDto {
+  id: string;
+  instructorId: string;
+  amount: number;
+  bankAccountMasked: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAID';
+  adminNote?: string | null;
+  processedAt?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export async function getInstructorPayoutProfileAction() {
   return callApi<InstructorPayoutProfileDto | null>(
     `/payment/api/instructor/payout-profile`,
@@ -1020,7 +1045,23 @@ export async function saveInstructorPayoutProfileAction(payload: {
   );
 }
 
-// â”€â”€â”€ Instructor Channel / Profile Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export async function getMyInstructorPayoutsAction() {
+  return callApi<InstructorPayoutDto[]>(
+    `/payment/api/instructor/payouts/my`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function createInstructorPayoutAction(amount: number) {
+  return callApi<InstructorPayoutDto>(
+    `/payment/api/instructor/payouts`,
+    { method: 'POST', body: JSON.stringify({ amount }) },
+    true,
+  );
+}
+
+// Instructor Channel / Profile Actions
 
 export async function getMyInstructorProfileAction() {
   return callApi<InstructorProfileDto>(
@@ -1072,5 +1113,3 @@ export async function listInstructorCoursesBySlugAction(slug: string, page = 1, 
     { method: 'GET' },
   );
 }
-
-

@@ -19,6 +19,10 @@ const updatePayoutSchema = z.object({
   adminNote: z.string().trim().max(1000).optional(),
 });
 
+const createPayoutSchema = z.object({
+  amount: z.coerce.number().positive('Amount must be greater than 0'),
+});
+
 function toAmount(value: { toNumber: () => number } | number) {
   return typeof value === 'number' ? value : value.toNumber();
 }
@@ -28,6 +32,165 @@ function readHeaderValue(value: string | string[] | undefined): string {
     return value[0] || '';
   }
   return value || '';
+}
+
+async function selectEarningsForAmount(
+  client: Pick<typeof prisma, 'instructorEarning'>,
+  instructorId: string,
+  amount: number,
+  status: 'AVAILABLE' | 'PENDING',
+) {
+  const earnings = await client.instructorEarning.findMany({
+    where: { instructorId, status },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, netAmount: true },
+  });
+
+  const selected: string[] = [];
+  let total = 0;
+  for (const earning of earnings) {
+    const nextAmount = toAmount(earning.netAmount);
+    if (total + nextAmount > amount) continue;
+    selected.push(earning.id);
+    total += nextAmount;
+    if (total === amount) break;
+  }
+
+  return { selected, total };
+}
+
+async function getAvailableBalance(instructorId: string): Promise<number> {
+  const available = await prisma.instructorEarning.aggregate({
+    where: { instructorId, status: 'AVAILABLE' },
+    _sum: { netAmount: true },
+  });
+  return available._sum.netAmount?.toNumber() ?? 0;
+}
+
+function mapPayout<T extends { amount: unknown }>(payout: T): Omit<T, 'amount'> & { amount: number } {
+  return { ...payout, amount: toAmount(payout.amount as { toNumber: () => number } | number) };
+}
+
+export async function listMyPayouts(req: Request, res: Response) {
+  const traceId = readHeaderValue(req.headers['x-trace-id']) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+
+  try {
+    const items = await prisma.payout.findMany({
+      where: { instructorId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    const response: ApiResponse<Array<ReturnType<typeof mapPayout>>> = {
+      success: true,
+      code: 200,
+      message: 'Payout requests fetched',
+      data: items.map(mapPayout),
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'listMyPayouts');
+  }
+}
+
+export async function createPayout(req: Request, res: Response) {
+  const traceId = readHeaderValue(req.headers['x-trace-id']) || crypto.randomUUID();
+  const instructorId = res.locals.userId as string;
+  const parsed = createPayoutSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    const response: ApiResponse<null> = {
+      success: false,
+      code: 400,
+      message: parsed.error.issues[0]?.message || 'Body invalid',
+      data: null,
+      trace_id: traceId,
+    };
+    return res.status(400).json(response);
+  }
+
+  try {
+    const amount = Math.round(parsed.data.amount);
+    const [profile, pending, availableBalance] = await Promise.all([
+      prisma.instructorPayoutProfile.findUnique({ where: { instructorId } }),
+      prisma.payout.findFirst({ where: { instructorId, status: 'PENDING' } }),
+      getAvailableBalance(instructorId),
+    ]);
+
+    if (!profile) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: 'Vui long luu thong tin nhan thanh toan truoc khi rut tien',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(response);
+    }
+
+    if (pending) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 409,
+        message: 'Ban dang co mot yeu cau rut tien cho xu ly',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(409).json(response);
+    }
+
+    if (amount > availableBalance) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: 'So tien rut vuot qua so du kha dung',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(response);
+    }
+
+    const selected = await selectEarningsForAmount(prisma, instructorId, amount, 'AVAILABLE');
+    if (selected.total !== amount || selected.selected.length === 0) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: 'So tien rut hien tai can khop voi cac khoan thu nhap kha dung',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(response);
+    }
+
+    const payout = await prisma.$transaction(async (tx) => {
+      await tx.instructorEarning.updateMany({
+        where: { id: { in: selected.selected }, instructorId, status: 'AVAILABLE' },
+        data: { status: 'PENDING' },
+      });
+
+      return tx.payout.create({
+        data: {
+          instructorId,
+          amount,
+          bankAccountMasked: profile.bankAccountMasked,
+          status: 'PENDING',
+        },
+      });
+    });
+
+    const response: ApiResponse<ReturnType<typeof mapPayout>> = {
+      success: true,
+      code: 201,
+      message: 'Payout request created',
+      data: mapPayout(payout),
+      trace_id: traceId,
+    };
+    return res.status(201).json(response);
+  } catch (err) {
+    return handlePrismaError(err, res, traceId, 'createPayout');
+  }
 }
 
 export async function listPayouts(req: Request, res: Response) {
@@ -124,14 +287,53 @@ export async function updatePayout(req: Request, res: Response) {
       return res.status(404).json(response);
     }
 
+    if (existing.status === 'PAID' || existing.status === 'REJECTED') {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 409,
+        message: 'Payout is already finalized',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(409).json(response);
+    }
+
+    if (parsed.data.status === 'REJECTED' && !parsed.data.adminNote) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: 'Admin note is required when rejecting a payout',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(response);
+    }
+
     const nextStatus = parsed.data.status;
-    const payout = await prisma.payout.update({
-      where: { id },
-      data: {
-        status: nextStatus,
-        adminNote: parsed.data.adminNote ?? existing.adminNote,
-        processedAt: new Date(),
-      },
+    const payout = await prisma.$transaction(async (tx) => {
+      const shouldRelease = nextStatus === 'REJECTED';
+      const shouldWithdraw = nextStatus === 'PAID';
+
+      if (shouldRelease || shouldWithdraw) {
+        const selected = await selectEarningsForAmount(tx, existing.instructorId, toAmount(existing.amount), 'PENDING');
+        if (selected.total !== toAmount(existing.amount)) {
+          throw new Error('Payout earning reservation is not consistent');
+        }
+
+        await tx.instructorEarning.updateMany({
+          where: { id: { in: selected.selected }, instructorId: existing.instructorId, status: 'PENDING' },
+          data: { status: shouldWithdraw ? 'WITHDRAWN' : 'AVAILABLE' },
+        });
+      }
+
+      return tx.payout.update({
+        where: { id },
+        data: {
+          status: nextStatus,
+          adminNote: parsed.data.adminNote ?? existing.adminNote,
+          processedAt: new Date(),
+        },
+      });
     });
 
     await writeAuditLog({
@@ -145,11 +347,11 @@ export async function updatePayout(req: Request, res: Response) {
       traceId,
     });
 
-    const response: ApiResponse<typeof payout> = {
+    const response: ApiResponse<ReturnType<typeof mapPayout>> = {
       success: true,
       code: 200,
       message: 'Payout updated',
-      data: payout,
+      data: mapPayout(payout),
       trace_id: traceId,
     };
     return res.status(200).json(response);

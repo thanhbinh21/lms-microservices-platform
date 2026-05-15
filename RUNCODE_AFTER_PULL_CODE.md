@@ -6,7 +6,8 @@ Tai lieu nay dung cho dev pull code moi nhat ve may local.
 
 - Node.js >= 18
 - pnpm >= 8
-- Docker Desktop dang bat
+- Docker Desktop dang bat cho Kafka/Kong/Zookeeper
+- Upstash/cloud Redis URL da cau hinh trong `.env`
 - Da tao day du `.env` cho cac service
 
 ## 2) Lan dau pull ve hoac pull co thay doi DB
@@ -68,7 +69,7 @@ pnpm test
 
 - `pnpm setup`: install + docker up + setup db + seed
 - `pnpm setup:db`: deploy migration + generate prisma client
-- `pnpm docker:up`: bat Kafka/Kong/Zookeeper
+- `pnpm docker:up`: bat Kafka/Kong/Zookeeper, dong thoi go orphan Redis local cu neu con
 - `pnpm docker:down`: tat docker stack local
 - `pnpm docker:health`: xem trang thai container
 - `pnpm docker:logs`: xem log docker stack
@@ -85,4 +86,3 @@ pnpm test
 
 3. Neon cold start lam request dau cham:
    - Day la hanh vi binh thuong voi Neon serverless.
-

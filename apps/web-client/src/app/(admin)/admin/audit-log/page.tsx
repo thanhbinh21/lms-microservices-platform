@@ -41,11 +41,11 @@ export default function AdminAuditLogPage() {
   }, [actionFilter, resourceTypeFilter, actorFilter]);
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="workspace-page">
       <div className="mb-8 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Audit log</h1>
-          <p className="mt-1 text-sm font-medium text-muted-foreground">
+          <h1 className="workspace-page-title">Nhật ký hoạt động</h1>
+          <p className="workspace-page-description">
             Theo dõi các hành động nhạy cảm của admin và các service nội bộ.
           </p>
         </div>
@@ -57,24 +57,24 @@ export default function AdminAuditLogPage() {
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
-          <CardTitle className="text-lg">Danh sách audit log</CardTitle>
+          <CardTitle className="text-lg">Danh sách nhật ký hoạt động</CardTitle>
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Lọc theo action"
+                placeholder="Lọc theo hành động"
                 className="pl-9"
                 value={actionFilter}
                 onChange={(e) => setActionFilter(e.target.value)}
               />
             </div>
             <Input
-              placeholder="Resource type"
+              placeholder="Lọc theo loại tài nguyên"
               value={resourceTypeFilter}
               onChange={(e) => setResourceTypeFilter(e.target.value)}
             />
             <Input
-              placeholder="Actor ID"
+              placeholder="Lọc theo ID người dùng"
               value={actorFilter}
               onChange={(e) => setActorFilter(e.target.value)}
             />
@@ -94,11 +94,11 @@ export default function AdminAuditLogPage() {
               <table className="w-full min-w-[1120px] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <th className="pb-3 pr-4">Actor</th>
-                    <th className="pb-3 pr-4">Action</th>
-                    <th className="pb-3 pr-4">Target</th>
-                    <th className="pb-3 pr-4">Payload</th>
-                    <th className="pb-3 pr-4">Trace</th>
+                    <th className="pb-3 pr-4">Người thực hiện</th>
+                    <th className="pb-3 pr-4">Hành động</th>
+                    <th className="pb-3 pr-4">Tài nguyên</th>
+                    <th className="pb-3 pr-4">Dữ liệu</th>
+                    <th className="pb-3 pr-4">Trace ID</th>
                     <th className="pb-3">Thời gian</th>
                   </tr>
                 </thead>
@@ -160,3 +160,5 @@ export default function AdminAuditLogPage() {
     </div>
   );
 }
+
+

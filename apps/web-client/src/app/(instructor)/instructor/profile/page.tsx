@@ -6,6 +6,7 @@ import { UserCircle, Sparkles, Upload, Loader2, Save } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/toast';
 import {
   getMyInstructorProfileAction,
   updateMyInstructorProfileAction,
@@ -67,12 +68,12 @@ export default function InstructorProfilePage() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setError('Vui lòng chọn file ảnh hợp lệ (jpg, png).');
+      setError('Vui lÃ²ng chá»n file áº£nh há»£p lá»‡ (jpg, png).');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setError('Kích thước ảnh tối đa là 5MB.');
+      setError('KÃ­ch thÆ°á»›c áº£nh tá»‘i Ä‘a lÃ  5MB.');
       return;
     }
 
@@ -88,7 +89,7 @@ export default function InstructorProfilePage() {
       });
 
       if (!res.success || !res.data) {
-        throw new Error(res.message || 'Không thể lấy URL upload');
+        throw new Error(res.message || 'KhÃ´ng thá»ƒ láº¥y URL upload');
       }
 
       const { presignedUrl, mediaId } = res.data;
@@ -108,18 +109,20 @@ export default function InstructorProfilePage() {
       }
 
       if (!uploadRes.ok) {
-        throw new Error('Upload ảnh thất bại');
+        throw new Error('Upload áº£nh tháº¥t báº¡i');
       }
 
       const confirmRes = await confirmMediaUploadAction(mediaId);
       if (confirmRes.success && confirmRes.data?.url) {
         setAvatar(confirmRes.data.url);
+        toast('success', 'Upload ảnh đại diện thành công');
       } else {
-        throw new Error('Không thể xác nhận upload');
+        throw new Error('KhÃ´ng thá»ƒ xÃ¡c nháº­n upload');
       }
       
     } catch (err: any) {
-      setError(err.message || 'Có lỗi xảy ra khi upload ảnh.');
+      setError(err.message || 'CÃ³ lá»—i xáº£y ra khi upload áº£nh.');
+      toast('error', 'Upload ảnh đại diện thất bại', err?.message || 'Vui lòng thử lại.');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -142,11 +145,13 @@ export default function InstructorProfilePage() {
       });
       
       if (!res.success) {
-        setError(res.message || 'Có lỗi xảy ra khi lưu thông tin.');
+        setError(res.message || 'CÃ³ lá»—i xáº£y ra khi lÆ°u thÃ´ng tin.');
+        toast('error', 'Lưu thông tin kênh thất bại', res.message || 'Vui lòng thử lại.');
         return;
       }
       
-      setSuccess('Đã lưu thông tin kênh thành công.');
+      setSuccess('ÄÃ£ lÆ°u thÃ´ng tin kÃªnh thÃ nh cÃ´ng.');
+      toast('success', 'Đã lưu thông tin kênh');
       if (res.data) {
         setSlug(res.data.slug);
       }
@@ -154,7 +159,8 @@ export default function InstructorProfilePage() {
       setTimeout(() => setSuccess(''), 3000);
       
     } catch (err: any) {
-      setError(err.message || 'Có lỗi xảy ra.');
+      setError(err.message || 'CÃ³ lá»—i xáº£y ra.');
+      toast('error', 'Lưu thông tin kênh thất bại', err?.message || 'Vui lòng thử lại.');
     } finally {
       setSaving(false);
     }
@@ -169,16 +175,16 @@ export default function InstructorProfilePage() {
   }
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="workspace-page">
       {/* Page header */}
-      <div className="mb-8">
+      <div className="workspace-page-header">
         <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
           <Sparkles className="size-3.5" />
           NexEdu Studio
         </div>
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Kênh của tôi</h1>
-        <p className="mt-1 text-sm font-medium text-muted-foreground">
-          Cấu hình hồ sơ và hiển thị công khai của giảng viên.
+        <h1 className="workspace-page-title">KÃªnh cá»§a tÃ´i</h1>
+        <p className="workspace-page-description">
+          Cáº¥u hÃ¬nh há»“ sÆ¡ vÃ  hiá»ƒn thá»‹ cÃ´ng khai cá»§a giáº£ng viÃªn.
         </p>
       </div>
 
@@ -201,7 +207,7 @@ export default function InstructorProfilePage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <UserCircle className="size-4 text-primary" />
-              <CardTitle className="text-sm font-bold">Thông tin cơ bản</CardTitle>
+              <CardTitle className="text-sm font-bold">ThÃ´ng tin cÆ¡ báº£n</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -222,8 +228,8 @@ export default function InstructorProfilePage() {
                 )}
               </div>
               <div className="space-y-2">
-                <p className="text-sm font-bold text-slate-700">Ảnh đại diện</p>
-                <p className="text-xs text-muted-foreground">Khuyến nghị ảnh vuông, tối thiểu 256x256px.</p>
+                <p className="text-sm font-bold text-slate-700">áº¢nh Ä‘áº¡i diá»‡n</p>
+                <p className="text-xs text-muted-foreground">Khuyáº¿n nghá»‹ áº£nh vuÃ´ng, tá»‘i thiá»ƒu 256x256px.</p>
                 <input 
                   type="file" 
                   accept="image/png, image/jpeg, image/webp" 
@@ -240,25 +246,25 @@ export default function InstructorProfilePage() {
                   disabled={uploading}
                 >
                   <Upload className="mr-2 size-3.5" />
-                  Tải ảnh lên
+                  Táº£i áº£nh lÃªn
                 </Button>
               </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-muted-foreground">Tên hiển thị <span className="text-destructive">*</span></label>
+                <label className="text-xs font-bold text-muted-foreground">TÃªn hiá»ƒn thá»‹ <span className="text-destructive">*</span></label>
                 <Input 
-                  placeholder="Nhập tên hiển thị" 
+                  placeholder="Nháº­p tÃªn hiá»ƒn thá»‹" 
                   value={displayName} 
                   onChange={(e) => setDisplayName(e.target.value)}
                   className="rounded-xl"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-muted-foreground">Đường dẫn kênh (Slug)</label>
+                <label className="text-xs font-bold text-muted-foreground">ÄÆ°á»ng dáº«n kÃªnh (Slug)</label>
                 <Input 
-                  placeholder="VD: nguyen-van-a (để trống sẽ tự tạo)" 
+                  placeholder="VD: nguyen-van-a (Ä‘á»ƒ trá»‘ng sáº½ tá»± táº¡o)" 
                   value={slug} 
                   onChange={(e) => setSlug(e.target.value)}
                   className="rounded-xl"
@@ -268,9 +274,9 @@ export default function InstructorProfilePage() {
             </div>
             
             <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground">Headline (Giới thiệu ngắn gọn)</label>
+              <label className="text-xs font-bold text-muted-foreground">Headline (Giá»›i thiá»‡u ngáº¯n gá»n)</label>
               <Input 
-                placeholder="VD: Chuyên gia phát triển phần mềm | Giảng viên lập trình" 
+                placeholder="VD: ChuyÃªn gia phÃ¡t triá»ƒn pháº§n má»m | Giáº£ng viÃªn láº­p trÃ¬nh" 
                 value={headline} 
                 onChange={(e) => setHeadline(e.target.value)}
                 className="rounded-xl"
@@ -278,10 +284,10 @@ export default function InstructorProfilePage() {
             </div>
             
             <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground">Tiểu sử (Bio)</label>
+              <label className="text-xs font-bold text-muted-foreground">Tiá»ƒu sá»­ (Bio)</label>
               <textarea 
                 className="min-h-32 w-full rounded-xl border border-input bg-white p-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" 
-                placeholder="Mô tả chi tiết về kinh nghiệm, kỹ năng và bản thân..." 
+                placeholder="MÃ´ táº£ chi tiáº¿t vá» kinh nghiá»‡m, ká»¹ nÄƒng vÃ  báº£n thÃ¢n..." 
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
               />
@@ -295,7 +301,7 @@ export default function InstructorProfilePage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Sparkles className="size-4 text-primary" />
-              <CardTitle className="text-sm font-bold">Mạng xã hội</CardTitle>
+              <CardTitle className="text-sm font-bold">Máº¡ng xÃ£ há»™i</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -343,11 +349,11 @@ export default function InstructorProfilePage() {
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4">
           <Button variant="outline" className="rounded-xl font-bold" onClick={() => router.back()}>
-            Hủy
+            Há»§y
           </Button>
           <Button className="rounded-xl font-bold" onClick={handleSave} disabled={saving || !displayName}>
             {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}
-            Lưu thay đổi
+            LÆ°u thay Ä‘á»•i
           </Button>
         </div>
 
@@ -355,3 +361,5 @@ export default function InstructorProfilePage() {
     </div>
   );
 }
+
+

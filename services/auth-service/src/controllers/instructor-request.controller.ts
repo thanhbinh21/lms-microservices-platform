@@ -32,6 +32,10 @@ const createRequestSchema = z.object({
   targetStudents: z.string().optional(),
 });
 
+const rejectRequestSchema = z.object({
+  reason: z.string().trim().min(10, 'Ly do tu choi toi thieu 10 ky tu'),
+});
+
 function getMediaServiceUrl(): string {
   return (process.env.MEDIA_SERVICE_URL || 'http://localhost:3004').replace(/\/$/, '');
 }
@@ -368,6 +372,7 @@ export async function rejectInstructorRequest(req: Request, res: Response): Prom
   const adminId = res.locals.userId as string;
 
   try {
+    const validated = rejectRequestSchema.parse(req.body);
     const found = await prisma.instructorRequest.findUnique({ where: { id: req.params.id } });
     if (!found) {
       const response: ApiResponse<null> = {
@@ -402,7 +407,7 @@ export async function rejectInstructorRequest(req: Request, res: Response): Prom
       resourceType: 'INSTRUCTOR_REQUEST',
       resourceId: req.params.id,
       targetLabel: found.fullName,
-      payload: { userId: found.userId },
+      payload: { userId: found.userId, reason: validated.reason },
       traceId,
     });
 
@@ -415,6 +420,16 @@ export async function rejectInstructorRequest(req: Request, res: Response): Prom
     };
     return res.status(200).json(response);
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      const response: ApiResponse<null> = {
+        success: false,
+        code: 400,
+        message: err.errors[0]?.message || 'Du lieu khong hop le',
+        data: null,
+        trace_id: traceId,
+      };
+      return res.status(400).json(response);
+    }
     logger.error({ err, traceId }, 'rejectInstructorRequest that bai');
     const response: ApiResponse<null> = {
       success: false,

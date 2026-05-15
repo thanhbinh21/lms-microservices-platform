@@ -1,40 +1,51 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   approveInstructorRequestAction,
   getInstructorRequestByIdAdminAction,
   getInstructorRequestStatsAction,
   listInstructorRequestsAdminAction,
   rejectInstructorRequestAction,
+  type InstructorRequestDto,
 } from '@/app/actions/instructor';
-import type { InstructorRequestDto } from '@/app/actions/instructor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatusMessage } from '@/components/ui/status-message';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
+import { StatusMessage } from '@/components/ui/status-message';
+import { toast } from '@/components/ui/toast';
 import { ArrowLeft, CheckCircle, ClipboardList, Loader2, XCircle } from 'lucide-react';
 
-function statusLabel(status: string) {
-  switch (status) {
-    case 'pending':
+type AdminInstructorRequestsPanelProps = {
+  requestId: string | null;
+  onOpenDetail: (id: string) => void;
+  onBackToList: () => void;
+};
+
+function normalizeStatus(status?: string | null) {
+  return (status || '').toUpperCase();
+}
+
+function statusLabel(status?: string | null) {
+  switch (normalizeStatus(status)) {
+    case 'PENDING':
       return 'Chờ xem xét';
-    case 'approved':
+    case 'APPROVED':
       return 'Đã duyệt';
-    case 'rejected':
+    case 'REJECTED':
       return 'Đã từ chối';
     default:
-      return status;
+      return status || '-';
   }
 }
 
-function statusClass(status: string) {
-  switch (status) {
-    case 'pending':
+function statusClass(status?: string | null) {
+  switch (normalizeStatus(status)) {
+    case 'PENDING':
       return 'bg-amber-500/15 text-amber-800 border-amber-500/30';
-    case 'approved':
+    case 'APPROVED':
       return 'bg-emerald-500/15 text-emerald-800 border-emerald-500/30';
-    case 'rejected':
+    case 'REJECTED':
       return 'bg-red-500/15 text-red-800 border-red-500/30';
     default:
       return 'bg-muted text-muted-foreground';
@@ -42,7 +53,7 @@ function statusClass(status: string) {
 }
 
 function Field({ label, value }: { label: string; value?: string | null }) {
-  if (value === undefined || value === null || value === '') return null;
+  if (!value) return null;
   return (
     <div className="space-y-1">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -51,42 +62,48 @@ function Field({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-type AdminInstructorRequestsPanelProps = {
-  requestId: string | null;
-  onOpenDetail: (id: string) => void;
-  onBackToList: () => void;
-};
-
 export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackToList }: AdminInstructorRequestsPanelProps) {
   const [loadingList, setLoadingList] = useState(true);
   const [error, setError] = useState('');
-  const [stats, setStats] = useState<{ total: number; pending: number; approved: number; rejected: number } | null>(null);
   const [requests, setRequests] = useState<InstructorRequestDto[]>([]);
+  const [stats, setStats] = useState<{ total: number; pending: number; approved: number; rejected: number } | null>(null);
 
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [detailError, setDetailError] = useState('');
   const [detail, setDetail] = useState<InstructorRequestDto | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     if (requestId) return;
 
     let cancelled = false;
     (async () => {
-      setError('');
       setLoadingList(true);
-      const [s, list] = await Promise.all([getInstructorRequestStatsAction(), listInstructorRequestsAdminAction()]);
+      setError('');
+
+      const [statsRes, listRes] = await Promise.all([
+        getInstructorRequestStatsAction(),
+        listInstructorRequestsAdminAction(),
+      ]);
+
       if (cancelled) return;
-      if (!s.success) {
-        setError(s.message || 'Không tải được thống kê.');
-      } else if (s.stats) {
-        setStats(s.stats);
-      }
-      if (!list.success) {
-        setError((prev) => (prev ? `${prev} ` : '') + (list.message || 'Không tải được danh sách đơn.'));
+
+      if (!statsRes.success || !statsRes.stats) {
+        setError(statsRes.message || 'Không tải được thống kê đơn đăng ký giảng viên.');
       } else {
-        setRequests(list.requests);
+        setStats(statsRes.stats);
       }
+
+      if (!listRes.success) {
+        setError((prev) => {
+          const listError = listRes.message || 'Không tải được danh sách đơn.';
+          return prev ? `${prev} ${listError}` : listError;
+        });
+      } else {
+        setRequests(listRes.requests);
+      }
+
       setLoadingList(false);
     })();
 
@@ -99,6 +116,7 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
     if (!requestId) {
       setDetail(null);
       setDetailError('');
+      setRejectReason('');
       return;
     }
 
@@ -106,14 +124,17 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
     (async () => {
       setLoadingDetail(true);
       setDetailError('');
-      const res = await getInstructorRequestByIdAdminAction(requestId);
+
+      const result = await getInstructorRequestByIdAdminAction(requestId);
       if (cancelled) return;
-      if (!res.success || !res.request) {
-        setDetailError(res.message || 'Không tìm thấy đơn.');
+
+      if (!result.success || !result.request) {
+        setDetailError(result.message || 'Không tìm thấy đơn đăng ký.');
         setDetail(null);
       } else {
-        setDetail(res.request);
+        setDetail(result.request);
       }
+
       setLoadingDetail(false);
     })();
 
@@ -122,29 +143,50 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
     };
   }, [requestId]);
 
+  const canReview = useMemo(() => normalizeStatus(detail?.status) === 'PENDING', [detail?.status]);
+
   const handleApprove = async () => {
-    if (!requestId || !detail || detail.status !== 'pending') return;
+    if (!requestId || !detail || !canReview) return;
     setActionLoading(true);
     setDetailError('');
-    const res = await approveInstructorRequestAction(requestId);
+
+    const result = await approveInstructorRequestAction(requestId);
     setActionLoading(false);
-    if (!res.success) {
-      setDetailError(res.message);
+
+    if (!result.success) {
+      setDetailError(result.message || 'Duyệt đơn thất bại.');
+      toast('error', 'Duyệt thất bại', result.message || 'Không thể duyệt đơn.');
       return;
     }
+
+    toast('success', 'Đã duyệt đơn', `${detail.fullName} đã trở thành giảng viên.`);
     onBackToList();
   };
 
   const handleReject = async () => {
-    if (!requestId || !detail || detail.status !== 'pending') return;
-    setActionLoading(true);
-    setDetailError('');
-    const res = await rejectInstructorRequestAction(requestId);
-    setActionLoading(false);
-    if (!res.success) {
-      setDetailError(res.message);
+    if (!requestId || !detail || !canReview) return;
+
+    const reason = rejectReason.trim();
+    if (reason.length < 10) {
+      const message = 'Lý do từ chối phải có ít nhất 10 ký tự.';
+      setDetailError(message);
+      toast('error', 'Thiếu lý do', message);
       return;
     }
+
+    setActionLoading(true);
+    setDetailError('');
+
+    const result = await rejectInstructorRequestAction(requestId, reason);
+    setActionLoading(false);
+
+    if (!result.success) {
+      setDetailError(result.message || 'Từ chối đơn thất bại.');
+      toast('error', 'Từ chối thất bại', result.message || 'Không thể từ chối đơn.');
+      return;
+    }
+
+    toast('info', 'Đã từ chối đơn', `${detail.fullName} đã được thông báo.`);
     onBackToList();
   };
 
@@ -168,11 +210,12 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
         {loadingDetail ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Loader2 className="mb-4 size-10 animate-spin text-primary" />
-            <p className="text-muted-foreground">Đang tải chi tiết...</p>
+            <p className="text-muted-foreground">Đang tải chi tiết đơn...</p>
           </div>
         ) : detail ? (
           <>
             {detailError && <StatusMessage type="error" message={detailError} />}
+
             <ScrollReveal>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -182,27 +225,33 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
                     <span className="font-mono text-foreground">{detail.userId}</span>
                   </p>
                 </div>
-                {detail.status === 'pending' && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      disabled={actionLoading}
-                      className="gap-2 rounded-xl font-bold shadow-md"
-                      onClick={handleApprove}
-                    >
-                      {actionLoading ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle className="size-4" />}
-                      Duyệt
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      disabled={actionLoading}
-                      className="gap-2 rounded-xl font-bold"
-                      onClick={handleReject}
-                    >
-                      <XCircle className="size-4" />
-                      Từ chối
-                    </Button>
+
+                {canReview && (
+                  <div className="flex w-full flex-col gap-3 sm:w-auto">
+                    <div className="sm:max-w-sm">
+                      <label htmlFor="reject-reason" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Lý do từ chối
+                      </label>
+                      <textarea
+                        id="reject-reason"
+                        rows={3}
+                        value={rejectReason}
+                        onChange={(event) => setRejectReason(event.target.value)}
+                        placeholder="Nhập lý do để học viên bổ sung hồ sơ..."
+                        className="w-full resize-none rounded-xl border border-white/50 bg-white/60 px-3 py-2 text-sm outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" disabled={actionLoading} className="gap-2 rounded-xl font-bold shadow-md" onClick={handleApprove}>
+                        {actionLoading ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle className="size-4" />}
+                        Duyệt
+                      </Button>
+                      <Button type="button" variant="destructive" disabled={actionLoading} className="gap-2 rounded-xl font-bold" onClick={handleReject}>
+                        <XCircle className="size-4" />
+                        Từ chối
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -210,11 +259,11 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
 
             <Card className="glass-panel rounded-3xl border-white/60">
               <CardHeader>
-                <CardTitle className="text-lg">Trạng thái</CardTitle>
+                <CardTitle className="text-lg">Trạng thái hồ sơ</CardTitle>
                 <CardDescription>
-                  {detail.status === 'pending' && 'Đơn đang chờ xử lý.'}
-                  {detail.status === 'approved' && 'Đã duyệt — tài khoản đã được nâng lên INSTRUCTOR.'}
-                  {detail.status === 'rejected' && 'Đã từ chối đơn.'}
+                  {normalizeStatus(detail.status) === 'PENDING' && 'Đơn đang chờ xử lý.'}
+                  {normalizeStatus(detail.status) === 'APPROVED' && 'Đơn đã được duyệt và tài khoản đã nâng quyền INSTRUCTOR.'}
+                  {normalizeStatus(detail.status) === 'REJECTED' && 'Đơn đã bị từ chối.'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-6 md:grid-cols-2">
@@ -226,7 +275,7 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
                   <Field label="Giới thiệu" value={detail.bio} />
                 </div>
                 <div className="md:col-span-2">
-                  <Field label="Khóa học dự kiến — tiêu đề" value={detail.courseTitle} />
+                  <Field label="Tên khóa học dự kiến" value={detail.courseTitle} />
                 </div>
                 <Field label="Danh mục" value={detail.courseCategory} />
                 <div className="md:col-span-2">
@@ -259,7 +308,7 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
           <div>
             <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Quản lý đơn đăng ký giảng viên</h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground md:text-base">
-              Thống kê và xem xét hồ sơ học viên gửi lên. Chọn một đơn để xem chi tiết và duyệt hoặc từ chối.
+              Xem thống kê và xử lý hồ sơ học viên gửi đăng ký trở thành giảng viên.
             </p>
           </div>
         </div>
@@ -319,18 +368,18 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
                       </td>
                     </tr>
                   ) : (
-                    requests.map((r) => (
-                      <tr key={r.id} className="border-b border-white/40 transition-colors hover:bg-white/30">
-                        <td className="px-4 py-3 font-semibold">{r.fullName}</td>
-                        <td className="max-w-[200px] truncate px-4 py-3 text-muted-foreground">{r.email}</td>
-                        <td className="max-w-[180px] truncate px-4 py-3">{r.expertise}</td>
+                    requests.map((request) => (
+                      <tr key={request.id} className="border-b border-white/40 transition-colors hover:bg-white/30">
+                        <td className="px-4 py-3 font-semibold">{request.fullName}</td>
+                        <td className="max-w-[200px] truncate px-4 py-3 text-muted-foreground">{request.email}</td>
+                        <td className="max-w-[180px] truncate px-4 py-3">{request.expertise}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusClass(r.status)}`}>
-                            {statusLabel(r.status)}
+                          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusClass(request.status)}`}>
+                            {statusLabel(request.status)}
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                          {new Date(r.createdAt).toLocaleString('vi-VN')}
+                          {new Date(request.createdAt).toLocaleString('vi-VN')}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <Button
@@ -338,7 +387,7 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
                             size="sm"
                             variant="outline"
                             className="rounded-xl font-semibold"
-                            onClick={() => onOpenDetail(r.id)}
+                            onClick={() => onOpenDetail(request.id)}
                           >
                             Chi tiết
                           </Button>

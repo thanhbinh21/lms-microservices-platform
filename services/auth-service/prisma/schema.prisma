@@ -71,6 +71,41 @@ model SystemConfig {
   @@map("system_configs")
 }
 
+model SupportTicket {
+  id          String                @id @default(uuid())
+  userId      String                @map("user_id")
+  subject     String
+  description String                @db.Text
+  category    SupportTicketCategory @default(OTHER)
+  status      SupportTicketStatus   @default(OPEN)
+  priority    SupportTicketPriority @default(NORMAL)
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+  closedAt    DateTime?             @map("closed_at")
+  replies     SupportTicketReply[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt(sort: Desc)])
+  @@map("support_tickets")
+}
+
+model SupportTicketReply {
+  id        String        @id @default(uuid())
+  ticketId  String        @map("ticket_id")
+  authorId  String        @map("author_id")
+  authorRole String       @map("author_role")
+  message   String        @db.Text
+  createdAt DateTime      @default(now()) @map("created_at")
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([authorId])
+  @@index([createdAt(sort: Desc)])
+  @@map("support_ticket_replies")
+}
+
 enum UserRole {
   STUDENT
   INSTRUCTOR
@@ -81,6 +116,27 @@ enum UserStatus {
   ACTIVE
   BANNED
   SUSPENDED
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SupportTicketCategory {
+  PAYMENT
+  COURSE
+  ACCOUNT
+  SYSTEM
+  OTHER
+}
+
+enum SupportTicketPriority {
+  LOW
+  NORMAL
+  HIGH
 }
 
 // Don xin tro thanh giang vien — do auth-service quan ly vi lien quan den User domain

@@ -75,10 +75,10 @@ export default function AdminReviewsPage() {
   };
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Quản lý đánh giá</h1>
-        <p className="mt-1 text-sm font-medium text-muted-foreground">
+    <div className="workspace-page">
+      <div className="workspace-page-header">
+        <h1 className="workspace-page-title">Quản lý đánh giá</h1>
+        <p className="workspace-page-description">
           Kiểm duyệt, gắn cờ và xóa các đánh giá vi phạm.
         </p>
       </div>
@@ -215,3 +215,5 @@ export default function AdminReviewsPage() {
     </div>
   );
 }
+
+

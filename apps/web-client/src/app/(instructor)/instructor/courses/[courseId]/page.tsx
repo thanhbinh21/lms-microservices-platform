@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { StatusMessage } from '@/components/ui/status-message';
+import { toast } from '@/components/ui/toast';
 import {
   confirmLessonUploadAction,
   createCourseCategoryAction,
@@ -64,11 +65,11 @@ interface FlatLesson {
 }
 
 const STEP_DEFINITIONS: StepDefinition[] = [
-  { id: 1, title: 'Co ban', subtitle: 'Tieu de, danh muc, thong tin khoa hoc', icon: <BookOpen className="size-4" /> },
-  { id: 2, title: 'Chi tiáº¿t', subtitle: 'MÃ´ táº£, áº£nh bÃ¬a, giÃ¡, chá»©ng chá»‰', icon: <Eye className="size-4" /> },
-  { id: 3, title: 'GiÃ¡o trÃ¬nh', subtitle: 'ChÆ°Æ¡ng vÃ  bÃ i há»c', icon: <BookOpen className="size-4" /> },
-  { id: 4, title: 'Ná»™i dung', subtitle: 'Video, YouTube, mÃ´ táº£', icon: <UploadCloud className="size-4" /> },
-  { id: 5, title: 'Xuáº¥t báº£n', subtitle: 'Kiá»ƒm tra vÃ  cÃ´ng khai', icon: <Check className="size-4" /> },
+  { id: 1, title: 'Cơ bản', subtitle: 'Tiêu đề, danh mục, thông tin khóa học', icon: <BookOpen className="size-4" /> },
+  { id: 2, title: 'Chi tiết', subtitle: 'Mô tả, ảnh bìa, giá, chứng chỉ', icon: <Eye className="size-4" /> },
+  { id: 3, title: 'Giáo trình', subtitle: 'Chương và bài học', icon: <BookOpen className="size-4" /> },
+  { id: 4, title: 'Nội dung', subtitle: 'Video, YouTube, mô tả', icon: <UploadCloud className="size-4" /> },
+  { id: 5, title: 'Xuất bản', subtitle: 'Kiểm tra và công khai', icon: <Check className="size-4" /> },
 ];
 
 function parseStep(rawStep: string | null): WizardStep {
@@ -84,7 +85,7 @@ function formatSavedAt(date: Date | null): string {
 }
 
 function stripChapterPrefix(title: string): string {
-  return title.replace(/^chÆ°Æ¡ng\s+\d+\s*:?\s*/i, '').trim();
+  return title.replace(/^chương\s+\d+\s*:?\s*/i, '').trim();
 }
 
 interface CreateCategoryModalProps {
@@ -107,7 +108,7 @@ function CreateCategoryModal({ open, onClose, onSuccess }: CreateCategoryModalPr
 
   const handleCreate = async () => {
     if (name.trim().length < 2) {
-      setError('Ten danh muc can it nhat 2 ky tu.');
+      setError('Tên danh mục cần ít nhất 2 ký tự.');
       return;
     }
     setLoading(true);
@@ -118,10 +119,10 @@ function CreateCategoryModal({ open, onClose, onSuccess }: CreateCategoryModalPr
         onSuccess(result.data);
         onClose();
       } else {
-        setError(result.message || 'Khong the tao danh muc.');
+        setError(result.message || 'Không thể tạo danh mục.');
       }
     } catch {
-      setError('Da co loi he thong.');
+      setError('Đã có lỗi hệ thống.');
     } finally {
       setLoading(false);
     }
@@ -134,22 +135,22 @@ function CreateCategoryModal({ open, onClose, onSuccess }: CreateCategoryModalPr
       <FocusTrap>
         <div role="dialog" aria-modal="true" aria-labelledby="modal-cat-title" className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-6 shadow-2xl">
           <div className="mb-4 flex items-center justify-between">
-            <h3 id="modal-cat-title" className="text-lg font-bold">Tao danh muc moi</h3>
-            <button onClick={onClose} aria-label="Dong" className="text-muted-foreground transition-colors hover:text-foreground">
+            <h3 id="modal-cat-title" className="text-lg font-bold">Tạo danh mục mới</h3>
+            <button onClick={onClose} aria-label="Đóng" className="text-muted-foreground transition-colors hover:text-foreground">
               <X className="size-5" />
             </button>
           </div>
           <div className="space-y-3">
             <div>
-              <label htmlFor="cat-name" className="mb-1.5 block text-sm font-semibold">Ten danh muc</label>
-              <Input id="cat-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Lap trinh Web, Marketing..." onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }} autoFocus />
+              <label htmlFor="cat-name" className="mb-1.5 block text-sm font-semibold">Tên danh mục</label>
+              <Input id="cat-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Lập trình Web, Marketing..." onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }} autoFocus />
             </div>
             {error && <StatusMessage type="error" message={error} />}
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">Huy</Button>
+              <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">Hủy</Button>
               <Button onClick={() => void handleCreate()} disabled={loading} className="rounded-xl font-bold">
                 {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                Tao danh muc
+                Tạo danh mục
               </Button>
             </div>
           </div>
@@ -159,7 +160,7 @@ function CreateCategoryModal({ open, onClose, onSuccess }: CreateCategoryModalPr
   );
 }
 
-// Inline Certificate Template Creation Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Inline Certificate Template Creation Modal ──────────────────────────────────
 interface CreateCertificateModalProps {
   open: boolean;
   onClose: () => void;
@@ -178,7 +179,7 @@ function CreateCertificateModal({ open, onClose, onSuccess }: CreateCertificateM
 
   const handleCreate = async () => {
     if (!name.trim() || name.trim().length < 2) {
-      setError('TÃªn máº«u chá»©ng chá»‰ cáº§n Ã­t nháº¥t 2 kÃ½ tá»±.');
+      setError('Tên mẫu chứng chỉ cần ít nhất 2 ký tự.');
       return;
     }
     setLoading(true);
@@ -189,10 +190,10 @@ function CreateCertificateModal({ open, onClose, onSuccess }: CreateCertificateM
         onSuccess(result.data);
         onClose();
       } else {
-        setError(result.message || 'KhÃ´ng thá»ƒ táº¡o máº«u chá»©ng chá»‰.');
+        setError(result.message || 'Không thể tạo mẫu chứng chỉ.');
       }
     } catch {
-      setError('ÄÃ£ cÃ³ lá»—i há»‡ thá»‘ng.');
+      setError('Đã có lỗi hệ thống.');
     } finally {
       setLoading(false);
     }
@@ -210,26 +211,26 @@ function CreateCertificateModal({ open, onClose, onSuccess }: CreateCertificateM
           className="w-full max-w-md rounded-2xl border border-white/20 bg-white p-6 shadow-2xl"
         >
           <div className="mb-4 flex items-center justify-between">
-            <h3 id="modal-cert-title" className="text-lg font-bold">Táº¡o máº«u chá»©ng chá»‰ má»›i</h3>
-            <button onClick={onClose} aria-label="ÄÃ³ng" className="text-muted-foreground hover:text-foreground transition-colors">
+            <h3 id="modal-cert-title" className="text-lg font-bold">Tạo mẫu chứng chỉ mới</h3>
+            <button onClick={onClose} aria-label="Đóng" className="text-muted-foreground hover:text-foreground transition-colors">
               <X className="size-5" />
             </button>
           </div>
           <div className="space-y-3">
             <div>
-              <label htmlFor="cert-tmpl-name" className="mb-1.5 block text-sm font-semibold">TÃªn máº«u chá»©ng chá»‰</label>
-              <Input id="cert-tmpl-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Chá»©ng nháº­n hoÃ n thÃ nh khÃ³a há»c" onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }} autoFocus />
+              <label htmlFor="cert-tmpl-name" className="mb-1.5 block text-sm font-semibold">Tên mẫu chứng chỉ</label>
+              <Input id="cert-tmpl-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Chứng nhận hoàn thành khóa học" onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }} autoFocus />
             </div>
             <div>
-              <label htmlFor="cert-tmpl-desc" className="mb-1.5 block text-sm font-semibold">MÃ´ táº£ (tÃ¹y chá»n)</label>
-              <textarea id="cert-tmpl-desc" className="min-h-20 w-full rounded-md border border-slate-200 bg-white p-3 text-sm" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="MÃ´ táº£ vá» chá»©ng chá»‰ nÃ y..." />
+              <label htmlFor="cert-tmpl-desc" className="mb-1.5 block text-sm font-semibold">Mô tả (tùy chọn)</label>
+              <textarea id="cert-tmpl-desc" className="min-h-20 w-full rounded-md border border-slate-200 bg-white p-3 text-sm" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Mô tả về chứng chỉ này..." />
             </div>
             {error && <StatusMessage type="error" message={error} />}
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">Há»§y</Button>
+              <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">Hủy</Button>
               <Button onClick={() => void handleCreate()} disabled={loading} className="rounded-xl font-bold">
                 {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                Táº¡o máº«u chá»©ng chá»‰
+                Tạo mẫu chứng chỉ
               </Button>
             </div>
           </div>
@@ -239,7 +240,7 @@ function CreateCertificateModal({ open, onClose, onSuccess }: CreateCertificateM
   );
 }
 
-// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function CourseWizardPage() {
   const router = useRouter();
   const params = useParams();
@@ -308,6 +309,11 @@ export default function CourseWizardPage() {
   const setStatus = (type: 'success' | 'error', message: string) => {
     setStatusType(type);
     setStatusMessage(message);
+    if (type === 'success') {
+      toast('success', 'Thao tác thành công', message);
+      return;
+    }
+    toast('error', 'Thao tác thất bại', message);
   };
 
   const flatLessons = useMemo(() => {
@@ -351,17 +357,17 @@ export default function CourseWizardPage() {
     ]);
 
     if (!courseResult.success || !courseResult.data) {
-      setStatus('error', courseResult.message || 'KhÃ´ng táº£i Ä‘Æ°á»£c khÃ³a há»c.');
+      setStatus('error', courseResult.message || 'Không tải được khóa học.');
       setLoading(false);
       return;
     }
     if (!curriculumResult.success || !curriculumResult.data) {
-      setStatus('error', curriculumResult.message || 'KhÃ´ng táº£i Ä‘Æ°á»£c giÃ¡o trÃ¬nh.');
+      setStatus('error', curriculumResult.message || 'Không tải được giáo trình.');
       setLoading(false);
       return;
     }
     if (!guardResult.success || !guardResult.data) {
-      setStatus('error', guardResult.message || 'KhÃ´ng táº£i Ä‘Æ°á»£c Ä‘iá»u kiá»‡n publish.');
+      setStatus('error', guardResult.message || 'Không tải được điều kiện publish.');
       setLoading(false);
       return;
     }
@@ -429,25 +435,25 @@ export default function CourseWizardPage() {
     return stepCompletion.step1 && stepCompletion.step2 && stepCompletion.step3;
   }, [stepCompletion]);
 
-  // â”€â”€â”€ Save Functions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Save Functions ─────────────────────────────────────────────────────────
 
   const saveStep1 = useCallback(async (): Promise<boolean> => {
     if (!course) return false;
-    if (title.trim().length < 3) { setStatus('error', 'TiÃªu Ä‘á» cáº§n Ã­t nháº¥t 3 kÃ½ tá»±.'); return false; }
-    if (!categoryId.trim()) { setStatus('error', 'Vui lÃ²ng chá»n danh má»¥c.'); return false; }
+    if (title.trim().length < 3) { setStatus('error', 'Tiêu đề cần ít nhất 3 ký tự.'); return false; }
+    if (!categoryId.trim()) { setStatus('error', 'Vui lòng chọn danh mục.'); return false; }
 
     setSavingStep(true);
     const result = await updateCourseAction(course.id, { title: title.trim(), categoryId, level });
     setSavingStep(false);
 
     if (!result.success || !result.data) {
-      setStatus('error', result.message || 'KhÃ´ng thá»ƒ lÆ°u bÆ°á»›c 1.');
+      setStatus('error', result.message || 'Không thể lưu bước 1.');
       return false;
     }
 
     setCourse(result.data);
     setLastSavedAt(new Date());
-    setStatus('success', 'ÄÃ£ lÆ°u thÃ´ng tin cÆ¡ báº£n.');
+    setStatus('success', 'Đã lưu thông tin cơ bản.');
     return true;
   }, [course, title, categoryId, level]);
 
@@ -458,7 +464,7 @@ export default function CourseWizardPage() {
     const result = await updateCourseCertificateTemplatesAction(course.id, selectedTemplateIds);
     setSavingTemplates(false);
     if (!result.success) {
-      setStatus('error', result.message || 'KhÃ´ng lÆ°u Ä‘Æ°á»£c chá»©ng chá»‰.');
+      setStatus('error', result.message || 'Không lưu được chứng chỉ.');
       return false;
     }
     return true;
@@ -468,11 +474,11 @@ export default function CourseWizardPage() {
     if (!course) return false;
     const parsedPrice = Number(price);
     if (pricingMode === 'PAID' && (!Number.isFinite(parsedPrice) || parsedPrice <= 0)) {
-      setStatus('error', 'KhÃ³a há»c tráº£ phÃ­ yÃªu cáº§u giÃ¡ lá»›n hÆ¡n 0.');
+      setStatus('error', 'Khóa học trả phí yêu cầu giá lớn hơn 0.');
       return false;
     }
     if (!thumbnail.trim()) {
-      setStatus('error', 'Báº¯t buá»™c pháº£i cÃ³ áº£nh bÃ¬a.');
+      setStatus('error', 'Bắt buộc phải có ảnh bìa.');
       return false;
     }
 
@@ -485,13 +491,13 @@ export default function CourseWizardPage() {
     setSavingStep(false);
 
     if (!result.success || !result.data) {
-      setStatus('error', result.message || 'KhÃ´ng thá»ƒ lÆ°u bÆ°á»›c 2.');
+      setStatus('error', result.message || 'Không thể lưu bước 2.');
       return false;
     }
 
     setCourse(result.data);
     setLastSavedAt(new Date());
-    setStatus('success', 'ÄÃ£ lÆ°u chi tiáº¿t khÃ³a há»c.');
+    setStatus('success', 'Đã lưu chi tiết khóa học.');
     await loadWizardData();
     return true;
   }, [course, price, pricingMode, thumbnail, description, loadWizardData]);
@@ -515,7 +521,7 @@ export default function CourseWizardPage() {
         if (!ok) return;
       }
       if (!isStepUnlocked(nextStep)) {
-        setStatus('error', 'Vui lÃ²ng hoÃ n táº¥t cÃ¡c bÆ°á»›c báº¯t buá»™c trÆ°á»›c khi Ä‘i tiáº¿p.');
+        setStatus('error', 'Vui lòng hoàn tất các bước bắt buộc trước khi đi tiếp.');
         return;
       }
     }
@@ -536,7 +542,7 @@ export default function CourseWizardPage() {
     await navigateStep(target);
   };
 
-  // â”€â”€â”€ Upload helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Upload helpers ─────────────────────────────────────────────────────────
 
   const uploadWithPresigned = async (presignedUrl: string, file: File, uploadFields?: Record<string, string>) => {
     if (uploadFields) {
@@ -561,15 +567,15 @@ export default function CourseWizardPage() {
     setIsUploadingThumbnail(true);
     try {
       const presigned = await requestCourseThumbnailUploadAction({ filename: file.name, mimeType: file.type || 'image/jpeg', size: file.size, courseId: course.id });
-      if (!presigned.success || !presigned.data) { setStatus('error', presigned.message || 'KhÃ´ng táº¡o Ä‘Æ°á»£c phiÃªn upload áº£nh bÃ¬a.'); return; }
+      if (!presigned.success || !presigned.data) { setStatus('error', presigned.message || 'Không tạo được phiên upload ảnh bìa.'); return; }
       const uploaded = await uploadWithPresigned(presigned.data.presignedUrl, file, presigned.data.uploadMethod === 'POST_FORM' ? presigned.data.uploadFields : undefined);
-      if (!uploaded) { setStatus('error', 'Upload áº£nh bÃ¬a tháº¥t báº¡i.'); return; }
+      if (!uploaded) { setStatus('error', 'Upload ảnh bìa thất bại.'); return; }
       const confirmed = await confirmLessonUploadAction(presigned.data.mediaId);
-      if (!confirmed.success || !confirmed.data?.url) { setStatus('error', confirmed.message || 'KhÃ´ng xÃ¡c nháº­n Ä‘Æ°á»£c áº£nh bÃ¬a.'); return; }
+      if (!confirmed.success || !confirmed.data?.url) { setStatus('error', confirmed.message || 'Không xác nhận được ảnh bìa.'); return; }
       const nextThumbnail = confirmed.data.url;
       setThumbnail(nextThumbnail);
       setLastSavedAt(new Date());
-      setStatus('success', 'áº¢nh bÃ¬a Ä‘Ã£ Ä‘Æ°á»£c upload vÃ  lÆ°u.');
+      setStatus('success', 'Ảnh bìa đã được upload và lưu.');
     } finally {
       setIsUploadingThumbnail(false);
     }
@@ -577,54 +583,54 @@ export default function CourseWizardPage() {
 
   const buildNumberedChapterTitle = useCallback((chapterIndex: number, rawTitle: string): string => {
     const cleanTitle = stripChapterPrefix(rawTitle || '').trim();
-    if (!cleanTitle) return `ChÆ°Æ¡ng ${chapterIndex}`;
-    return `ChÆ°Æ¡ng ${chapterIndex}: ${cleanTitle}`;
+    if (!cleanTitle) return `Chương ${chapterIndex}`;
+    return `Chương ${chapterIndex}: ${cleanTitle}`;
   }, []);
 
-  // â”€â”€â”€ Curriculum handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Curriculum handlers ─────────────────────────────────────────────────────
 
   const handleCreateChapter = async () => {
     if (!course || !curriculum) return;
     const nextChapterIndex = curriculum.chapters.length + 1;
     const chapterTitle = buildNumberedChapterTitle(nextChapterIndex, newChapterTitle);
     const result = await createChapterAction(course.id, chapterTitle);
-    if (!result.success) { setStatus('error', result.message || 'KhÃ´ng táº¡o Ä‘Æ°á»£c chÆ°Æ¡ng.'); return; }
+    if (!result.success) { setStatus('error', result.message || 'Không tạo được chương.'); return; }
     setNewChapterTitle('');
     await loadWizardData();
     setLastSavedAt(new Date());
-    setStatus('success', 'ÄÃ£ thÃªm chÆ°Æ¡ng má»›i.');
+    setStatus('success', 'Đã thêm chương mới.');
   };
 
   const handleRenameChapter = async (chapterId: string) => {
     if (!course || !curriculum) return;
     const chapterIndex = curriculum.chapters.findIndex((ch) => ch.id === chapterId) + 1;
-    if (chapterIndex <= 0) { setStatus('error', 'KhÃ´ng tÃ¬m tháº¥y chÆ°Æ¡ng cáº§n cáº­p nháº­t.'); return; }
+    if (chapterIndex <= 0) { setStatus('error', 'Không tìm thấy chương cần cập nhật.'); return; }
     const finalTitle = buildNumberedChapterTitle(chapterIndex, editingChapterTitle);
     const result = await updateChapterAction(course.id, chapterId, { title: finalTitle });
-    if (!result.success) { setStatus('error', result.message || 'KhÃ´ng Ä‘á»•i tÃªn Ä‘Æ°á»£c chÆ°Æ¡ng.'); return; }
+    if (!result.success) { setStatus('error', result.message || 'Không đổi tên được chương.'); return; }
     setEditingChapterId('');
     setEditingChapterTitle('');
     await loadWizardData();
     setLastSavedAt(new Date());
-    setStatus('success', 'ÄÃ£ Ä‘á»•i tÃªn chÆ°Æ¡ng.');
+    setStatus('success', 'Đã đổi tên chương.');
   };
 
   const handleDeleteChapter = async (chapterId: string) => {
     if (!course) return;
     const result = await deleteChapterAction(course.id, chapterId);
-    if (!result.success) { setStatus('error', result.message || 'KhÃ´ng xÃ³a Ä‘Æ°á»£c chÆ°Æ¡ng.'); return; }
+    if (!result.success) { setStatus('error', result.message || 'Không xóa được chương.'); return; }
     setPendingDeleteChapterId('');
     await loadWizardData();
     setLastSavedAt(new Date());
-    setStatus('success', 'ÄÃ£ xÃ³a chÆ°Æ¡ng.');
+    setStatus('success', 'Đã xóa chương.');
   };
 
   const syncCoursePriceForPaidLesson = useCallback(async (lessonPriceText: string): Promise<boolean> => {
     if (!course) return false;
     const parsed = Number(lessonPriceText);
-    if (!Number.isFinite(parsed) || parsed <= 0) { setStatus('error', 'Lesson tráº£ phÃ­ báº¯t buá»™c nháº­p giÃ¡ há»£p lá»‡.'); return false; }
+    if (!Number.isFinite(parsed) || parsed <= 0) { setStatus('error', 'Lesson trả phí bắt buộc nhập giá hợp lệ.'); return false; }
     const courseUpdated = await updateCourseAction(course.id, { price: parsed });
-    if (!courseUpdated.success || !courseUpdated.data) { setStatus('error', courseUpdated.message || 'KhÃ´ng cáº­p nháº­t Ä‘Æ°á»£c giÃ¡.'); return false; }
+    if (!courseUpdated.success || !courseUpdated.data) { setStatus('error', courseUpdated.message || 'Không cập nhật được giá.'); return false; }
     setCourse(courseUpdated.data);
     setPricingMode('PAID');
     setPrice(String(parsed));
@@ -634,18 +640,18 @@ export default function CourseWizardPage() {
   const handleCreateLesson = async (chapterId: string) => {
     if (!course) return;
     const nextTitle = (newLessonByChapter[chapterId] || '').trim();
-    if (nextTitle.length < 2) { setStatus('error', 'TÃªn bÃ i há»c cáº§n Ã­t nháº¥t 2 kÃ½ tá»±.'); return; }
+    if (nextTitle.length < 2) { setStatus('error', 'Tên bài học cần ít nhất 2 ký tự.'); return; }
     const isFree = newLessonFreeByChapter[chapterId] ?? true;
     const lessonPriceText = (newLessonPriceByChapter[chapterId] || '').trim();
     if (!isFree) { const okPrice = await syncCoursePriceForPaidLesson(lessonPriceText); if (!okPrice) return; }
     const result = await createLessonAction(course.id, chapterId, nextTitle, isFree);
-    if (!result.success) { setStatus('error', result.message || 'KhÃ´ng táº¡o Ä‘Æ°á»£c bÃ i há»c.'); return; }
+    if (!result.success) { setStatus('error', result.message || 'Không tạo được bài học.'); return; }
     setNewLessonByChapter((prev) => ({ ...prev, [chapterId]: '' }));
     setNewLessonFreeByChapter((prev) => ({ ...prev, [chapterId]: true }));
     setNewLessonPriceByChapter((prev) => ({ ...prev, [chapterId]: '' }));
     await loadWizardData();
     setLastSavedAt(new Date());
-    setStatus('success', 'ÄÃ£ thÃªm bÃ i há»c má»›i.');
+    setStatus('success', 'Đã thêm bài học mới.');
   };
 
   const startLessonEdit = (chapterId: string, lesson: LessonDto) => {
@@ -658,24 +664,24 @@ export default function CourseWizardPage() {
 
   const handleSaveLessonEdit = async () => {
     if (!course || !editingLessonId || !editingLessonChapterId) return;
-    if (editingLessonTitle.trim().length < 2) { setStatus('error', 'TÃªn bÃ i há»c cáº§n Ã­t nháº¥t 2 kÃ½ tá»±.'); return; }
+    if (editingLessonTitle.trim().length < 2) { setStatus('error', 'Tên bài học cần ít nhất 2 ký tự.'); return; }
     if (!editingLessonFree) { const okPrice = await syncCoursePriceForPaidLesson(editingLessonPrice); if (!okPrice) return; }
     const result = await updateLessonAction(course.id, editingLessonChapterId, editingLessonId, { title: editingLessonTitle.trim(), isFree: editingLessonFree });
-    if (!result.success) { setStatus('error', result.message || 'KhÃ´ng chá»‰nh sá»­a Ä‘Æ°á»£c bÃ i há»c.'); return; }
+    if (!result.success) { setStatus('error', result.message || 'Không chỉnh sửa được bài học.'); return; }
     setEditingLessonId(''); setEditingLessonChapterId(''); setEditingLessonTitle(''); setEditingLessonPrice(''); setEditingLessonFree(true);
     await loadWizardData();
     setLastSavedAt(new Date());
-    setStatus('success', 'ÄÃ£ cáº­p nháº­t bÃ i há»c.');
+    setStatus('success', 'Đã cập nhật bài học.');
   };
 
   const handleDeleteLesson = async (chapterId: string, lessonId: string) => {
     if (!course) return;
     const result = await deleteLessonAction(course.id, chapterId, lessonId);
-    if (!result.success) { setStatus('error', result.message || 'KhÃ´ng xÃ³a Ä‘Æ°á»£c bÃ i há»c.'); return; }
+    if (!result.success) { setStatus('error', result.message || 'Không xóa được bài học.'); return; }
     setPendingDeleteLessonId('');
     await loadWizardData();
     setLastSavedAt(new Date());
-    setStatus('success', 'ÄÃ£ xÃ³a bÃ i há»c.');
+    setStatus('success', 'Đã xóa bài học.');
   };
 
   const handleUploadLessonVideo = async (payload: FlatLesson, file?: File | null) => {
@@ -683,16 +689,16 @@ export default function CourseWizardPage() {
     setUploadingLessonId(payload.lesson.id);
     try {
       const presigned = await requestLessonUploadAction({ filename: file.name, mimeType: file.type || 'video/mp4', size: file.size, courseId: course.id, lessonId: payload.lesson.id });
-      if (!presigned.success || !presigned.data) { setStatus('error', presigned.message || 'KhÃ´ng táº¡o Ä‘Æ°á»£c phiÃªn upload.'); return; }
+      if (!presigned.success || !presigned.data) { setStatus('error', presigned.message || 'Không tạo được phiên upload.'); return; }
       const uploaded = await uploadWithPresigned(presigned.data.presignedUrl, file, presigned.data.uploadMethod === 'POST_FORM' ? presigned.data.uploadFields : undefined);
-      if (!uploaded) { setStatus('error', 'Upload video tháº¥t báº¡i.'); return; }
+      if (!uploaded) { setStatus('error', 'Upload video thất bại.'); return; }
       const confirmed = await confirmLessonUploadAction(presigned.data.mediaId);
-      if (!confirmed.success || !confirmed.data?.url) { setStatus('error', confirmed.message || 'KhÃ´ng xÃ¡c nháº­n Ä‘Æ°á»£c video.'); return; }
+      if (!confirmed.success || !confirmed.data?.url) { setStatus('error', confirmed.message || 'Không xác nhận được video.'); return; }
       const updated = await updateLessonAction(course.id, payload.chapterId, payload.lesson.id, { videoUrl: confirmed.data.url, sourceType: 'UPLOAD' });
-      if (!updated.success) { setStatus('error', updated.message || 'KhÃ´ng cáº­p nháº­t Ä‘Æ°á»£c lesson.'); return; }
+      if (!updated.success) { setStatus('error', updated.message || 'Không cập nhật được lesson.'); return; }
       await loadWizardData();
       setLastSavedAt(new Date());
-      setStatus('success', `ÄÃ£ upload video cho "${payload.lesson.title}".`);
+      setStatus('success', `Đã upload video cho "${payload.lesson.title}".`);
     } finally {
       setUploadingLessonId('');
     }
@@ -701,26 +707,26 @@ export default function CourseWizardPage() {
   const handleAttachYoutube = async (payload: FlatLesson) => {
     if (!course) return;
     const youtubeUrl = (youtubeUrlByLesson[payload.lesson.id] || '').trim();
-    if (!youtubeUrl) { setStatus('error', 'Vui lÃ²ng nháº­p URL YouTube.'); return; }
+    if (!youtubeUrl) { setStatus('error', 'Vui lòng nhập URL YouTube.'); return; }
     setSavingLessonId(payload.lesson.id);
     const updated = await updateLessonAction(course.id, payload.chapterId, payload.lesson.id, { sourceType: 'YOUTUBE', videoUrl: youtubeUrl });
-    if (!updated.success) { setSavingLessonId(''); setStatus('error', updated.message || 'KhÃ´ng cáº­p nháº­t Ä‘Æ°á»£c.'); return; }
+    if (!updated.success) { setSavingLessonId(''); setStatus('error', updated.message || 'Không cập nhật được.'); return; }
     await registerYoutubeMediaAction({ title: payload.lesson.title, youtubeUrl, courseId: course.id, lessonId: payload.lesson.id });
     await loadWizardData();
     setSavingLessonId('');
     setLastSavedAt(new Date());
-    setStatus('success', `ÄÃ£ gáº¯n YouTube cho "${payload.lesson.title}".`);
+    setStatus('success', `Đã gắn YouTube cho "${payload.lesson.title}".`);
   };
 
   const handleClearLessonMedia = async (payload: FlatLesson) => {
     if (!course) return;
     setSavingLessonId(payload.lesson.id);
     const updated = await updateLessonAction(course.id, payload.chapterId, payload.lesson.id, { sourceType: 'UPLOAD', videoUrl: null });
-    if (!updated.success) { setSavingLessonId(''); setStatus('error', updated.message || 'KhÃ´ng thá»ƒ bá» media.'); return; }
+    if (!updated.success) { setSavingLessonId(''); setStatus('error', updated.message || 'Không thể bỏ media.'); return; }
     await loadWizardData();
     setSavingLessonId('');
     setLastSavedAt(new Date());
-    setStatus('success', `BÃ i "${payload.lesson.title}" Ä‘ang á»Ÿ dáº¡ng chá»‰ cÃ³ ná»™i dung vÄƒn báº£n.`);
+    setStatus('success', `Bài "${payload.lesson.title}" đang ở dạng chỉ có nội dung văn bản.`);
   };
 
   const handleSaveLessonContent = async (payload: FlatLesson) => {
@@ -730,10 +736,10 @@ export default function CourseWizardPage() {
     setSavingLessonId(payload.lesson.id);
     const updated = await updateLessonAction(course.id, payload.chapterId, payload.lesson.id, { content: nextContent.length > 0 ? nextContent : null });
     setSavingLessonId('');
-    if (!updated.success) { setStatus('error', updated.message || 'KhÃ´ng lÆ°u Ä‘Æ°á»£c mÃ´ táº£.'); return; }
+    if (!updated.success) { setStatus('error', updated.message || 'Không lưu được mô tả.'); return; }
     await loadWizardData();
     setLastSavedAt(new Date());
-    setStatus('success', `ÄÃ£ lÆ°u mÃ´ táº£ cho "${payload.lesson.title}".`);
+    setStatus('success', `Đã lưu mô tả cho "${payload.lesson.title}".`);
   };
 
   const handlePublish = async () => {
@@ -743,15 +749,15 @@ export default function CourseWizardPage() {
     setPublishing(true);
     const result = await publishCourseAction(course.id, thumbnail.trim() || undefined);
     setPublishing(false);
-    if (!result.success) { setStatus('error', result.message || 'KhÃ´ng thá»ƒ publish.'); await loadWizardData(); return; }
+    if (!result.success) { setStatus('error', result.message || 'Không thể publish.'); await loadWizardData(); return; }
     const publicSlug = result.data?.slug || course.slug;
     if (publicSlug) { router.push(`/courses/${publicSlug}`); return; }
     await loadWizardData();
     setLastSavedAt(new Date());
-    setStatus('success', 'Publish thÃ nh cÃ´ng.');
+    setStatus('success', 'Publish thành công.');
   };
 
-  // â”€â”€â”€ Category/Cert handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Category/Cert handlers ──────────────────────────────────────────────────
 
   const handleCategoryCreated = (category: CourseCategoryDto) => {
     setCategories((prev) => [...prev, category]);
@@ -775,34 +781,34 @@ export default function CourseWizardPage() {
   }
 
   if (!course || !curriculum || !publishGuard) {
-    return <div className="p-8 text-muted-foreground">KhÃ´ng tÃ¬m tháº¥y khÃ³a há»c.</div>;
+    return <div className="p-8 text-muted-foreground">Không tìm thấy khóa học.</div>;
   }
 
   const canPublish = publishGuard.hasAtLeastOneLesson && publishGuard.hasThumbnail && publishGuard.priceValidForPaidCourse;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* â”€â”€â”€ Header â”€â”€â”€ */}
+      {/* ── Header ── */}
       <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur-md shadow-sm">
         <div className="mx-auto max-w-6xl px-8 py-4">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link href="/instructor/courses" className="flex items-center text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
-                <ArrowLeft className="mr-1.5 size-4" /> Quay láº¡i
+                <ArrowLeft className="mr-1.5 size-4" /> Quay lại
               </Link>
               <div className="h-5 w-px bg-slate-200" />
-              <h1 className="text-xl font-bold tracking-tight">{course.title || 'KhÃ³a há»c má»›i'}</h1>
+              <h1 className="text-xl font-bold tracking-tight">{course.title || 'Khóa học mới'}</h1>
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${course.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
                 {course.status || 'DRAFT'}
               </span>
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               {savingStep ? (
-                <span className="flex items-center gap-1.5 text-amber-600"><Loader2 className="size-3.5 animate-spin" /> Äang lÆ°u...</span>
+                <span className="flex items-center gap-1.5 text-amber-600"><Loader2 className="size-3.5 animate-spin" /> Đang lưu...</span>
               ) : lastSavedAt ? (
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="size-3.5 text-emerald-500" /> LÆ°u lÃºc {formatSavedAt(lastSavedAt)}</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="size-3.5 text-emerald-500" /> Lưu lúc {formatSavedAt(lastSavedAt)}</span>
               ) : (
-                <span className="flex items-center gap-1.5"><AlertCircle className="size-3.5 text-slate-400" /> ChÆ°a lÆ°u</span>
+                <span className="flex items-center gap-1.5"><AlertCircle className="size-3.5 text-slate-400" /> Chưa lưu</span>
               )}
             </div>
           </div>
@@ -850,53 +856,53 @@ export default function CourseWizardPage() {
         </div>
       </div>
 
-      {/* â”€â”€â”€ Content â”€â”€â”€ */}
+      {/* ── Content ── */}
       <div className="mx-auto max-w-6xl px-8 py-6">
         {statusMessage && (
           <div className="mb-4"><StatusMessage type={statusType} message={statusMessage} /></div>
         )}
 
-        {/* â”€â”€ STEP 1: Basic â”€â”€ */}
+        {/* ── STEP 1: Basic ── */}
         {currentStep === 1 && (
           <div className="space-y-6">
             <Card className="rounded-2xl border-white/60 bg-white/70 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BookOpen className="size-5 text-primary" />
-                  ThÃ´ng tin cÆ¡ báº£n
+                  Thông tin cơ bản
                 </CardTitle>
-                <CardDescription>TiÃªu Ä‘á», danh má»¥c, trÃ¬nh Ä‘á»™ vÃ  ngÃ´n ngá»¯ lÃ  báº¯t buá»™c Ä‘á»ƒ tiáº¿p tá»¥c.</CardDescription>
+                <CardDescription>Tiêu đề, danh mục, trình độ và ngôn ngữ là bắt buộc để tiếp tục.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold">TiÃªu Ä‘á» khÃ³a há»c</label>
-                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: React.js Thá»±c chiáº¿n Doanh nghiá»‡p" className="h-12 rounded-xl text-base" />
+                  <label className="mb-1.5 block text-sm font-semibold">Tiêu đề khóa học</label>
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: React.js Thực chiến Doanh nghiệp" className="h-12 rounded-xl text-base" />
                 </div>
                 <div className="grid gap-4 md:grid-cols-3">
                   <div>
                     <label className="mb-1.5 flex items-center justify-between text-sm font-semibold">
-                      Danh má»¥c
+                      Danh mục
                       <button onClick={() => setShowCategoryModal(true)} className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
-                        <Plus className="size-3" /> Táº¡o má»›i
+                        <Plus className="size-3" /> Tạo mới
                       </button>
                     </label>
                     <select className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                      <option value="">Chá»n danh má»¥c</option>
+                      <option value="">Chọn danh mục</option>
                       {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-sm font-semibold">TrÃ¬nh Ä‘á»™</label>
+                    <label className="mb-1.5 block text-sm font-semibold">Trình độ</label>
                     <select className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={level} onChange={(e) => setLevel(e.target.value as LevelValue)}>
-                      <option value="BEGINNER">NgÆ°á»i má»›i báº¯t Ä‘áº§u</option>
-                      <option value="INTERMEDIATE">Trung cáº¥p</option>
-                      <option value="ADVANCED">NÃ¢ng cao</option>
+                      <option value="BEGINNER">Người mới bắt đầu</option>
+                      <option value="INTERMEDIATE">Trung cấp</option>
+                      <option value="ADVANCED">Nâng cao</option>
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-sm font-semibold">NgÃ´n ngá»¯</label>
+                    <label className="mb-1.5 block text-sm font-semibold">Ngôn ngữ</label>
                     <select className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={language} onChange={(e) => { setLanguage(e.target.value); window.localStorage.setItem(`course-wizard-language-${courseId}`, e.target.value); }}>
-                      <option value="vi">Tiáº¿ng Viá»‡t</option>
+                      <option value="vi">Tiếng Việt</option>
                       <option value="en">English</option>
                       <option value="ja">Japanese</option>
                     </select>
@@ -905,7 +911,7 @@ export default function CourseWizardPage() {
                 <div className="flex justify-end pt-2">
                   <Button onClick={() => void handleSaveStep1()} disabled={savingStep || savingTemplates} className="rounded-xl font-bold gap-2 shadow-md">
                     {savingStep ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                    LÆ°u thÃ´ng tin cÆ¡ báº£n
+                    Lưu thông tin cơ bản
                   </Button>
                 </div>
               </CardContent>
@@ -913,66 +919,66 @@ export default function CourseWizardPage() {
             {/* Navigation */}
             <div className="flex justify-end">
               <Button onClick={() => void handleNext()} className="rounded-xl font-bold gap-2 shadow-md px-8">
-                Tiáº¿p tá»¥c <ChevronRight className="size-4" />
+                Tiếp tục <ChevronRight className="size-4" />
               </Button>
             </div>
           </div>
         )}
 
-        {/* â”€â”€ STEP 2: Details â”€â”€ */}
+        {/* ── STEP 2: Details ── */}
         {currentStep === 2 && (
           <div className="space-y-6">
             <Card className="rounded-2xl border-white/60 bg-white/70 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Eye className="size-5 text-primary" />
-                  Chi tiáº¿t khÃ³a há»c
+                  Chi tiết khóa học
                 </CardTitle>
-                <CardDescription>MÃ´ táº£, áº£nh bÃ¬a vÃ  Ä‘á»‹nh giÃ¡ lÃ  báº¯t buá»™c Ä‘á»ƒ cÃ³ thá»ƒ xuáº¥t báº£n.</CardDescription>
+                <CardDescription>Mô tả, ảnh bìa và định giá là bắt buộc để có thể xuất bản.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold">MÃ´ táº£ khÃ³a há»c</label>
-                  <textarea className="min-h-32 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Nháº­p mÃ´ táº£ chi tiáº¿t vá» khÃ³a há»c..." />
+                  <label className="mb-1.5 block text-sm font-semibold">Mô tả khóa học</label>
+                  <textarea className="min-h-32 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Nhập mô tả chi tiết về khóa học..." />
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold">áº¢nh bÃ¬a</label>
+                  <label className="mb-1.5 block text-sm font-semibold">Ảnh bìa</label>
                   <div className="flex aspect-video max-w-sm items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50">
                     {thumbnail ? (
                       <Image src={thumbnail} alt="thumbnail" width={640} height={360} className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex flex-col items-center text-sm font-semibold text-slate-500">
                         <ImageIcon className="mb-2 size-10 text-slate-300" />
-                        ChÆ°a cÃ³ áº£nh bÃ¬a
+                        Chưa có ảnh bìa
                       </div>
                     )}
                   </div>
                   <label className="mt-3 inline-flex h-11 cursor-pointer items-center rounded-xl border border-dashed border-slate-300 px-4 text-sm font-semibold text-slate-600 hover:border-primary hover:text-primary transition-colors">
                     <UploadCloud className="mr-2 size-4" />
-                    {isUploadingThumbnail ? 'Äang upload...' : 'Upload áº£nh bÃ¬a'}
+                    {isUploadingThumbnail ? 'Đang upload...' : 'Upload ảnh bìa'}
                     <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" disabled={isUploadingThumbnail}
                       onChange={(event) => { const file = event.target.files?.[0]; void handleUploadThumbnail(file); event.currentTarget.value = ''; }} />
                   </label>
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold">Äá»‹nh giÃ¡</label>
+                  <label className="mb-1.5 block text-sm font-semibold">Định giá</label>
                   <div className="flex gap-3 mb-3">
                     <Button type="button" variant={pricingMode === 'FREE' ? 'default' : 'outline'} onClick={() => { setPricingMode('FREE'); setPrice('0'); }} className="rounded-xl font-semibold gap-1.5">
-                      Miá»…n phÃ­
+                      Miễn phí
                     </Button>
                     <Button type="button" variant={pricingMode === 'PAID' ? 'default' : 'outline'} onClick={() => setPricingMode('PAID')} className="rounded-xl font-semibold gap-1.5">
-                      Tráº£ phÃ­
+                      Trả phí
                     </Button>
                   </div>
                   <Input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} disabled={pricingMode === 'FREE'}
-                    placeholder="GiÃ¡ (VND)" className="max-w-xs rounded-xl h-12 text-base" />
+                    placeholder="Giá (VND)" className="max-w-xs rounded-xl h-12 text-base" />
                 </div>
                 <div className="flex justify-end pt-2">
                   <Button onClick={() => void saveStep2()} disabled={savingStep || isUploadingThumbnail} className="rounded-xl font-bold gap-2 shadow-md">
                     {savingStep ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                    LÆ°u chi tiáº¿t
+                    Lưu chi tiết
                   </Button>
                 </div>
               </CardContent>
@@ -983,9 +989,9 @@ export default function CourseWizardPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Award className="size-5 text-primary" />
-                  Chá»©ng chá»‰ cho khÃ³a há»c
+                  Chứng chỉ cho khóa học
                 </CardTitle>
-                <CardDescription>Chá»n máº«u chá»©ng chá»‰ mÃ  há»c viÃªn sáº½ nháº­n Ä‘Æ°á»£c khi hoÃ n thÃ nh khÃ³a há»c.</CardDescription>
+                <CardDescription>Chọn mẫu chứng chỉ mà học viên sẽ nhận được khi hoàn thành khóa học.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-end gap-3">
@@ -993,7 +999,7 @@ export default function CourseWizardPage() {
                     {certificateTemplates.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 w-full">
                         <Award className="mb-1.5 size-4 text-slate-400" />
-                        Báº¡n chÆ°a cÃ³ máº«u chá»©ng chá»‰ nÃ o. Táº¡o máº«u má»›i táº¡i tab Chá»©ng chá»‰ hoáº·c báº¥m nÃºt bÃªn dÆ°á»›i.
+                        Bạn chưa có mẫu chứng chỉ nào. Tạo mẫu mới tại tab Chứng chỉ hoặc bấm nút bên dưới.
                       </div>
                     ) : (
                       certificateTemplates.map((template) => (
@@ -1012,11 +1018,11 @@ export default function CourseWizardPage() {
                     )}
                   </div>
                   <Button variant="outline" onClick={() => setShowCertModal(true)} className="rounded-xl font-semibold gap-1.5 h-12 shrink-0">
-                    <Plus className="size-4" /> Táº¡o máº«u má»›i
+                    <Plus className="size-4" /> Tạo mẫu mới
                   </Button>
                   <Button onClick={() => void saveTemplateSelection()} disabled={savingTemplates} className="rounded-xl font-bold gap-1.5 h-12 shrink-0">
                     {savingTemplates ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                    LÆ°u
+                    Lưu
                   </Button>
                 </div>
               </CardContent>
@@ -1024,41 +1030,41 @@ export default function CourseWizardPage() {
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => void handlePrevious()} className="rounded-xl font-bold gap-2">
-                <ArrowLeft className="size-4" /> Quay láº¡i
+                <ArrowLeft className="size-4" /> Quay lại
               </Button>
               <Button onClick={() => void handleNext()} className="rounded-xl font-bold gap-2 shadow-md px-8">
-                Tiáº¿p tá»¥c <ChevronRight className="size-4" />
+                Tiếp tục <ChevronRight className="size-4" />
               </Button>
             </div>
           </div>
         )}
 
-        {/* â”€â”€ STEP 3: Curriculum â”€â”€ */}
+        {/* ── STEP 3: Curriculum ── */}
         {currentStep === 3 && (
           <div className="space-y-6">
             <Card className="rounded-2xl border-white/60 bg-white/70 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BookOpen className="size-5 text-primary" />
-                  XÃ¢y dá»±ng giÃ¡o trÃ¬nh
+                  Xây dựng giáo trình
                 </CardTitle>
-                <CardDescription>Táº¡o chÆ°Æ¡ng vÃ  bÃ i há»c. Há»‡ thá»‘ng tá»± Ä‘Ã¡nh sá»‘ chÆ°Æ¡ng.</CardDescription>
+                <CardDescription>Tạo chương và bài học. Hệ thống tự đánh số chương.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex gap-3">
                   <Input value={newChapterTitle} onChange={(e) => setNewChapterTitle(e.target.value)}
-                    placeholder="TÃªn chÆ°Æ¡ng (há»‡ thá»‘ng tá»± Ä‘Ã¡nh sá»‘ ChÆ°Æ¡ng 1, 2...)"
+                    placeholder="Tên chương (hệ thống tự đánh số Chương 1, 2...)"
                     className="h-12 rounded-xl text-base" onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateChapter(); }} />
                   <Button onClick={() => void handleCreateChapter()} className="h-12 rounded-xl font-bold gap-1.5 shadow-md" disabled={!newChapterTitle.trim()}>
-                    <Plus className="size-4" /> ThÃªm chÆ°Æ¡ng
+                    <Plus className="size-4" /> Thêm chương
                   </Button>
                 </div>
 
                 {curriculum.chapters.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-12 text-center text-slate-500">
                     <BookOpen className="mx-auto mb-3 size-10 text-slate-300" />
-                    <p className="font-semibold">ChÆ°a cÃ³ chÆ°Æ¡ng nÃ o</p>
-                    <p className="text-sm mt-1">Báº¯t Ä‘áº§u báº±ng cÃ¡ch thÃªm chÆ°Æ¡ng Ä‘áº§u tiÃªn á»Ÿ trÃªn.</p>
+                    <p className="font-semibold">Chưa có chương nào</p>
+                    <p className="text-sm mt-1">Bắt đầu bằng cách thêm chương đầu tiên ở trên.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -1070,8 +1076,8 @@ export default function CourseWizardPage() {
                             <div className="flex flex-1 items-center gap-2">
                               <Input value={editingChapterTitle} onChange={(e) => setEditingChapterTitle(e.target.value)}
                                 className="h-9 rounded-lg text-sm flex-1" onKeyDown={(e) => { if (e.key === 'Enter') void handleRenameChapter(chapter.id); }} autoFocus />
-                              <Button size="sm" onClick={() => void handleRenameChapter(chapter.id)} className="rounded-lg font-bold h-9">LÆ°u</Button>
-                              <Button size="sm" variant="outline" onClick={() => { setEditingChapterId(''); setEditingChapterTitle(''); }} className="rounded-lg h-9">Há»§y</Button>
+                              <Button size="sm" onClick={() => void handleRenameChapter(chapter.id)} className="rounded-lg font-bold h-9">Lưu</Button>
+                              <Button size="sm" variant="outline" onClick={() => { setEditingChapterId(''); setEditingChapterTitle(''); }} className="rounded-lg h-9">Hủy</Button>
                             </div>
                           ) : (
                             <>
@@ -1079,16 +1085,16 @@ export default function CourseWizardPage() {
                                 <span className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">{chapterIndex + 1}</span>
                                 <div>
                                   <p className="font-bold text-slate-800">{stripChapterPrefix(chapter.title)}</p>
-                                  <p className="text-xs text-muted-foreground">{chapter.lessons.length} bÃ i há»c</p>
+                                  <p className="text-xs text-muted-foreground">{chapter.lessons.length} bài học</p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <Button size="sm" variant="ghost" onClick={() => { setEditingChapterId(chapter.id); setEditingChapterTitle(stripChapterPrefix(chapter.title)); setPendingDeleteChapterId(''); }} className="rounded-lg h-9 gap-1.5 text-slate-600">
-                                  <Pencil className="size-3.5" /> Äá»•i tÃªn
+                                  <Pencil className="size-3.5" /> Đổi tên
                                 </Button>
                                 <Button size="sm" variant="ghost" onClick={() => setPendingDeleteChapterId((prev) => (prev === chapter.id ? '' : chapter.id))}
                                   className={`rounded-lg h-9 gap-1.5 ${pendingDeleteChapterId === chapter.id ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
-                                  <Trash2 className="size-3.5" /> XÃ³a
+                                  <Trash2 className="size-3.5" /> Xóa
                                 </Button>
                               </div>
                             </>
@@ -1098,10 +1104,10 @@ export default function CourseWizardPage() {
                         {/* Delete confirm */}
                         {pendingDeleteChapterId === chapter.id && (
                           <div className="flex items-center justify-between bg-red-50 px-5 py-3 border-b border-red-200">
-                            <p className="text-sm font-semibold text-red-700">XÃ¡c nháº­n xÃ³a chÆ°Æ¡ng nÃ y vÃ  toÃ n bá»™ bÃ i há»c?</p>
+                            <p className="text-sm font-semibold text-red-700">Xác nhận xóa chương này và toàn bộ bài học?</p>
                             <div className="flex gap-2">
-                              <Button size="sm" variant="destructive" onClick={() => void handleDeleteChapter(chapter.id)} className="rounded-lg font-bold h-9">XÃ¡c nháº­n xÃ³a</Button>
-                              <Button size="sm" variant="outline" onClick={() => setPendingDeleteChapterId('')} className="rounded-lg h-9">Há»§y</Button>
+                              <Button size="sm" variant="destructive" onClick={() => void handleDeleteChapter(chapter.id)} className="rounded-lg font-bold h-9">Xác nhận xóa</Button>
+                              <Button size="sm" variant="outline" onClick={() => setPendingDeleteChapterId('')} className="rounded-lg h-9">Hủy</Button>
                             </div>
                           </div>
                         )}
@@ -1109,26 +1115,26 @@ export default function CourseWizardPage() {
                         {/* Lessons */}
                         <div className="px-5 py-4 space-y-3">
                           {chapter.lessons.length === 0 && (
-                            <p className="text-sm text-slate-500 py-2">ChÆ°a cÃ³ bÃ i há»c nÃ o trong chÆ°Æ¡ng nÃ y.</p>
+                            <p className="text-sm text-slate-500 py-2">Chưa có bài học nào trong chương này.</p>
                           )}
                           {chapter.lessons.map((lesson, lessonIndex) => (
                             <div key={lesson.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
                               {editingLessonId === lesson.id ? (
                                 <div className="space-y-3">
                                   <Input value={editingLessonTitle} onChange={(e) => setEditingLessonTitle(e.target.value)}
-                                    placeholder="TÃªn bÃ i há»c" className="h-10 rounded-lg text-sm"
+                                    placeholder="Tên bài học" className="h-10 rounded-lg text-sm"
                                     onKeyDown={(e) => { if (e.key === 'Enter') void handleSaveLessonEdit(); }} />
                                   <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
                                     <input type="checkbox" checked={editingLessonFree} onChange={(e) => setEditingLessonFree(e.target.checked)} className="size-4 rounded" />
-                                    BÃ i há»c miá»…n phÃ­
+                                    Bài học miễn phí
                                   </label>
                                   {!editingLessonFree && (
                                     <Input type="number" min={0} value={editingLessonPrice} onChange={(e) => setEditingLessonPrice(e.target.value)}
-                                      placeholder="GiÃ¡ lesson tráº£ phÃ­ (VND)" className="h-10 rounded-lg text-sm" />
+                                      placeholder="Giá lesson trả phí (VND)" className="h-10 rounded-lg text-sm" />
                                   )}
                                   <div className="flex gap-2">
-                                    <Button size="sm" onClick={() => void handleSaveLessonEdit()} className="rounded-lg font-bold h-9">LÆ°u</Button>
-                                    <Button size="sm" variant="outline" onClick={() => { setEditingLessonId(''); setEditingLessonChapterId(''); setEditingLessonTitle(''); setEditingLessonFree(true); setEditingLessonPrice(''); }} className="rounded-lg h-9">Há»§y</Button>
+                                    <Button size="sm" onClick={() => void handleSaveLessonEdit()} className="rounded-lg font-bold h-9">Lưu</Button>
+                                    <Button size="sm" variant="outline" onClick={() => { setEditingLessonId(''); setEditingLessonChapterId(''); setEditingLessonTitle(''); setEditingLessonFree(true); setEditingLessonPrice(''); }} className="rounded-lg h-9">Hủy</Button>
                                   </div>
                                 </div>
                               ) : (
@@ -1139,25 +1145,25 @@ export default function CourseWizardPage() {
                                       <div>
                                         <p className="text-sm font-semibold text-slate-800">{lesson.title}</p>
                                         <p className="text-xs text-muted-foreground">
-                                          {lesson.isFree ? 'Miá»…n phÃ­' : 'Tráº£ phÃ­'} &bull; {lesson.videoUrl ? (lesson.sourceType === 'YOUTUBE' ? 'YouTube' : 'Video') : 'ChÆ°a cÃ³ media'}
+                                          {lesson.isFree ? 'Miễn phí' : 'Trả phí'} &bull; {lesson.videoUrl ? (lesson.sourceType === 'YOUTUBE' ? 'YouTube' : 'Video') : 'Chưa có media'}
                                         </p>
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-1">
                                       <Button size="sm" variant="ghost" onClick={() => { startLessonEdit(chapter.id, lesson); setPendingDeleteLessonId(''); }} className="rounded-lg h-8 gap-1.5 text-slate-600">
-                                        <Pencil className="size-3" /> Sá»­a
+                                        <Pencil className="size-3" /> Sửa
                                       </Button>
                                       <Button size="sm" variant="ghost" onClick={() => setPendingDeleteLessonId((prev) => (prev === lesson.id ? '' : lesson.id))}
                                         className={`rounded-lg h-8 gap-1.5 ${pendingDeleteLessonId === lesson.id ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
-                                        <Trash2 className="size-3" /> XÃ³a
+                                        <Trash2 className="size-3" /> Xóa
                                       </Button>
                                     </div>
                                   </div>
                                   {pendingDeleteLessonId === lesson.id && (
                                     <div className="mt-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
-                                      <p className="flex-1 text-sm font-semibold text-red-700">XÃ³a bÃ i há»c nÃ y?</p>
-                                      <Button size="sm" variant="destructive" onClick={() => void handleDeleteLesson(chapter.id, lesson.id)} className="rounded-lg h-8 font-bold">XÃ³a</Button>
-                                      <Button size="sm" variant="outline" onClick={() => setPendingDeleteLessonId('')} className="rounded-lg h-8">Há»§y</Button>
+                                      <p className="flex-1 text-sm font-semibold text-red-700">Xóa bài học này?</p>
+                                      <Button size="sm" variant="destructive" onClick={() => void handleDeleteLesson(chapter.id, lesson.id)} className="rounded-lg h-8 font-bold">Xóa</Button>
+                                      <Button size="sm" variant="outline" onClick={() => setPendingDeleteLessonId('')} className="rounded-lg h-8">Hủy</Button>
                                     </div>
                                   )}
                                 </>
@@ -1170,7 +1176,7 @@ export default function CourseWizardPage() {
                             <div className="flex-1 space-y-1">
                               <Input value={newLessonByChapter[chapter.id] || ''}
                                 onChange={(e) => setNewLessonByChapter((prev) => ({ ...prev, [chapter.id]: e.target.value }))}
-                                placeholder="TÃªn bÃ i há»c má»›i" className="h-10 rounded-lg text-sm"
+                                placeholder="Tên bài học mới" className="h-10 rounded-lg text-sm"
                                 onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateLesson(chapter.id); }} />
                             </div>
                             <label className="flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600">
@@ -1179,7 +1185,7 @@ export default function CourseWizardPage() {
                               Free
                             </label>
                             <Button onClick={() => void handleCreateLesson(chapter.id)} className="h-10 rounded-lg font-bold gap-1.5">
-                              <Plus className="size-4" /> ThÃªm bÃ i
+                              <Plus className="size-4" /> Thêm bài
                             </Button>
                           </div>
                         </div>
@@ -1192,32 +1198,32 @@ export default function CourseWizardPage() {
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => void handlePrevious()} className="rounded-xl font-bold gap-2">
-                <ArrowLeft className="size-4" /> Quay láº¡i
+                <ArrowLeft className="size-4" /> Quay lại
               </Button>
               <Button onClick={() => void handleNext()} disabled={!stepCompletion.step3} className="rounded-xl font-bold gap-2 shadow-md px-8">
-                Tiáº¿p tá»¥c <ChevronRight className="size-4" />
+                Tiếp tục <ChevronRight className="size-4" />
               </Button>
             </div>
           </div>
         )}
 
-        {/* â”€â”€ STEP 4: Content â”€â”€ */}
+        {/* ── STEP 4: Content ── */}
         {currentStep === 4 && (
           <div className="space-y-6">
             <Card className="rounded-2xl border-white/60 bg-white/70 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <UploadCloud className="size-5 text-primary" />
-                  Ná»™i dung bÃ i há»c
+                  Nội dung bài học
                 </CardTitle>
-                <CardDescription>Upload video, gáº¯n YouTube hoáº·c nháº­p mÃ´ táº£ cho tá»«ng bÃ i há»c.</CardDescription>
+                <CardDescription>Upload video, gắn YouTube hoặc nhập mô tả cho từng bài học.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 {curriculum.chapters.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-12 text-center text-slate-500">
                     <BookOpen className="mx-auto mb-3 size-10 text-slate-300" />
-                    <p className="font-semibold">ChÆ°a cÃ³ chÆ°Æ¡ng nÃ o</p>
-                    <p className="text-sm mt-1">HÃ£y thÃªm chÆ°Æ¡ng vÃ  bÃ i há»c á»Ÿ bÆ°á»›c GiÃ¡o trÃ¬nh trÆ°á»›c.</p>
+                    <p className="font-semibold">Chưa có chương nào</p>
+                    <p className="text-sm mt-1">Hãy thêm chương và bài học ở bước Giáo trình trước.</p>
                   </div>
                 ) : (
                   <div className="space-y-5">
@@ -1231,7 +1237,7 @@ export default function CourseWizardPage() {
                         </div>
                         <div className="divide-y divide-slate-100">
                           {chapter.lessons.length === 0 ? (
-                            <div className="px-5 py-6 text-sm text-slate-500">ChÆ°a cÃ³ bÃ i há»c.</div>
+                            <div className="px-5 py-6 text-sm text-slate-500">Chưa có bài học.</div>
                           ) : (
                             chapter.lessons.map((lesson) => {
                               const flatPayload = flatLessons.find((item) => item.lesson.id === lesson.id && item.chapterId === chapter.id);
@@ -1246,11 +1252,11 @@ export default function CourseWizardPage() {
                                     <div>
                                       <p className="font-semibold text-slate-800">{lesson.title}</p>
                                       <p className="text-xs text-muted-foreground">
-                                        {lesson.videoUrl ? (lesson.sourceType === 'YOUTUBE' ? 'YouTube' : 'Video') : 'Chá»‰ ná»™i dung vÄƒn báº£n'}
+                                        {lesson.videoUrl ? (lesson.sourceType === 'YOUTUBE' ? 'YouTube' : 'Video') : 'Chỉ nội dung văn bản'}
                                       </p>
                                     </div>
                                     <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${lesson.isFree ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                      {lesson.isFree ? 'Miá»…n phÃ­' : 'Tráº£ phÃ­'}
+                                      {lesson.isFree ? 'Miễn phí' : 'Trả phí'}
                                     </span>
                                   </div>
 
@@ -1258,7 +1264,7 @@ export default function CourseWizardPage() {
                                   <div className="grid gap-3 md:grid-cols-[auto_1fr_auto]">
                                     <label className="flex h-10 cursor-pointer items-center rounded-xl border border-dashed border-slate-300 bg-white px-3 text-sm font-semibold text-slate-600 hover:border-primary hover:text-primary transition-colors">
                                       <UploadCloud className="mr-2 size-4" />
-                                      {uploadingLessonId === lesson.id ? 'Äang upload...' : 'Upload video'}
+                                      {uploadingLessonId === lesson.id ? 'Đang upload...' : 'Upload video'}
                                       <input type="file" accept="video/mp4,video/webm,video/quicktime,video/x-msvideo" className="hidden" disabled={isBusy}
                                         onChange={(event) => { const file = event.target.files?.[0]; void handleUploadLessonVideo(flatPayload, file); event.currentTarget.value = ''; }} />
                                     </label>
@@ -1267,7 +1273,7 @@ export default function CourseWizardPage() {
                                       placeholder="https://www.youtube.com/watch?v=..." className="h-10 rounded-xl text-sm" disabled={isBusy} />
                                     <Button variant="outline" onClick={() => void handleAttachYoutube(flatPayload)} disabled={isBusy || !youtubeInput}
                                       className="h-10 rounded-xl font-semibold gap-1.5">
-                                      LÆ°u YouTube
+                                      Lưu YouTube
                                     </Button>
                                   </div>
 
@@ -1275,23 +1281,23 @@ export default function CourseWizardPage() {
                                     <div className="flex justify-start">
                                       <Button variant="ghost" size="sm" onClick={() => void handleClearLessonMedia(flatPayload)} disabled={isBusy}
                                         className="rounded-lg h-9 gap-1.5 text-slate-600 hover:text-red-600">
-                                        <X className="size-3.5" /> Bá» media
+                                        <X className="size-3.5" /> Bỏ media
                                       </Button>
                                     </div>
                                   )}
 
                                   {/* Description */}
                                   <div className="space-y-1.5">
-                                    <label className="text-sm font-semibold">MÃ´ táº£ bÃ i há»c</label>
+                                    <label className="text-sm font-semibold">Mô tả bài học</label>
                                     <textarea className="min-h-20 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
                                       value={contentInput}
                                       onChange={(e) => setContentByLesson((prev) => ({ ...prev, [lesson.id]: e.target.value }))}
-                                      placeholder="Nháº­p ná»™i dung/mÃ´ táº£ (khÃ´ng báº¯t buá»™c)" disabled={isBusy} />
+                                      placeholder="Nhập nội dung/mô tả (không bắt buộc)" disabled={isBusy} />
                                     <div className="flex justify-end">
                                       <Button variant="outline" size="sm" onClick={() => void handleSaveLessonContent(flatPayload)} disabled={isBusy}
                                         className="rounded-xl font-semibold gap-1.5">
                                         {savingLessonId === lesson.id ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-                                        LÆ°u mÃ´ táº£
+                                        Lưu mô tả
                                       </Button>
                                     </div>
                                   </div>
@@ -1306,9 +1312,9 @@ export default function CourseWizardPage() {
                 )}
 
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold">Tá»•ng quan</p>
+                  <p className="text-sm font-semibold">Tổng quan</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    ÄÃ£ gáº¯n media: {flatLessons.filter((item) => Boolean(item.lesson.videoUrl)).length}/{flatLessons.length} bÃ i há»c
+                    Đã gắn media: {flatLessons.filter((item) => Boolean(item.lesson.videoUrl)).length}/{flatLessons.length} bài học
                   </p>
                 </div>
               </CardContent>
@@ -1316,32 +1322,32 @@ export default function CourseWizardPage() {
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => void handlePrevious()} className="rounded-xl font-bold gap-2">
-                <ArrowLeft className="size-4" /> Quay láº¡i
+                <ArrowLeft className="size-4" /> Quay lại
               </Button>
               <Button onClick={() => void handleNext()} className="rounded-xl font-bold gap-2 shadow-md px-8">
-                Tiáº¿p tá»¥c <ChevronRight className="size-4" />
+                Tiếp tục <ChevronRight className="size-4" />
               </Button>
             </div>
           </div>
         )}
 
-        {/* â”€â”€ STEP 5: Publish â”€â”€ */}
+        {/* ── STEP 5: Publish ── */}
         {currentStep === 5 && (
           <div className="space-y-6">
             <Card className="rounded-2xl border-white/60 bg-white/70 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Check className="size-5 text-primary" />
-                  Xuáº¥t báº£n khÃ³a há»c
+                  Xuất bản khóa học
                 </CardTitle>
-                <CardDescription>Kiá»ƒm tra Ä‘iá»u kiá»‡n trÆ°á»›c khi cÃ´ng khai khÃ³a há»c cho há»c viÃªn.</CardDescription>
+                <CardDescription>Kiểm tra điều kiện trước khi công khai khóa học cho học viên.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-2">
                   {[
-                    { label: 'CÃ³ Ã­t nháº¥t 1 bÃ i há»c', check: publishGuard.hasAtLeastOneLesson },
-                    { label: 'áº¢nh bÃ¬a Ä‘Ã£ upload', check: publishGuard.hasThumbnail },
-                    { label: 'GiÃ¡ há»£p lá»‡ khi cÃ³ bÃ i tráº£ phÃ­', check: publishGuard.priceValidForPaidCourse },
+                    { label: 'Có ít nhất 1 bài học', check: publishGuard.hasAtLeastOneLesson },
+                    { label: 'Ảnh bìa đã upload', check: publishGuard.hasThumbnail },
+                    { label: 'Giá hợp lệ khi có bài trả phí', check: publishGuard.priceValidForPaidCourse },
                   ].map(({ label, check }) => (
                     <div key={label} className={`flex items-center gap-3 rounded-xl border p-4 ${check ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
                       {check
@@ -1349,30 +1355,30 @@ export default function CourseWizardPage() {
                         : <AlertCircle className="size-5 shrink-0 text-red-600" />}
                       <div>
                         <p className={`text-sm font-semibold ${check ? 'text-emerald-800' : 'text-red-800'}`}>{label}</p>
-                        <p className={`text-xs ${check ? 'text-emerald-600' : 'text-red-600'}`}>{check ? 'Äáº¡t' : 'ChÆ°a Ä‘áº¡t'}</p>
+                        <p className={`text-xs ${check ? 'text-emerald-600' : 'text-red-600'}`}>{check ? 'Đạt' : 'Chưa đạt'}</p>
                       </div>
                     </div>
                   ))}
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
-                  <p className="font-semibold">Chi tiáº¿t</p>
+                  <p className="font-semibold">Chi tiết</p>
                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                    <span>Tá»•ng bÃ i há»c: {publishGuard.lessonCount}</span>
-                    <span>BÃ i tráº£ phÃ­: {publishGuard.paidLessonCount}</span>
-                    <span>Tráº¡ng thÃ¡i hiá»‡n táº¡i: {course.status || 'DRAFT'}</span>
-                    <span>GiÃ¡: {Number(course.price || 0).toLocaleString('vi-VN')} Ä‘</span>
+                    <span>Tổng bài học: {publishGuard.lessonCount}</span>
+                    <span>Bài trả phí: {publishGuard.paidLessonCount}</span>
+                    <span>Trạng thái hiện tại: {course.status || 'DRAFT'}</span>
+                    <span>Giá: {Number(course.price || 0).toLocaleString('vi-VN')} đ</span>
                   </div>
                 </div>
                 {course.status === 'PUBLISHED' ? (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
                     <p className="font-semibold text-emerald-800 flex items-center gap-2">
                       <CheckCircle2 className="size-4 text-emerald-600" />
-                      KhÃ³a há»c Ä‘Ã£ xuáº¥t báº£n
+                      Khóa học đã xuất bản
                     </p>
-                    <p className="text-emerald-700 mt-1">Há»c viÃªn cÃ³ thá»ƒ tÃ¬m tháº¥y khÃ³a há»c nÃ y. Báº¡n cÃ³ thá»ƒ chá»‰nh sá»­a ná»™i dung vÃ  cáº­p nháº­t.</p>
+                    <p className="text-emerald-700 mt-1">Học viên có thể tìm thấy khóa học này. Bạn có thể chỉnh sửa nội dung và cập nhật.</p>
                     <Button variant="outline" asChild className="mt-3 rounded-xl font-semibold gap-1.5">
                       <Link href={`/courses/${course.slug}`} target="_blank">
-                        <ExternalLink className="size-4" /> Xem trang cÃ´ng khai
+                        <ExternalLink className="size-4" /> Xem trang công khai
                       </Link>
                     </Button>
                   </div>
@@ -1380,7 +1386,7 @@ export default function CourseWizardPage() {
                   <Button onClick={() => void handlePublish()} disabled={!canPublish || publishing}
                     className="w-full rounded-xl font-bold text-base h-14 shadow-lg gap-2">
                     {publishing ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}
-                    {canPublish ? 'Xuáº¥t báº£n khÃ³a há»c' : 'ChÆ°a Ä‘á»§ Ä‘iá»u kiá»‡n xuáº¥t báº£n'}
+                    {canPublish ? 'Xuất bản khóa học' : 'Chưa đủ điều kiện xuất bản'}
                   </Button>
                 )}
               </CardContent>
@@ -1388,18 +1394,16 @@ export default function CourseWizardPage() {
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => void handlePrevious()} className="rounded-xl font-bold gap-2">
-                <ArrowLeft className="size-4" /> Quay láº¡i
+                <ArrowLeft className="size-4" /> Quay lại
               </Button>
             </div>
           </div>
         )}
       </div>
 
-      {/* â”€â”€â”€ Modals â”€â”€â”€ */}
+      {/* ── Modals ── */}
       <CreateCategoryModal open={showCategoryModal} onClose={() => setShowCategoryModal(false)} onSuccess={handleCategoryCreated} />
       <CreateCertificateModal open={showCertModal} onClose={() => setShowCertModal(false)} onSuccess={handleCertCreated} />
     </div>
   );
 }
-
-

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
+import { toast } from '@/components/ui/toast';
 import {
   getAdminUsers,
   updateAdminUserRole,
@@ -64,7 +65,12 @@ export default function AdminUsersPage() {
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     const res = await updateAdminUserRole(userId, newRole);
-    if (res.success) fetchUsers();
+    if (res.success) {
+      toast('success', 'Đã cập nhật vai trò người dùng');
+      fetchUsers();
+      return;
+    }
+    toast('error', 'Cập nhật vai trò thất bại', res.message || 'Vui lòng thử lại.');
   };
 
   const handleStatusToggle = (userId: string, currentStatus: string) => {
@@ -77,7 +83,12 @@ export default function AdminUsersPage() {
       variant: newStatus === 'BANNED' ? 'danger' : 'default',
       onConfirm: async () => {
         const res = await updateAdminUserStatus(userId, newStatus);
-        if (res.success) fetchUsers();
+        if (res.success) {
+          toast('success', 'Đã cập nhật trạng thái người dùng');
+          fetchUsers();
+          return;
+        }
+        toast('error', 'Cập nhật trạng thái thất bại', res.message || 'Vui lòng thử lại.');
       },
     });
   };
@@ -119,17 +130,19 @@ export default function AdminUsersPage() {
 
     if (!res.success) {
       setPasswordError(res.message || 'Đổi mật khẩu thất bại.');
+      toast('error', 'Đổi mật khẩu thất bại', res.message || 'Vui lòng thử lại.');
       return;
     }
 
     setPasswordDialogOpen(false);
+    toast('success', 'Đã đổi mật khẩu người dùng');
   };
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Quản lý người dùng</h1>
-        <p className="mt-1 text-sm font-medium text-muted-foreground">
+    <div className="workspace-page">
+      <div className="workspace-page-header">
+        <h1 className="workspace-page-title">Quản lý người dùng</h1>
+        <p className="workspace-page-description">
           Xem, tìm kiếm, phân quyền và quản lý trạng thái người dùng.
         </p>
       </div>
@@ -369,3 +382,5 @@ export default function AdminUsersPage() {
     </div>
   );
 }
+
+

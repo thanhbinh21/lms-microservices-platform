@@ -12,9 +12,10 @@ import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { createCourseAction } from '@/app/actions/instructor';
 import { StatusMessage } from '@/components/ui/status-message';
+import { toast } from '@/components/ui/toast';
 
 const formSchema = z.object({
-  title: z.string().min(3, { message: "Tiêu đề phải có ít nhất 3 ký tự." }),
+  title: z.string().min(3, { message: 'Tiêu đề phải có ít nhất 3 ký tự.' }),
 });
 
 export default function CreateCoursePage() {
@@ -33,31 +34,35 @@ export default function CreateCoursePage() {
     try {
       const result = await createCourseAction(values.title);
       if (result.success && result.courseId) {
+        toast('success', 'Tạo khóa học thành công');
         router.push(`/instructor/courses/${result.courseId}?step=1`);
         return;
       }
 
-      setSubmitError(result.message || 'Không thể tạo khóa học. Vui lòng thử lại.');
+      const message = result.message || 'Không thể tạo khóa học. Vui lòng thử lại.';
+      setSubmitError(message);
+      toast('error', 'Tạo khóa học thất bại', message);
     } catch (error) {
       console.error(error);
       setSubmitError('Đã có lỗi hệ thống khi tạo khóa học. Vui lòng thử lại.');
+      toast('error', 'Lỗi hệ thống khi tạo khóa học');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-8 pt-12">
-      <Link href="/instructor/courses" className="flex items-center text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors mb-6 w-fit">
-        <ArrowLeft className="w-4 h-4 mr-2" /> Quay lại danh sách
+    <div className="workspace-page-tight pt-8 md:pt-10">
+      <Link href="/instructor/courses" className="mb-6 flex w-fit items-center text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
+        <ArrowLeft className="mr-2 h-4 w-4" /> Quay lại danh sách
       </Link>
 
-      <Card className="rounded-4xl border-white/60 shadow-xl bg-white/60 backdrop-blur-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-        
+      <Card className="relative overflow-hidden rounded-4xl border-white/60 bg-white/60 shadow-xl backdrop-blur-xl">
+        <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
+
         <CardHeader className="p-8">
-          <CardTitle className="text-3xl font-bold flex items-center gap-2">
-            Khởi tạo khóa học <Sparkles className="w-6 h-6 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-3xl font-bold">
+            Khởi tạo khóa học <Sparkles className="h-6 w-6 text-primary" />
           </CardTitle>
           <CardDescription className="text-base font-medium">
             Hãy bắt đầu bằng cách đặt tên cho khóa học của bạn. Bạn có thể thay đổi nó bất cứ lúc nào.
@@ -70,26 +75,26 @@ export default function CreateCoursePage() {
               <label className="text-sm font-bold text-foreground">Tiêu đề khóa học</label>
               <Input
                 placeholder="VD: Nuxt.js Thực chiến Doanh nghiệp..."
-                className="h-14 rounded-xl bg-white/80 backdrop-blur-sm border-border focus-visible:ring-primary/40 focus-visible:border-primary shadow-sm text-base px-4"
+                className="h-14 rounded-xl border-border bg-white/80 px-4 text-base shadow-sm backdrop-blur-sm focus-visible:border-primary focus-visible:ring-primary/40"
                 disabled={isLoading}
                 {...form.register('title')}
               />
               {form.formState.errors.title && (
-                 <p className="text-sm text-destructive font-bold">{form.formState.errors.title.message}</p>
+                <p className="text-sm font-bold text-destructive">{form.formState.errors.title.message}</p>
               )}
               {submitError && <StatusMessage type="error" message={submitError} />}
             </div>
           </form>
         </CardContent>
 
-        <CardFooter className="p-8 bg-black/5 flex justify-end gap-3 mt-4 border-t border-white/40">
-           <Button variant="ghost" onClick={() => router.push('/instructor/courses')} className="rounded-xl font-bold" disabled={isLoading}>
-             Hủy bỏ
-           </Button>
-           <Button type="submit" form="create-course-form" className="rounded-xl px-8 shadow-md font-bold h-12 text-base" disabled={isLoading}>
-             {isLoading && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
-             Tiếp tục
-           </Button>
+        <CardFooter className="mt-4 flex justify-end gap-3 border-t border-white/40 bg-black/5 p-8">
+          <Button variant="ghost" onClick={() => router.push('/instructor/courses')} className="rounded-xl font-bold" disabled={isLoading}>
+            Hủy bỏ
+          </Button>
+          <Button type="submit" form="create-course-form" className="h-12 rounded-xl px-8 text-base font-bold shadow-md" disabled={isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+            Tiếp tục
+          </Button>
         </CardFooter>
       </Card>
     </div>

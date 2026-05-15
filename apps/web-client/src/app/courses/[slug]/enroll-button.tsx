@@ -111,9 +111,9 @@ interface CourseReviewPanelProps {
 type SortByType = 'newest' | 'highest' | 'lowest';
 
 const SORT_OPTIONS: Array<{ value: SortByType; label: string }> = [
-  { value: 'newest', label: 'Moi nhat' },
-  { value: 'highest', label: 'Sao cao nhat' },
-  { value: 'lowest', label: 'Sao thap nhat' },
+  { value: 'newest', label: 'Mới nhất' },
+  { value: 'highest', label: 'Sao cao nhất' },
+  { value: 'lowest', label: 'Sao thấp nhất' },
 ];
 
 function formatDateTime(value: string) {
@@ -124,7 +124,7 @@ export function CourseReviewPanel({
   courseId,
   isEnrolled,
   isCourseCompleted,
-  heading = 'Danh gia tu hoc vien',
+  heading = 'Đánh giá từ học viên',
 }: CourseReviewPanelProps) {
   const router = useRouter();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
@@ -165,7 +165,7 @@ export function CourseReviewPanel({
 
     if (!reviewRes.success || !reviewRes.data) {
       setReviews([]);
-      setErrorStr(reviewRes.message || 'Khong the tai danh gia');
+      setErrorStr(reviewRes.message || 'Không thể tải đánh giá.');
       setLoading(false);
       return;
     }
@@ -204,17 +204,17 @@ export function CourseReviewPanel({
     }
 
     if (!isEnrolled) {
-      setErrorStr('Ban can ghi danh khoa hoc truoc khi danh gia');
+      setErrorStr('Bạn cần ghi danh khóa học trước khi đánh giá');
       return;
     }
 
     if (!isCourseCompleted) {
-      setErrorStr('Chi duoc danh gia sau khi hoan thanh 100% khoa hoc');
+      setErrorStr('Chỉ được đánh giá sau khi hoàn thành 100% khóa học');
       return;
     }
 
     if (myReview) {
-      setErrorStr('Ban da gui danh gia cho khoa hoc nay');
+      setErrorStr('Bạn đã gửi đánh giá cho khóa học này');
       return;
     }
 
@@ -231,20 +231,20 @@ export function CourseReviewPanel({
 
     if (!response.success) {
       if (response.code === 401) {
-        setErrorStr('Vui long dang nhap de danh gia');
+        setErrorStr('Vui lòng đăng nhập để đánh giá');
         setTimeout(() => router.push('/login'), 1200);
         return;
       }
       if (response.code === 409) {
-        setErrorStr('Ban da gui danh gia cho khoa hoc nay');
+        setErrorStr('Bạn đã gửi đánh giá cho khóa học này');
         await loadReviews(sortBy);
         return;
       }
-      setErrorStr(response.message || 'Khong the luu danh gia');
+      setErrorStr(response.message || 'Không thể lưu đánh giá');
       return;
     }
 
-    setSuccessStr('Da luu danh gia cua ban');
+    setSuccessStr('Đã lưu đánh giá của bạn');
     await loadReviews(sortBy);
   };
 
@@ -270,7 +270,7 @@ export function CourseReviewPanel({
             onChange={(e) => setRatingFilter(Number(e.target.value))}
             className="bg-transparent text-sm font-semibold outline-none"
           >
-            <option value={0}>Tat ca sao</option>
+            <option value={0}>Tất cả sao</option>
             <option value={5}>5 sao</option>
             <option value={4}>4 sao</option>
             <option value={3}>3 sao</option>
@@ -283,12 +283,12 @@ export function CourseReviewPanel({
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-        placeholder="Tim trong danh gia..."
+        placeholder="Tìm trong đánh giá..."
       />
 
       <div className="grid gap-4 md:grid-cols-[280px,1fr]">
         <div className="rounded-2xl border border-white/70 bg-white/75 p-4 space-y-3">
-          <p className="text-sm font-semibold text-muted-foreground">Tong quan danh gia</p>
+          <p className="text-sm font-semibold text-muted-foreground">Tổng quan đánh giá</p>
           <div className="flex items-end gap-2">
             <span className="text-4xl font-black text-amber-500">
               {stats.averageRating > 0 ? stats.averageRating.toFixed(1) : '0.0'}
@@ -296,7 +296,7 @@ export function CourseReviewPanel({
             <span className="pb-1 text-sm text-muted-foreground">/5</span>
           </div>
           <p className="text-xs font-medium text-muted-foreground">
-            {stats.ratingCount} danh gia
+            {stats.ratingCount} đánh giá
           </p>
 
           <div className="space-y-1.5">
@@ -323,19 +323,19 @@ export function CourseReviewPanel({
         <div className="space-y-4">
           {!isEnrolled && (
             <div className="rounded-2xl border border-white/70 bg-white/75 p-4 text-sm text-muted-foreground">
-              Dang ky khoa hoc de mo tinh nang danh gia.
+              Đăng ký khóa học để mở tính năng đánh giá.
             </div>
           )}
 
           {isEnrolled && !isCourseCompleted && (
             <div className="rounded-2xl border border-white/70 bg-white/75 p-4 text-sm text-muted-foreground">
-              Hoan thanh 100% bai hoc de gui danh gia cho khoa hoc nay.
+              Hoàn thành 100% bài học để gửi đánh giá cho khóa học này.
             </div>
           )}
 
           {isEnrolled && isCourseCompleted && myReview && (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-2">
-              <p className="text-sm font-bold text-emerald-700">Ban da gui danh gia</p>
+              <p className="text-sm font-bold text-emerald-700">Bạn đã gửi đánh giá</p>
               <div className="flex items-center gap-0.5">
                 {[1, 2, 3, 4, 5].map((value) => (
                   <Star
@@ -349,7 +349,7 @@ export function CourseReviewPanel({
                 ))}
               </div>
               <p className="text-sm text-foreground/90 whitespace-pre-wrap">
-                {myReview.comment || 'Ban khong de lai binh luan.'}
+                {myReview.comment || 'Bạn không để lại bình luận.'}
               </p>
             </div>
           )}
@@ -358,7 +358,7 @@ export function CourseReviewPanel({
             <div className="rounded-2xl border border-white/70 bg-white/75 p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <MessageSquare className="size-4 text-primary" />
-                <p className="text-sm font-bold">Viet danh gia cua ban</p>
+                <p className="text-sm font-bold">Viết đánh giá của bạn</p>
               </div>
 
               <div className="flex items-center gap-1">
@@ -385,7 +385,7 @@ export function CourseReviewPanel({
                 onChange={(e) => setComment(e.target.value)}
                 maxLength={1000}
                 rows={4}
-                placeholder="Chia se trai nghiem hoc tap cua ban..."
+                placeholder="Chia sẻ trải nghiệm học tập của bạn..."
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
               />
 
@@ -393,7 +393,7 @@ export function CourseReviewPanel({
                 <span className="text-xs text-muted-foreground">{comment.length}/1000</span>
                 <Button onClick={handleSubmit} disabled={submitting}>
                   {submitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-                  Luu danh gia
+                  Luu đánh giá
                 </Button>
               </div>
               {errorStr && <p className="text-xs text-red-500 font-semibold">{errorStr}</p>}
@@ -408,7 +408,7 @@ export function CourseReviewPanel({
               </div>
             ) : reviews.length === 0 ? (
               <div className="rounded-2xl border border-white/70 bg-white/75 p-5 text-sm text-muted-foreground">
-                Chua co danh gia nao cho khoa hoc nay.
+                Chưa có đánh giá nào cho khóa học này.
               </div>
             ) : (
               reviews.map((review) => (
@@ -432,7 +432,7 @@ export function CourseReviewPanel({
                   </div>
 
                   <p className="text-sm text-foreground/90 whitespace-pre-wrap">
-                    {review.comment || 'Nguoi hoc vien nay khong de lai binh luan.'}
+                    {review.comment || 'Người học viên này không để lại bình luận.'}
                   </p>
                 </article>
               ))
@@ -440,7 +440,7 @@ export function CourseReviewPanel({
           </div>
           <div className="flex items-center justify-end gap-2">
             <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-              Truoc
+              Trước
             </Button>
             <span className="text-xs text-muted-foreground">Trang {page}/{totalPages}</span>
             <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>

@@ -29,7 +29,8 @@
 
 ### Local Services (Docker Compose)
 - Kafka + Zookeeper (Event-Driven Architecture)
-- Redis (Session/Cache)
+- Kong Gateway (DB-less mode)
+- Redis khong chay local nua; dung Upstash/cloud Redis qua `REDIS_URL` / `CACHE_REDIS_URL`
 
 ### Serverless Services (Neon)
 - PostgreSQL Databases (5 separate instances)
