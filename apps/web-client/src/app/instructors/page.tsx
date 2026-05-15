@@ -1,7 +1,7 @@
-import { SharedNavbar } from '@/components/shared/shared-navbar';
+﻿import { SharedNavbar } from '@/components/shared/shared-navbar';
 import { SharedFooter } from '@/components/shared/shared-footer';
 import { listInstructorsAction } from '@/app/actions/instructor';
-import { UserCircle, Search } from 'lucide-react';
+import { UserCircle, Search, SlidersHorizontal } from 'lucide-react';
 import Link from 'next/link';
 
 export default async function InstructorsPage({
@@ -10,13 +10,13 @@ export default async function InstructorsPage({
   searchParams: Promise<Record<string, string>>;
 }) {
   const params = await searchParams;
-  const page = params.page ? parseInt(params.page) : 1;
+  const page = params.page ? parseInt(params.page, 10) : 1;
   const q = params.q || '';
-  const sortBy = params.sortBy || 'name';
+  const sortBy = params.sortBy || 'newest';
 
   const result = await listInstructorsAction(page, 20, q, sortBy);
   const items = result.success && result.data ? result.data.items : [];
-  
+
   return (
     <div className="glass-page min-h-screen text-foreground relative overflow-hidden">
       <div className="absolute top-[-5%] right-[-5%] w-[40%] h-[40%] rounded-full bg-primary/10 blur-[150px] pointer-events-none" />
@@ -32,20 +32,70 @@ export default async function InstructorsPage({
           </p>
         </div>
 
+        <form method="GET" className="flex flex-col gap-3 sm:flex-row items-start sm:items-center justify-between">
+          <div className="flex flex-1 items-center gap-2 max-w-md">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                name="q"
+                defaultValue={q}
+                placeholder="Tìm theo tên, chuyên môn..."
+                className="w-full h-10 pl-9 pr-4 rounded-xl border border-border bg-white/70 text-sm shadow-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+              />
+            </div>
+            <button
+              type="submit"
+              className="h-10 px-4 rounded-xl bg-primary text-white text-sm font-bold shadow-sm hover:bg-primary/90 transition-colors"
+            >
+              Tìm
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="size-4 text-muted-foreground shrink-0" />
+            <label htmlFor="sortBy" className="text-sm font-medium text-muted-foreground">Sắp xếp:</label>
+            <select
+              id="sortBy"
+              name="sortBy"
+              defaultValue={sortBy}
+              className="h-9 rounded-lg border border-border bg-white/70 px-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="newest">Mới nhất</option>
+              <option value="courses">Nhiều khóa học nhất</option>
+              <option value="rating">Đánh giá cao nhất</option>
+            </select>
+            <button
+              type="submit"
+              className="h-9 rounded-lg border border-border bg-white/70 px-3 text-sm font-semibold shadow-sm hover:bg-white"
+            >
+              Áp dụng
+            </button>
+          </div>
+        </form>
+
+        {q && (
+          <p className="text-sm text-muted-foreground">
+            Kết quả tìm kiếm cho "<strong className="text-foreground">{q}</strong>"
+          </p>
+        )}
+
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 border border-dashed rounded-3xl bg-white/40">
             <UserCircle className="size-12 text-slate-300 mb-4" />
-            <p className="text-lg font-medium text-slate-600">Không tìm thấy giảng viên nào</p>
+            <p className="text-lg font-medium text-slate-600">
+              {q ? 'Không tìm thấy giảng viên nào' : 'Chưa có giảng viên nào'}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {items.map(instructor => (
+            {items.map((instructor) => (
               <Link key={instructor.id} href={`/instructors/${instructor.slug}`}>
                 <div className="group rounded-3xl border border-white/60 bg-white/60 p-6 backdrop-blur-md transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary/20">
                   <div className="flex flex-col items-center text-center space-y-4">
                     <div className="relative size-24 overflow-hidden rounded-full border border-slate-100 bg-slate-50">
                       {instructor.avatar ? (
-                         // eslint-disable-next-line @next/next/no-img-element
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img src={instructor.avatar} alt={instructor.displayName} className="size-full object-cover transition-transform group-hover:scale-110" />
                       ) : (
                         <UserCircle className="size-full text-slate-300" />

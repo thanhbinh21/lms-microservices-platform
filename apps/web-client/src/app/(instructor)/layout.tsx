@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useAppSelector } from '@/lib/redux/hooks';
 import { usePathname, useRouter } from 'next/navigation';
@@ -163,7 +163,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
 
       {/* Main content */}
       <main className="min-h-screen flex-1 overflow-x-hidden pb-20 pt-16 md:pt-0">
-        {children}
+        <div className="workspace-shell">{children}</div>
       </main>
     </div>
   );

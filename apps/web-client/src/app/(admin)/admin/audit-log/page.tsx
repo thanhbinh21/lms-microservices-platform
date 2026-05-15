@@ -41,40 +41,40 @@ export default function AdminAuditLogPage() {
   }, [actionFilter, resourceTypeFilter, actorFilter]);
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="workspace-page">
       <div className="mb-8 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Nhật ký kiểm toán</h1>
-          <p className="mt-1 text-sm font-medium text-muted-foreground">
-            Theo dõi các hành động nhạy cảm của admin và các service nội bộ.
+          <h1 className="workspace-page-title">Nháº­t kÃ½ hoáº¡t Ä‘á»™ng</h1>
+          <p className="workspace-page-description">
+            Theo dÃµi cÃ¡c hÃ nh Ä‘á»™ng nháº¡y cáº£m cá»§a admin vÃ  cÃ¡c service ná»™i bá»™.
           </p>
         </div>
         <Button variant="outline" className="gap-2" onClick={() => void fetchLogs()}>
           <RefreshCw className="size-4" />
-          Làm mới
+          LÃ m má»›i
         </Button>
       </div>
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
-          <CardTitle className="text-lg">Danh sách nhật ký kiểm toán</CardTitle>
+          <CardTitle className="text-lg">Danh sÃ¡ch nháº­t kÃ½ hoáº¡t Ä‘á»™ng</CardTitle>
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Lọc theo hành động"
+                placeholder="Lá»c theo hÃ nh Ä‘á»™ng"
                 className="pl-9"
                 value={actionFilter}
                 onChange={(e) => setActionFilter(e.target.value)}
               />
             </div>
             <Input
-              placeholder="Lọc theo loại tài nguyên"
+              placeholder="Lá»c theo loáº¡i tÃ i nguyÃªn"
               value={resourceTypeFilter}
               onChange={(e) => setResourceTypeFilter(e.target.value)}
             />
             <Input
-              placeholder="Lọc theo ID người dùng"
+              placeholder="Lá»c theo ID ngÆ°á»i dÃ¹ng"
               value={actorFilter}
               onChange={(e) => setActorFilter(e.target.value)}
             />
@@ -88,18 +88,18 @@ export default function AdminAuditLogPage() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Chưa có audit log nào.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">ChÆ°a cÃ³ audit log nÃ o.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1120px] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <th className="pb-3 pr-4">Người thực hiện</th>
-                    <th className="pb-3 pr-4">Hành động</th>
-                    <th className="pb-3 pr-4">Tài nguyên</th>
-                    <th className="pb-3 pr-4">Dữ liệu</th>
+                    <th className="pb-3 pr-4">NgÆ°á»i thá»±c hiá»‡n</th>
+                    <th className="pb-3 pr-4">HÃ nh Ä‘á»™ng</th>
+                    <th className="pb-3 pr-4">TÃ i nguyÃªn</th>
+                    <th className="pb-3 pr-4">Dá»¯ liá»‡u</th>
                     <th className="pb-3 pr-4">Trace ID</th>
-                    <th className="pb-3">Thời gian</th>
+                    <th className="pb-3">Thá»i gian</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -108,15 +108,15 @@ export default function AdminAuditLogPage() {
                       <td className="py-3 pr-4">
                         <div className="space-y-1">
                           <p className="font-medium">{log.actorName || log.actorId}</p>
-                          <p className="text-xs text-muted-foreground">{log.actorRole}{log.actorEmail ? ` · ${log.actorEmail}` : ''}</p>
+                          <p className="text-xs text-muted-foreground">{log.actorRole}{log.actorEmail ? ` Â· ${log.actorEmail}` : ''}</p>
                         </div>
                       </td>
                       <td className="py-3 pr-4 font-mono text-xs">{log.action}</td>
                       <td className="py-3 pr-4 text-muted-foreground">
                         <div className="space-y-1">
-                          <p>{log.resourceType || '—'}</p>
-                          <p className="font-mono text-xs">{log.resourceId || '—'}</p>
-                          <p>{log.targetLabel || '—'}</p>
+                          <p>{log.resourceType || 'â€”'}</p>
+                          <p className="font-mono text-xs">{log.resourceId || 'â€”'}</p>
+                          <p>{log.targetLabel || 'â€”'}</p>
                         </div>
                       </td>
                       <td className="max-w-[280px] py-3 pr-4 text-xs text-muted-foreground">
@@ -124,7 +124,7 @@ export default function AdminAuditLogPage() {
                           {JSON.stringify(log.payload ?? {}, null, 2)}
                         </pre>
                       </td>
-                      <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">{log.traceId || '—'}</td>
+                      <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">{log.traceId || 'â€”'}</td>
                       <td className="whitespace-nowrap py-3 text-muted-foreground">
                         {new Date(log.createdAt).toLocaleString('vi-VN')}
                       </td>
@@ -138,11 +138,11 @@ export default function AdminAuditLogPage() {
           {pagination && pagination.totalPages > 1 && (
             <div className="mt-6 flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Trang {pagination.page} / {pagination.totalPages} ({pagination.total} kết quả)
+                Trang {pagination.page} / {pagination.totalPages} ({pagination.total} káº¿t quáº£)
               </p>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((prev) => prev - 1)}>
-                  Trước
+                  TrÆ°á»›c
                 </Button>
                 <Button
                   variant="outline"
@@ -160,3 +160,5 @@ export default function AdminAuditLogPage() {
     </div>
   );
 }
+
+

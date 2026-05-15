@@ -14,14 +14,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { mapUiErrorMessage, mapUiSuccessMessage } from '@/lib/ui-notification';
+import { mapUiErrorMessage } from '@/lib/ui-notification';
 import { StatusMessage } from '@/components/ui/status-message';
+import { toast } from '@/components/ui/toast';
 
 export default function RegisterForm() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [error, setError] = useState<string>('');
-  const [success, setSuccess] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<RegisterInput>({
@@ -37,29 +37,23 @@ export default function RegisterForm() {
   const onSubmit = async (data: RegisterInput) => {
     setIsLoading(true);
     setError('');
-    setSuccess('');
 
     try {
       const result = await registerAction(data);
 
       if (result.success && result.user && result.accessToken) {
-        dispatch(setUser({
-          user: result.user,
-          accessToken: result.accessToken,
-        }));
-
-        setSuccess(mapUiSuccessMessage(result.message, 'Đăng ký thành công! Đang chuyển hướng...'));
-        const redirectPath = '/';
-        
-        setTimeout(() => {
-          router.push(redirectPath);
-        }, 800);
+        dispatch(setUser({ user: result.user, accessToken: result.accessToken }));
+        toast('success', 'Đăng ký thành công', 'Chào mừng bạn đến với NexEdu!');
+        setTimeout(() => router.push('/'), 800);
       } else {
-        setError(mapUiErrorMessage(result.message, 'Hệ thống đang bận. Đăng ký thất bại.'));
+        const msg = mapUiErrorMessage(result.message, 'Hệ thống đang bận. Đăng ký thất bại.');
+        setError(msg);
+        toast('error', 'Đăng ký thất bại', msg);
       }
     } catch (err) {
-      setError(mapUiErrorMessage(err, 'Lỗi kết nối máy chủ. Vui lòng thử lại sau.'));
-      console.error('Register error:', err);
+      const msg = mapUiErrorMessage(err, 'Lỗi kết nối máy chủ. Vui lòng thử lại.');
+      setError(msg);
+      toast('error', 'Lỗi đăng ký', msg);
     } finally {
       setIsLoading(false);
     }
@@ -162,7 +156,6 @@ export default function RegisterForm() {
             </div>
 
             {error && <StatusMessage type="error" message={error} />}
-            {success && <StatusMessage type="success" message={success} />}
 
             <Button 
               type="submit" 

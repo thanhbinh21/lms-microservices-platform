@@ -10,7 +10,7 @@ export default function AdminInstructorRequestsPage() {
   const requestId = params.id as string | null;
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="workspace-page">
       <AdminInstructorRequestsPanel
         requestId={requestId}
         onOpenDetail={(id) => router.push(`/admin/instructor-requests/${encodeURIComponent(id)}`)}
@@ -19,3 +19,4 @@ export default function AdminInstructorRequestsPage() {
     </div>
   );
 }
+

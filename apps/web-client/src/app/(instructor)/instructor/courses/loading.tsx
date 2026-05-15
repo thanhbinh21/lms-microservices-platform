@@ -2,7 +2,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function InstructorCourseListLoading() {
   return (
-    <div className="p-6 md:p-8 space-y-6">
+    <div className="workspace-page space-y-6">
       <div className="flex items-center justify-between">
         <div className="space-y-2">
           <div className="h-8 w-56 animate-pulse rounded-lg bg-slate-200" />
@@ -34,3 +34,4 @@ export default function InstructorCourseListLoading() {
     </div>
   );
 }
+

@@ -41,8 +41,7 @@ export default function BecomeInstructorPage() {
                     <span className="text-primary">Giảng viên</span> trên NexEdu
                   </h1>
                   <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
-                    Chia sẻ chuyên môn, xây dựng khóa học chất lượng và đồng hành cùng hàng nghìn học viên. Nhấn nâng cấp để
-                    chuyển vai trò từ học viên sang giảng viên ngay trong phiên đăng nhập hiện tại.
+                    Chia sẻ chuyên môn, xây dựng khóa học chất lượng và đồng hành cùng hàng nghìn học viên. Gửi hồ sơ ứng tuyển để trở thành giảng viên NexEdu.
                   </p>
                 </div>
               </div>

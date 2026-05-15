@@ -2,7 +2,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function InstructorOverviewLoading() {
   return (
-    <div className="p-6 md:p-8 space-y-8">
+    <div className="workspace-page space-y-8">
       <div className="space-y-2">
         <div className="h-9 w-72 animate-pulse rounded-lg bg-slate-200" />
         <div className="h-5 w-96 animate-pulse rounded bg-slate-100" />
@@ -42,3 +42,4 @@ export default function InstructorOverviewLoading() {
     </div>
   );
 }
+

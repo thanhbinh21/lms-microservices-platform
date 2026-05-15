@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { StatusMessage } from '@/components/ui/status-message';
+import { toast } from '@/components/ui/toast';
 import {
   getInstructorCertificateTemplatesAction,
   createInstructorCertificateTemplateAction,
@@ -36,6 +37,11 @@ export default function InstructorCertificatesPage() {
   const setStatus = (type: 'success' | 'error', message: string) => {
     setStatusType(type);
     setStatusMessage(message);
+    if (type === 'success') {
+      toast('success', 'Thao tác thành công', message);
+      return;
+    }
+    toast('error', 'Thao tác thất bại', message);
   };
 
   const fetchTemplates = async () => {
@@ -79,7 +85,7 @@ export default function InstructorCertificatesPage() {
 
   const handleCreate = async () => {
     if (!formName.trim() || formName.trim().length < 2) {
-      setStatus('error', 'Tên mẫu chứng chỉ cần ít nhất 2 ký tự.');
+      setStatus('error', 'TÃªn máº«u chá»©ng chá»‰ cáº§n Ã­t nháº¥t 2 kÃ½ tá»±.');
       return;
     }
     setSubmitting(true);
@@ -90,18 +96,18 @@ export default function InstructorCertificatesPage() {
     setSubmitting(false);
 
     if (result.success) {
-      setStatus('success', 'Đã tạo mẫu chứng chỉ thành công.');
+      setStatus('success', 'ÄÃ£ táº¡o máº«u chá»©ng chá»‰ thÃ nh cÃ´ng.');
       await fetchTemplates();
       closeModal();
     } else {
-      setStatus('error', result.message || 'Không thể tạo mẫu chứng chỉ.');
+      setStatus('error', result.message || 'KhÃ´ng thá»ƒ táº¡o máº«u chá»©ng chá»‰.');
     }
   };
 
   const handleUpdate = async () => {
     if (!selectedTemplate) return;
     if (!formName.trim() || formName.trim().length < 2) {
-      setStatus('error', 'Tên mẫu chứng chỉ cần ít nhất 2 ký tự.');
+      setStatus('error', 'TÃªn máº«u chá»©ng chá»‰ cáº§n Ã­t nháº¥t 2 kÃ½ tá»±.');
       return;
     }
     setSubmitting(true);
@@ -112,11 +118,11 @@ export default function InstructorCertificatesPage() {
     setSubmitting(false);
 
     if (result.success) {
-      setStatus('success', 'Đã cập nhật mẫu chứng chỉ thành công.');
+      setStatus('success', 'ÄÃ£ cáº­p nháº­t máº«u chá»©ng chá»‰ thÃ nh cÃ´ng.');
       await fetchTemplates();
       closeModal();
     } else {
-      setStatus('error', result.message || 'Không thể cập nhật mẫu chứng chỉ.');
+      setStatus('error', result.message || 'KhÃ´ng thá»ƒ cáº­p nháº­t máº«u chá»©ng chá»‰.');
     }
   };
 
@@ -126,11 +132,11 @@ export default function InstructorCertificatesPage() {
     setDeletingId('');
 
     if (result.success) {
-      setStatus('success', 'Đã xóa mẫu chứng chỉ.');
+      setStatus('success', 'ÄÃ£ xÃ³a máº«u chá»©ng chá»‰.');
       await fetchTemplates();
       setConfirmDeleteId('');
     } else {
-      setStatus('error', result.message || 'Không thể xóa mẫu chứng chỉ.');
+      setStatus('error', result.message || 'KhÃ´ng thá»ƒ xÃ³a máº«u chá»©ng chá»‰.');
     }
   };
 
@@ -143,7 +149,7 @@ export default function InstructorCertificatesPage() {
   }
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="workspace-page">
       {/* Page header */}
       <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
@@ -151,14 +157,14 @@ export default function InstructorCertificatesPage() {
             <Sparkles className="size-3.5" />
             NexEdu Studio
           </div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Chứng chỉ</h1>
-          <p className="mt-1 text-sm font-medium text-muted-foreground">
-            Tạo và quản lý mẫu chứng chỉ cho học viên hoàn thành khóa học.
+          <h1 className="workspace-page-title">Chá»©ng chá»‰</h1>
+          <p className="workspace-page-description">
+            Táº¡o vÃ  quáº£n lÃ½ máº«u chá»©ng chá»‰ cho há»c viÃªn hoÃ n thÃ nh khÃ³a há»c.
           </p>
         </div>
         <Button onClick={openCreateModal} className="rounded-xl font-bold shadow-md md:w-auto w-full">
           <Plus className="mr-2 size-4" />
-          Tạo mẫu mới
+          Táº¡o máº«u má»›i
         </Button>
       </div>
 
@@ -171,13 +177,13 @@ export default function InstructorCertificatesPage() {
         {templates.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-border bg-white/30 py-16 text-center">
             <Award className="mx-auto mb-4 size-12 text-muted-foreground/40" />
-            <h3 className="text-lg font-bold">Chưa có mẫu chứng chỉ nào</h3>
+            <h3 className="text-lg font-bold">ChÆ°a cÃ³ máº«u chá»©ng chá»‰ nÃ o</h3>
             <p className="text-muted-foreground mt-2 mb-6 text-sm font-medium">
-              Tạo mẫu chứng chỉ đầu tiên và gắn vào khóa học để học viên nhận được khi hoàn thành.
+              Táº¡o máº«u chá»©ng chá»‰ Ä‘áº§u tiÃªn vÃ  gáº¯n vÃ o khÃ³a há»c Ä‘á»ƒ há»c viÃªn nháº­n Ä‘Æ°á»£c khi hoÃ n thÃ nh.
             </p>
             <Button onClick={openCreateModal} className="rounded-xl font-bold shadow-md">
               <Plus className="mr-2 size-4" />
-              Tạo mẫu chứng chỉ đầu tiên
+              Táº¡o máº«u chá»©ng chá»‰ Ä‘áº§u tiÃªn
             </Button>
           </div>
         ) : (
@@ -188,7 +194,7 @@ export default function InstructorCertificatesPage() {
                   <div className="rounded-xl border-2 border-amber-300/60 bg-white p-4 shadow-sm">
                     <div className="mb-2 flex items-center justify-between">
                       <Award className="size-5 text-amber-600" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Chứng nhận</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Chá»©ng nháº­n</span>
                     </div>
                     <div className="h-px bg-gradient-to-r from-transparent via-amber-300 to-transparent my-2" />
                     <p className="text-center text-xs font-semibold text-slate-700 line-clamp-2 leading-relaxed">
@@ -210,15 +216,15 @@ export default function InstructorCertificatesPage() {
 
                   <div className="flex gap-2 pt-1">
                     <Button variant="outline" className="flex-1 rounded-xl font-semibold gap-1.5 h-9 text-xs" onClick={() => openEditModal(template)}>
-                      <Pencil className="size-3.5" /> Sửa
+                      <Pencil className="size-3.5" /> Sá»­a
                     </Button>
                     {confirmDeleteId === template.id ? (
                       <>
                         <Button size="sm" variant="destructive" onClick={() => void handleDelete(template.id)}
                           disabled={deletingId === template.id} className="rounded-xl font-bold h-9 text-xs">
-                          {deletingId === template.id ? <Loader2 className="size-3.5 animate-spin" /> : 'Xóa'}
+                          {deletingId === template.id ? <Loader2 className="size-3.5 animate-spin" /> : 'XÃ³a'}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId('')} className="rounded-xl font-semibold h-9 text-xs">Hủy</Button>
+                        <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId('')} className="rounded-xl font-semibold h-9 text-xs">Há»§y</Button>
                       </>
                     ) : (
                       <Button variant="outline" className="rounded-xl font-semibold gap-1.5 h-9 text-xs text-red-600 border-red-200 hover:bg-red-50"
@@ -247,38 +253,38 @@ export default function InstructorCertificatesPage() {
             >
               <div className="mb-5 flex items-center justify-between">
                 <h3 id="modal-cert-title" className="text-lg font-bold">
-                  {modalMode === 'create' ? 'Tạo mẫu chứng chỉ mới' : 'Chỉnh sửa mẫu chứng chỉ'}
+                  {modalMode === 'create' ? 'Táº¡o máº«u chá»©ng chá»‰ má»›i' : 'Chá»‰nh sá»­a máº«u chá»©ng chá»‰'}
                 </h3>
-                <button onClick={closeModal} aria-label="Đóng" className="text-muted-foreground hover:text-foreground transition-colors rounded-lg p-1">
+                <button onClick={closeModal} aria-label="ÄÃ³ng" className="text-muted-foreground hover:text-foreground transition-colors rounded-lg p-1">
                   <X className="size-5" />
                 </button>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="cert-name" className="mb-1.5 block text-sm font-semibold">Tên mẫu chứng chỉ</label>
+                  <label htmlFor="cert-name" className="mb-1.5 block text-sm font-semibold">TÃªn máº«u chá»©ng chá»‰</label>
                   <Input id="cert-name" value={formName} onChange={(e) => setFormName(e.target.value)}
-                    placeholder="VD: Chứng nhận hoàn thành khóa học"
+                    placeholder="VD: Chá»©ng nháº­n hoÃ n thÃ nh khÃ³a há»c"
                     className="h-12 rounded-xl text-base"
                     onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }}
                     autoFocus />
                 </div>
                 <div>
-                  <label htmlFor="cert-desc" className="mb-1.5 block text-sm font-semibold">Mô tả (tùy chọn)</label>
+                  <label htmlFor="cert-desc" className="mb-1.5 block text-sm font-semibold">MÃ´ táº£ (tÃ¹y chá»n)</label>
                   <textarea id="cert-desc" className="min-h-20 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
                     value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
-                    placeholder="Mô tả ngắn về chứng chỉ này..." />
+                    placeholder="MÃ´ táº£ ngáº¯n vá» chá»©ng chá»‰ nÃ y..." />
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">
-                  <Button variant="outline" onClick={closeModal} className="rounded-xl font-bold">Hủy</Button>
+                  <Button variant="outline" onClick={closeModal} className="rounded-xl font-bold">Há»§y</Button>
                   <Button
                     onClick={modalMode === 'create' ? () => void handleCreate() : () => void handleUpdate()}
                     disabled={submitting}
                     className="rounded-xl font-bold gap-2"
                   >
                     {submitting ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                    {modalMode === 'create' ? 'Tạo mẫu' : 'Lưu thay đổi'}
+                    {modalMode === 'create' ? 'Táº¡o máº«u' : 'LÆ°u thay Ä‘á»•i'}
                   </Button>
                 </div>
               </div>
@@ -289,3 +295,5 @@ export default function InstructorCertificatesPage() {
     </div>
   );
 }
+
+

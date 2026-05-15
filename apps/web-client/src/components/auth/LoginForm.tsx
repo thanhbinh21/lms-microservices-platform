@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -21,10 +21,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { mapUiErrorMessage, mapUiSuccessMessage } from '@/lib/ui-notification';
+import { mapUiErrorMessage } from '@/lib/ui-notification';
 import { StatusMessage } from '@/components/ui/status-message';
+import { toast } from '@/components/ui/toast';
 
-// Override schema inline if needed, but assuming standard loginSchema format exists
 const loginSchema = z.object({
   email: z.string().email('Email không đúng định dạng'),
   password: z.string().min(8, 'Mật khẩu phải từ 8 ký tự'),
@@ -35,48 +35,39 @@ export default function LoginForm() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [error, setError] = useState<string>('');
-  const [success, setSuccess] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // States: Default, Loading, Error (validation via React Hook Form), Error (API via error state), Disabled
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
+    defaultValues: { email: '', password: '' },
   });
 
   const onSubmit = async (data: LoginInput) => {
     setIsLoading(true);
     setError('');
-    setSuccess('');
 
     try {
-      // 1. Trigger API
       const result = await loginAction(data);
 
       if (result.success && result.user && result.accessToken) {
-        // 2. Map Redux
-        dispatch(setUser({
-          user: result.user,
-          accessToken: result.accessToken,
-        }));
+        dispatch(setUser({ user: result.user, accessToken: result.accessToken }));
+        toast('success', 'Đăng nhập thành công', `Chào mừng ${result.user.name}!`);
 
-        setSuccess(mapUiSuccessMessage(result.message, 'Đăng nhập thành công! Đang chuyển hướng...'));
-        const redirectPath = result.user.role === 'INSTRUCTOR' ? '/instructor/courses' : '/dashboard';
-        
-        // Dieu huong theo vai tro de giang vien vao thang khu vuc quan ly khoa hoc.
-        setTimeout(() => {
-          router.push(redirectPath);
-        }, 800);
+        const redirectPath =
+          result.user.role === 'ADMIN' ? '/admin'
+            : result.user.role === 'INSTRUCTOR' ? '/instructor/courses'
+              : '/dashboard';
+
+        setTimeout(() => router.push(redirectPath), 800);
       } else {
-        // API Error logic
-        setError(mapUiErrorMessage(result.message, 'Tài khoản hoặc mật khẩu không chính xác.'));
+        const msg = mapUiErrorMessage(result.message, 'Tài khoản hoặc mật khẩu không chính xác.');
+        setError(msg);
+        toast('error', 'Đăng nhập thất bại', msg);
       }
     } catch (err) {
-      setError(mapUiErrorMessage(err, 'Lỗi kết nối máy chủ. Vui lòng thử lại sau.'));
-      console.error('Login error:', err);
+      const msg = mapUiErrorMessage(err, 'Lỗi kết nối máy chủ. Vui lòng thử lại.');
+      setError(msg);
+      toast('error', 'Lỗi đăng nhập', msg);
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +75,6 @@ export default function LoginForm() {
 
   return (
     <Card className="glass-panel w-full border-white/60 shadow-2xl shadow-primary/10 rounded-3xl overflow-hidden relative">
-      {/* Decorative inner glow */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
 
       <CardHeader className="space-y-2 pb-6 pt-10 px-8 text-center">
@@ -142,15 +132,12 @@ export default function LoginForm() {
               )}
             />
 
-            {/* Remember & QR Code */}
             <div className="flex items-center justify-between pt-1">
               <label className="flex items-center gap-2 cursor-pointer group">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   disabled={isLoading}
-                  className="w-4 h-4 rounded appearance-none border-2 border-primary/30 checked:bg-primary checked:border-primary transition-all relative
-                    checked:after:content-[''] checked:after:absolute checked:after:w-1.5 checked:after:h-2.5 checked:after:border-r-2 checked:after:border-b-2 checked:after:border-white 
-                    checked:after:left-[5px] checked:after:top-[1px] checked:after:rotate-45 disabled:opacity-50"
+                  className="w-4 h-4 rounded appearance-none border-2 border-primary/30 checked:bg-primary checked:border-primary transition-all relative checked:after:content-[''] checked:after:absolute checked:after:w-1.5 checked:after:h-2.5 checked:after:border-r-2 checked:after:border-b-2 checked:after:border-white checked:after:left-[5px] checked:after:top-[1px] checked:after:rotate-45 disabled:opacity-50"
                   defaultChecked
                 />
                 <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
@@ -164,16 +151,11 @@ export default function LoginForm() {
               </Button>
             </div>
 
-            {/* Error State: API Failed */}
             {error && <StatusMessage type="error" message={error} />}
 
-            {/* Success State */}
-            {success && <StatusMessage type="success" message={success} />}
-
-            {/* Submit Button */}
-            <Button 
-              type="submit" 
-              className="w-full h-12 rounded-xl text-base font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5 mt-2" 
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-xl text-base font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5 mt-2"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -191,7 +173,7 @@ export default function LoginForm() {
           </form>
         </Form>
       </CardContent>
-      
+
       <CardFooter className="flex flex-col gap-4 pb-8 pt-2 px-8">
         <div className="relative w-full">
           <div className="absolute inset-0 flex items-center">
@@ -203,7 +185,7 @@ export default function LoginForm() {
             </span>
           </div>
         </div>
-        
+
         <div className="text-center mt-2">
           <p className="text-sm text-muted-foreground font-medium">
             Chưa có tài khoản?{' '}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Clapperboard, LayoutDashboard, LogOut, Menu, X, GraduationCap } from 'lucide-react';
@@ -17,7 +17,7 @@ const navItems = [
   { label: 'Khóa học', href: '/courses' },
   { label: 'Giảng viên', href: '/instructors' },
   { label: 'Cộng đồng', href: '/community' },
-  { label: 'Hỗ trợ', href: '/#ho-tro' },
+  { label: 'Hỗ trợ', href: '/support' },
 ];
 
 function isActive(pathname: string, href: string): boolean {
@@ -42,8 +42,8 @@ export function SharedNavbar() {
   const normalizedRole = (user?.role || '').toUpperCase();
   const canBecomeInstructor = isAuthenticated && normalizedRole === 'STUDENT';
   const canAccessInstructorStudio = isAuthenticated && normalizedRole === 'INSTRUCTOR';
-  // Chi hoc vien (STUDENT) moi thay Dashboard. INSTRUCTOR dung Studio, ADMIN dung Profile > Quan ly don GV.
   const canAccessDashboard = isAuthenticated && normalizedRole === 'STUDENT';
+  const isAdmin = normalizedRole === 'ADMIN';
 
   const handleLogout = async () => {
     await logoutAction();
@@ -51,6 +51,17 @@ export function SharedNavbar() {
     router.push('/login');
     router.refresh();
   };
+
+  const closeMobileMenu = useCallback(() => setMobileOpen(false), []);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeMobileMenu();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [mobileOpen, closeMobileMenu]);
 
   if (!mounted) {
     return <header className="glass-navbar sticky top-0 z-40 shadow-sm h-16"></header>;
@@ -93,6 +104,15 @@ export function SharedNavbar() {
                   <Button variant="ghost" className="font-bold gap-2 hover:bg-primary/10">
                     <Clapperboard className="size-4 text-muted-foreground" />
                     Studio
+                  </Button>
+                </Link>
+              )}
+
+              {(normalizedRole === 'ADMIN') && (
+                <Link href="/admin">
+                  <Button variant="ghost" className="font-bold gap-2 hover:bg-primary/10">
+                    <LayoutDashboard className="size-4 text-muted-foreground" />
+                    Quản trị
                   </Button>
                 </Link>
               )}
@@ -194,15 +214,23 @@ export function SharedNavbar() {
             {isAuthenticated ? (
               <>
                 {canAccessDashboard && (
-                  <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
+                  <Link href="/dashboard" onClick={closeMobileMenu}>
                     <Button variant="outline" className="w-full">Dashboard</Button>
                   </Link>
                 )}
-                <Link href="/profile" onClick={() => setMobileOpen(false)}>
+                {isAdmin && (
+                  <Link href="/admin" onClick={closeMobileMenu}>
+                    <Button variant="outline" className="w-full gap-2 border-primary/30 font-bold">
+                      <LayoutDashboard className="size-4 shrink-0" />
+                      Quản trị
+                    </Button>
+                  </Link>
+                )}
+                <Link href="/profile" onClick={closeMobileMenu}>
                   <Button variant="outline" className="w-full font-bold">Hồ sơ & tài khoản</Button>
                 </Link>
                 {canAccessInstructorStudio && (
-                  <Link href="/instructor" onClick={() => setMobileOpen(false)}>
+                  <Link href="/instructor" onClick={closeMobileMenu}>
                     <Button variant="outline" className="w-full gap-2 border-primary/30 font-bold">
                       <Clapperboard className="size-4 shrink-0" />
                       Studio giảng viên
@@ -210,7 +238,7 @@ export function SharedNavbar() {
                   </Link>
                 )}
                 {canBecomeInstructor && (
-                  <Link href="/become-instructor" onClick={() => setMobileOpen(false)}>
+                  <Link href="/become-instructor" onClick={closeMobileMenu}>
                     <Button className="w-full">Đăng ký GV</Button>
                   </Link>
                 )}
@@ -219,7 +247,7 @@ export function SharedNavbar() {
                   variant="ghost"
                   className="flex h-11 w-full items-center justify-center text-muted-foreground hover:bg-transparent hover:text-primary"
                   onClick={async () => {
-                    setMobileOpen(false);
+                    closeMobileMenu();
                     await handleLogout();
                   }}
                   aria-label="Đăng xuất"
@@ -229,10 +257,10 @@ export function SharedNavbar() {
               </>
             ) : (
               <>
-                <Link href="/login" onClick={() => setMobileOpen(false)}>
+                <Link href="/login" onClick={closeMobileMenu}>
                   <Button variant="outline" className="w-full">Đăng nhập</Button>
                 </Link>
-                <Link href="/register" onClick={() => setMobileOpen(false)}>
+                <Link href="/register" onClick={closeMobileMenu}>
                   <Button className="w-full">Đăng ký</Button>
                 </Link>
               </>

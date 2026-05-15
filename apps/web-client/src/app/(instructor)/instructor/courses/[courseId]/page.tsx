@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { StatusMessage } from '@/components/ui/status-message';
+import { toast } from '@/components/ui/toast';
 import {
   confirmLessonUploadAction,
   createCourseCategoryAction,
@@ -308,6 +309,11 @@ export default function CourseWizardPage() {
   const setStatus = (type: 'success' | 'error', message: string) => {
     setStatusType(type);
     setStatusMessage(message);
+    if (type === 'success') {
+      toast('success', 'Thao tác thành công', message);
+      return;
+    }
+    toast('error', 'Thao tác thất bại', message);
   };
 
   const flatLessons = useMemo(() => {

@@ -59,51 +59,51 @@ export default function AdminDashboardPage() {
 
   const statCards: StatCard[] = [
     {
-      label: 'Tổng người dùng',
+      label: 'Tá»•ng ngÆ°á»i dÃ¹ng',
       value: loading ? '...' : String(userStats?.totalUsers ?? 0),
-      hint: loading ? 'Đang tải' : `${userStats?.activeUsers ?? 0} đang hoạt động`,
+      hint: loading ? 'Äang táº£i' : `${userStats?.activeUsers ?? 0} Ä‘ang hoáº¡t Ä‘á»™ng`,
       icon: <Users className="size-5" />,
     },
     {
-      label: 'Khóa học đã xuất bản',
+      label: 'KhÃ³a há»c Ä‘Ã£ xuáº¥t báº£n',
       value: loading ? '...' : String(courseStats?.publishedCourses ?? 0),
-      hint: loading ? 'Đang tải' : `${courseStats?.totalCourses ?? 0} tổng khóa học`,
+      hint: loading ? 'Äang táº£i' : `${courseStats?.totalCourses ?? 0} tá»•ng khÃ³a há»c`,
       icon: <BookOpen className="size-5" />,
     },
     {
-      label: 'Tổng lượt ghi danh',
+      label: 'Tá»•ng lÆ°á»£t ghi danh',
       value: loading ? '...' : (courseStats?.totalEnrollments ?? 0).toLocaleString('vi-VN'),
-      hint: 'Tổng học viên đã đăng ký',
+      hint: 'Tá»•ng há»c viÃªn Ä‘Ã£ Ä‘Äƒng kÃ½',
       icon: <GraduationCap className="size-5" />,
     },
     {
-      label: 'Đánh giá bị gắn cờ',
+      label: 'ÄÃ¡nh giÃ¡ bá»‹ gáº¯n cá»',
       value: loading ? '...' : String(flaggedReviews),
-      hint: 'Cần kiểm duyệt',
+      hint: 'Cáº§n kiá»ƒm duyá»‡t',
       icon: <Flag className="size-5" />,
       variant: flaggedReviews > 0 ? 'warning' : 'default',
       href: '/admin/reviews',
     },
     {
-      label: 'Yêu cầu hỗ trợ',
+      label: 'YÃªu cáº§u há»— trá»£',
       value: loading ? '...' : String(totalSupport),
-      hint: loading ? 'Đang tải' : `${supportStats.open} mới · ${supportStats.inProgress} đang xử lý`,
+      hint: loading ? 'Äang táº£i' : `${supportStats.open} má»›i Â· ${supportStats.inProgress} Ä‘ang xá»­ lÃ½`,
       icon: <Headphones className="size-5" />,
       variant: totalSupport > 0 ? 'warning' : 'default',
       href: '/admin/support',
     },
     {
-      label: 'Yêu cầu rút tiền',
+      label: 'YÃªu cáº§u rÃºt tiá»n',
       value: loading ? '...' : String(payoutStats.pending),
-      hint: 'Chờ duyệt',
+      hint: 'Chá» duyá»‡t',
       icon: <CreditCard className="size-5" />,
       variant: payoutStats.pending > 0 ? 'warning' : 'default',
       href: '/admin/payouts',
     },
     {
-      label: 'Sự kiện thất bại (DLQ)',
+      label: 'Sá»± kiá»‡n lá»—i cáº§n xá»­ lÃ½',
       value: loading ? '...' : String(pendingCount),
-      hint: 'Chờ xử lý lại',
+      hint: 'Chá» xá»­ lÃ½ láº¡i',
       icon: <AlertTriangle className="size-5" />,
       variant: pendingCount > 0 ? 'danger' : 'default',
       href: '/admin/system',
@@ -117,15 +117,15 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="mb-8">
+    <div className="workspace-page">
+      <div className="workspace-page-header">
         <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
           <Sparkles className="size-3.5" />
           NexEdu Admin
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">Tổng quan hệ thống</h1>
+        <h1 className="workspace-page-title">Tá»•ng quan há»‡ thá»‘ng</h1>
         <p className="mt-1 max-w-2xl text-sm font-medium text-muted-foreground">
-          Bảng điều khiển quản trị — theo dõi người dùng, khóa học, đánh giá và hệ thống.
+          Báº£ng Ä‘iá»u khiá»ƒn quáº£n trá»‹ â€” theo dÃµi ngÆ°á»i dÃ¹ng, khÃ³a há»c, Ä‘Ã¡nh giÃ¡ vÃ  há»‡ thá»‘ng.
         </p>
       </div>
 
@@ -176,8 +176,8 @@ export default function AdminDashboardPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
           <CardHeader>
-            <CardTitle className="text-lg">Người dùng theo vai trò</CardTitle>
-            <CardDescription>Phân bổ vai trò trong hệ thống</CardDescription>
+            <CardTitle className="text-lg">NgÆ°á»i dÃ¹ng theo vai trÃ²</CardTitle>
+            <CardDescription>PhÃ¢n bá»• vai trÃ² trong há»‡ thá»‘ng</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -205,8 +205,8 @@ export default function AdminDashboardPage() {
 
         <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
           <CardHeader>
-            <CardTitle className="text-lg">Khóa học theo trạng thái</CardTitle>
-            <CardDescription>Phân bổ trạng thái khóa học</CardDescription>
+            <CardTitle className="text-lg">KhÃ³a há»c theo tráº¡ng thÃ¡i</CardTitle>
+            <CardDescription>PhÃ¢n bá»• tráº¡ng thÃ¡i khÃ³a há»c</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -235,9 +235,9 @@ export default function AdminDashboardPage() {
 
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         {[
-          { href: '/admin/support', title: 'Hỗ trợ & Giải quyết', desc: 'Xử lý yêu cầu hỗ trợ từ học viên và giảng viên' },
-          { href: '/admin/payouts', title: 'Thanh toán & Payout', desc: 'Duyệt yêu cầu rút tiền của giảng viên' },
-          { href: '/admin/system', title: 'DLQ & System Events', desc: 'Giám sát và xử lý các sự kiện thất bại' },
+          { href: '/admin/support', title: 'Há»— trá»£ & Giáº£i quyáº¿t', desc: 'Xá»­ lÃ½ yÃªu cáº§u há»— trá»£ tá»« há»c viÃªn vÃ  giáº£ng viÃªn' },
+          { href: '/admin/payouts', title: 'YÃªu cáº§u rÃºt tiá»n', desc: 'Duyá»‡t yÃªu cáº§u rÃºt tiá»n cá»§a giáº£ng viÃªn' },
+          { href: '/admin/system', title: 'Sá»± kiá»‡n lá»—i há»‡ thá»‘ng', desc: 'GiÃ¡m sÃ¡t vÃ  xá»­ lÃ½ cÃ¡c sá»± kiá»‡n tháº¥t báº¡i trong há»‡ thá»‘ng' },
         ].map((item) => (
           <Link key={item.href} href={item.href}>
             <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md transition hover:bg-white/70">
@@ -252,3 +252,5 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
+

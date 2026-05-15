@@ -44,36 +44,36 @@ export default function AdminSystemConfigPage() {
     const res = await upsertAdminSystemConfigAction({ key: key.trim(), value: parsed, description: description.trim() });
     setSaving(false);
     if (res.success) {
-      setMessage({ type: 'success', text: 'Đã lưu cấu hình.' });
+      setMessage({ type: 'success', text: 'ÄÃ£ lÆ°u cáº¥u hÃ¬nh.' });
       setKey('');
       setValue('');
       setDescription('');
       await loadConfigs();
     } else {
-      setMessage({ type: 'error', text: res.message || 'Không thể lưu cấu hình.' });
+      setMessage({ type: 'error', text: res.message || 'KhÃ´ng thá»ƒ lÆ°u cáº¥u hÃ¬nh.' });
     }
   }
 
   return (
-    <div className="p-6 md:p-8 space-y-6">
+    <div className="workspace-page space-y-6">
       <div className="mb-2">
-        <h1 className="text-2xl font-bold tracking-tight">Cấu hình hệ thống</h1>
-        <p className="mt-1 text-sm font-medium text-muted-foreground">
-          Quản lý cấu hình toàn hệ thống. Mọi thay đổi được ghi audit log.
+        <h1 className="workspace-page-title">Cáº¥u hÃ¬nh há»‡ thá»‘ng</h1>
+        <p className="workspace-page-description">
+          Quáº£n lÃ½ cáº¥u hÃ¬nh toÃ n há»‡ thá»‘ng. Má»i thay Ä‘á»•i Ä‘Æ°á»£c ghi audit log.
         </p>
       </div>
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
-          <CardTitle className="text-base">Thêm / cập nhật cấu hình</CardTitle>
+          <CardTitle className="text-base">ThÃªm / cáº­p nháº­t cáº¥u hÃ¬nh</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input placeholder="Khóa cấu hình (VD: platform_fee_pct)" value={key} onChange={(e) => setKey(e.target.value)} />
-          <Input placeholder="Giá trị (JSON hoặc text thuần)" value={value} onChange={(e) => setValue(e.target.value)} />
-          <Input placeholder="Mô tả (tùy chọn)" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <Input placeholder="KhÃ³a cáº¥u hÃ¬nh (VD: platform_fee_pct)" value={key} onChange={(e) => setKey(e.target.value)} />
+          <Input placeholder="GiÃ¡ trá»‹ (JSON hoáº·c text thuáº§n)" value={value} onChange={(e) => setValue(e.target.value)} />
+          <Input placeholder="MÃ´ táº£ (tÃ¹y chá»n)" value={description} onChange={(e) => setDescription(e.target.value)} />
           <div className="flex items-center gap-3">
             <Button onClick={handleSave} disabled={saving || !key.trim() || !value.trim()} className="rounded-xl font-bold shadow-md">
-              {saving ? 'Đang lưu...' : 'Lưu cấu hình'}
+              {saving ? 'Äang lÆ°u...' : 'LÆ°u cáº¥u hÃ¬nh'}
             </Button>
             {message && <StatusMessage type={message.type} message={message.text} />}
           </div>
@@ -82,7 +82,7 @@ export default function AdminSystemConfigPage() {
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
-          <CardTitle className="text-base">Cấu hình hiện tại</CardTitle>
+          <CardTitle className="text-base">Cáº¥u hÃ¬nh hiá»‡n táº¡i</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {loading ? (
@@ -92,14 +92,14 @@ export default function AdminSystemConfigPage() {
               ))}
             </div>
           ) : configs.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Chưa có cấu hình nào.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">ChÆ°a cÃ³ cáº¥u hÃ¬nh nÃ o.</p>
           ) : (
             configs.map((item) => (
               <div key={item.id} className="rounded-xl border border-zinc-200 bg-white/70 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-sm font-mono">{item.key}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{item.description || 'Không có mô tả'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{item.description || 'KhÃ´ng cÃ³ mÃ´ táº£'}</p>
                   </div>
                   <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600">
                     {typeof item.value === 'object' ? 'JSON' : 'TEXT'}
@@ -116,3 +116,5 @@ export default function AdminSystemConfigPage() {
     </div>
   );
 }
+
+

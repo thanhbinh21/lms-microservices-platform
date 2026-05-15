@@ -15,6 +15,7 @@ import {
   Headphones,
   LayoutDashboard,
   Menu,
+  MessageSquare,
   Settings2,
   Shapes,
   Star,
@@ -32,19 +33,20 @@ interface NavLink {
 }
 
 const navLinks: NavLink[] = [
-  { label: 'Tổng quan', href: '/admin', icon: LayoutDashboard },
-  { label: 'Người dùng', href: '/admin/users', icon: Users },
-  { label: 'Khóa học', href: '/admin/courses', icon: BookOpen },
-  { label: 'Danh mục', href: '/admin/categories', icon: Shapes },
-  { label: 'Đánh giá', href: '/admin/reviews', icon: Star },
-  { label: 'Đơn giảng viên', href: '/admin/instructor-requests', icon: GraduationCap },
-  { label: 'Hỗ trợ', href: '/admin/support', icon: Headphones },
-  { label: 'Rút tiền', href: '/admin/payouts', icon: Wallet },
+  { label: 'Tá»•ng quan', href: '/admin', icon: LayoutDashboard },
+  { label: 'NgÆ°á»i dÃ¹ng', href: '/admin/users', icon: Users },
+  { label: 'KhÃ³a há»c', href: '/admin/courses', icon: BookOpen },
+  { label: 'Danh má»¥c', href: '/admin/categories', icon: Shapes },
+  { label: 'ÄÃ¡nh giÃ¡', href: '/admin/reviews', icon: Star },
+  { label: 'ÄÆ¡n giáº£ng viÃªn', href: '/admin/instructor-requests', icon: GraduationCap },
+  { label: 'Há»— trá»£', href: '/admin/support', icon: Headphones },
+  { label: 'RÃºt tiá»n', href: '/admin/payouts', icon: Wallet },
   { label: 'Doanh thu', href: '/admin/revenue', icon: BarChart3 },
-  { label: 'Lịch sử thông báo', href: '/admin/notifications', icon: Bell },
-  { label: 'Cấu hình hệ thống', href: '/admin/system-config', icon: Settings2 },
-  { label: 'Audit log', href: '/admin/audit-log', icon: ClipboardList },
-  { label: 'DLQ hệ thống', href: '/admin/system', icon: AlertTriangle },
+  { label: 'Lá»‹ch sá»­ thÃ´ng bÃ¡o', href: '/admin/notifications', icon: Bell },
+  { label: 'Cá»™ng Ä‘á»“ng', href: '/admin/community', icon: MessageSquare },
+  { label: 'Cáº¥u hÃ¬nh há»‡ thá»‘ng', href: '/admin/system-config', icon: Settings2 },
+  { label: 'Nháº­t kÃ½ hoáº¡t Ä‘á»™ng', href: '/admin/audit-log', icon: ClipboardList },
+  { label: 'Sá»± kiá»‡n lá»—i cáº§n xá»­ lÃ½', href: '/admin/system', icon: AlertTriangle },
 ];
 
 function normalizePath(path: string) {
@@ -88,7 +90,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Image src="/nexedu-logo.svg" alt="NexEdu Logo" width={28} height={28} />
           <span className="text-sm font-bold">NexEdu Admin</span>
         </Link>
-        <Button variant="ghost" size="icon" aria-label="Mở menu quản trị" onClick={() => setMobileOpen((prev) => !prev)}>
+        <Button variant="ghost" size="icon" aria-label="Má»Ÿ menu quáº£n trá»‹" onClick={() => setMobileOpen((prev) => !prev)}>
           {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
         </Button>
       </div>
@@ -106,7 +108,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span className="token-section-title">NexEdu Admin</span>
           </Link>
 
-          <nav className="flex-1 space-y-1 overflow-y-auto" aria-label="Điều hướng quản trị">
+          <nav className="flex-1 space-y-1 overflow-y-auto" aria-label="Äiá»u hÆ°á»›ng quáº£n trá»‹">
             {navLinks.map((link) => {
               const active = isLinkActive(pathname, link.href);
               return (
@@ -129,7 +131,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <div className="mt-4 space-y-4 border-t border-border pt-4">
             <Button variant="outline" className="w-full justify-start gap-2 font-bold" onClick={() => router.push('/dashboard')}>
-              <ArrowLeft className="size-4" /> Thoát Admin
+              <ArrowLeft className="size-4" /> ThoÃ¡t Admin
             </Button>
             <div className="flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/20 font-bold text-primary">
@@ -145,7 +147,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       <main className="min-h-screen flex-1 overflow-x-hidden pb-20 pt-16 md:pt-0">
-        {children}
+        <div className="workspace-shell">{children}</div>
       </main>
     </div>
   );
