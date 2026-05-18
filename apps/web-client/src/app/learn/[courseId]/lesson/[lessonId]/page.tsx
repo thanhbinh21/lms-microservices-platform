@@ -3,13 +3,18 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Loader2, Clock3, PlayCircle, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, HelpCircle, Keyboard, ListChecks, X, Award } from 'lucide-react';
+import { Loader2, Clock3, PlayCircle, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, HelpCircle, Keyboard, ListChecks, X, Award, MessageSquare, Brain } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getLearnDataAction, updateLessonProgressAction, type LearnDataDto, type LearnLessonDto } from '@/app/actions/learning';
+import { generateQuizAction, getAiContextStatusAction, submitQuizAction } from '@/app/actions/ai';
 import { VideoPlayer } from '@/components/learning/video-player';
 import { CourseQaSection } from '@/components/learning/course-qa-section';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ChatWidget } from '@/components/ai/chat/chat-widget';
+import { QuizButton } from '@/components/ai/quiz/quiz-button';
+import { QuizUnavailable } from '@/components/ai/quiz/quiz-unavailable';
+import { QuizPanel } from '@/components/ai/quiz/quiz-panel';
 
 function formatDuration(seconds: number) {
   if (!seconds) return '0 phút';
@@ -38,6 +43,14 @@ export default function LessonPage() {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [qaExpanded, setQaExpanded] = useState(false);
   const [togglingComplete, setTogglingComplete] = useState(false);
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [quizSessionId, setQuizSessionId] = useState<string | null>(null);
+  const [quizQuestions, setQuizQuestions] = useState<{ question: string; options: string[] }[]>([]);
+  const [quizExpiresAt, setQuizExpiresAt] = useState<string | undefined>();
+  const [quizUnavailableReason, setQuizUnavailableReason] = useState<string | null>(null);
+  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  const [aiUnavailableReason, setAiUnavailableReason] = useState<string | undefined>(undefined);
   const hasTriggeredConfetti = useRef(false);
 
   const fetchData = useCallback(async () => {
@@ -52,11 +65,54 @@ export default function LessonPage() {
     setLoading(false);
   }, [courseId, lessonId]);
 
+  // Fetch AI context status once when lesson loads
+  useEffect(() => {
+    void (async () => {
+      const ctxRes = await getAiContextStatusAction(lessonId);
+      if (ctxRes.success && ctxRes.data) {
+        setAiAvailable(ctxRes.data.available);
+        if (!ctxRes.data.available) {
+          setAiUnavailableReason(ctxRes.data.reason);
+        }
+      } else {
+        setAiAvailable(false);
+        setAiUnavailableReason('AI_SERVICE_UNAVAILABLE');
+      }
+    })();
+  }, [lessonId]);
+
   useEffect(() => {
     setLoading(true);
     setQaExpanded(false);
+    setQuizOpen(false);
+    setQuizSessionId(null);
+    setQuizQuestions([]);
+    setQuizUnavailableReason(null);
     void fetchData();
   }, [fetchData]);
+
+  const startLessonQuiz = async () => {
+    if (quizLoading) return;
+    setQuizOpen(true);
+    setQuizLoading(true);
+    setQuizUnavailableReason(null);
+
+    const res = await generateQuizAction(courseId, lessonId, 'LESSON', 5);
+    setQuizLoading(false);
+
+    if (!res.success || !res.data) {
+      const msg = res.message || '';
+      if (msg.includes('transcript')) setQuizUnavailableReason('TRANSCRIPT_NOT_READY');
+      else if (msg.includes('1000')) setQuizUnavailableReason('INSUFFICIENT_CONTENT');
+      else if (msg.toLowerCase().includes('video')) setQuizUnavailableReason('VIDEO_TOO_LARGE');
+      else setQuizUnavailableReason('INSUFFICIENT_CONTENT');
+      return;
+    }
+
+    setQuizSessionId(res.data.sessionId);
+    setQuizQuestions(res.data.questions);
+    setQuizExpiresAt(res.data.expiresAt);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -207,6 +263,15 @@ export default function LessonPage() {
           </div>
         )}
 
+        {/* Quiz Button */}
+        <QuizButton
+          courseId={courseId}
+          lessonId={lessonId}
+          status={isCompleted ? 'AVAILABLE' : 'DISABLED'}
+          reason={!isCompleted ? 'Hoàn thành bài học để mở khóa quiz.' : undefined}
+          onStartQuiz={() => void startLessonQuiz()}
+        />
+
         {/* Q&A Expandable */}
         <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
           <button
@@ -294,6 +359,16 @@ export default function LessonPage() {
               <span>Hỏi đáp</span>
             </button>
 
+            {/* AI Chat Button — triggers floating ChatWidget */}
+            <button
+              type="button"
+              onClick={() => {/* ChatWidget is standalone and manages its own state */}}
+              className="flex flex-col items-center gap-0.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[10px] font-semibold text-slate-500 transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+            >
+              <MessageSquare className="size-4" />
+              <span>AI Chat</span>
+            </button>
+
             {/* Certificate */}
             {courseCompleted && (
               <Link href={certificateNumber ? `/certificates/${certificateNumber}` : '#'}>
@@ -368,6 +443,47 @@ export default function LessonPage() {
                 <span>Đóng hướng dẫn</span>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Chat Widget — floating, opens on button click */}
+      <ChatWidget
+        courseId={courseId}
+        lessonId={lessonId}
+        aiAvailable={aiAvailable ?? false}
+        aiUnavailableReason={aiUnavailableReason}
+      />
+
+      {quizOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="h-[min(720px,90vh)] w-full max-w-2xl overflow-hidden rounded-xl border bg-background shadow-xl">
+            {quizLoading ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3">
+                <Loader2 className="size-6 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Đang tạo quiz...</p>
+              </div>
+            ) : quizUnavailableReason ? (
+              <div className="p-4">
+                <QuizUnavailable reason={quizUnavailableReason} />
+                <div className="mt-4 flex justify-end">
+                  <Button variant="outline" onClick={() => setQuizOpen(false)}>
+                    Đóng
+                  </Button>
+                </div>
+              </div>
+            ) : quizSessionId ? (
+              <QuizPanel
+                courseId={courseId}
+                lessonId={lessonId}
+                quizType="LESSON"
+                sessionId={quizSessionId}
+                questions={quizQuestions}
+                expiresAt={quizExpiresAt}
+                onClose={() => setQuizOpen(false)}
+                onSubmit={(answers) => submitQuizAction(quizSessionId, answers)}
+              />
+            ) : null}
           </div>
         </div>
       )}

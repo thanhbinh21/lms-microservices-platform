@@ -61,7 +61,7 @@ export type KafkaTopic = (typeof TOPICS)[keyof typeof TOPICS];
 
 export const PaymentOrderCompletedSchema = z.object({
   order_id: z.string().uuid(),
-  user_id: z.string().uuid(),
+  user_id: z.string().min(1),
   course_id: z.string().uuid(),
   instructor_id: z.string(),
   amount: z.number().positive(),
@@ -75,7 +75,7 @@ export const PaymentOrderCompletedSchema = z.object({
 });
 
 export const EnrollmentCreatedSchema = z.object({
-  user_id: z.string().uuid(),
+  user_id: z.string().min(1),
   course_id: z.string().uuid(),
   order_id: z.string(),
   enrolled_at: z.string().datetime(),

@@ -1113,3 +1113,47 @@ export async function listInstructorCoursesBySlugAction(slug: string, page = 1, 
     { method: 'GET' },
   );
 }
+
+export interface TranscriptDto {
+  id: string;
+  lessonId: string;
+  sourceType: string;
+  status: string;
+  fullText: string | null;
+  segments: unknown[];
+  language: string | null;
+}
+
+export async function getLessonTranscriptAction(
+  lessonId: string,
+): Promise<ApiResponse<TranscriptDto>> {
+  return callApi<TranscriptDto>(
+    `/course/api/lessons/${lessonId}/transcript`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function createManualTranscriptAction(
+  lessonId: string,
+  fullText: string,
+): Promise<ApiResponse<TranscriptDto>> {
+  return callApi<TranscriptDto>(
+    `/course/api/lessons/${lessonId}/transcript/manual`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ fullText }),
+    },
+    true,
+  );
+}
+
+export async function retryTranscriptAction(
+  lessonId: string,
+): Promise<ApiResponse<unknown>> {
+  return callApi<unknown>(
+    `/course/api/lessons/${lessonId}/transcript/retry`,
+    { method: 'POST' },
+    true,
+  );
+}

@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Chat Conversations ─────────────────────────────────────────────────────────
+
+model AiConversation {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  courseId  String   @map("course_id")
+  lessonId  String?  @map("lesson_id")
+  title     String   @default("Cuộc trò chuyện mới")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  messages AiMessage[]
+
+  @@index([userId])
+  @@index([userId, courseId])
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  role           String   // 'user' | 'assistant' | 'system'
+  content        String   @db.Text @map("content")
+  tokenCount     Int?     @map("token_count")
+  isError        Boolean  @default(false) @map("is_error")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("ai_messages")
+}
+
+// ─── Chat Semantic Summary (for long conversations) ───────────────────────────
+
+model AiConversationSummary {
+  id             String   @id @default(uuid())
+  conversationId String   @unique @map("conversation_id")
+  summaryText    String   @db.Text @map("summary_text")
+  messageIndex   Int      @map("message_index") // soan thảo lúc có bao nhiêu tin nhắn
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("ai_conversation_summaries")
+}
+
+// ─── Quiz Sessions ─────────────────────────────────────────────────────────────
+
+model AiQuizSession {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  courseId       String    @map("course_id")
+  lessonId       String?   @map("lesson_id") // null = final course quiz
+  quizType       String    @default("LESSON") @map("quiz_type")
+  // LESSON | FINAL_COURSE
+
+  status         String    @default("PENDING") @map("status")
+  // PENDING | SUBMITTED | EXPIRED
+
+  questionsHash  String    @map("questions_hash")
+  questions      Json      @map("questions_client") // Cau hoi KHONG kem dap an
+  correctData    Json      @map("correct_data")     // Dap an (server-only)
+
+  score          Int?
+  totalQ         Int       @map("total_questions")
+  correctQ       Int?      @map("correct_answers")
+
+  submittedAt    DateTime? @map("submitted_at")
+  expiresAt      DateTime  @map("expires_at")
+
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([lessonId])
+  @@index([userId, courseId, quizType, status])
+  @@map("ai_quiz_sessions")
+}

@@ -91,14 +91,14 @@ export default function InstructorCourseDetailPage() {
 
       if (!courseResult.success || !courseResult.data) {
         setStatusType('error');
-        setStatusMessage(courseResult.message || 'KhÃ´ng táº£i Ä‘Æ°á»£c thÃ´ng tin khÃ³a há»c.');
+        setStatusMessage(courseResult.message || 'Không tải được thông tin khóa học.');
         setLoading(false);
         return;
       }
 
       if (!curriculumResult.success || !curriculumResult.data) {
         setStatusType('error');
-        setStatusMessage(curriculumResult.message || 'KhÃ´ng táº£i Ä‘Æ°á»£c giÃ¡o trÃ¬nh khÃ³a há»c.');
+        setStatusMessage(curriculumResult.message || 'Không tải được giáo trình khóa học.');
         setLoading(false);
         return;
       }
@@ -118,13 +118,13 @@ export default function InstructorCourseDetailPage() {
   }, [selectedLessonId]);
 
   if (loading) {
-    return <div className="p-8 text-muted-foreground">Äang táº£i chi tiáº¿t khÃ³a há»c...</div>;
+    return <div className="p-8 text-muted-foreground">Đang tải chi tiết khóa học...</div>;
   }
 
   if (!course || !curriculum) {
     return (
       <div className="p-8">
-        <StatusMessage type="error" message={statusMessage || 'KhÃ´ng tÃ¬m tháº¥y khÃ³a há»c.'} />
+        <StatusMessage type="error" message={statusMessage || 'Không tìm thấy khóa học.'} />
       </div>
     );
   }
@@ -136,44 +136,44 @@ export default function InstructorCourseDetailPage() {
 
   const checklist = [
     {
-      label: 'CÃ³ tiÃªu Ä‘á» khÃ³a há»c',
+      label: 'Có tiêu đề khóa học',
       ok: !!course.title?.trim(),
-      action: !course.title?.trim() ? 'Nháº¥n "Cáº¥u hÃ¬nh" Ä‘á»ƒ thÃªm tiÃªu Ä‘á»' : undefined,
+      action: !course.title?.trim() ? 'Nhấn "Cấu hình" để thêm tiêu đề' : undefined,
     },
     {
-      label: 'CÃ³ mÃ´ táº£ khÃ³a há»c',
+      label: 'Có mô tả khóa học',
       ok: !!course.description?.trim(),
-      action: !course.description?.trim() ? 'Nháº¥n "Cáº¥u hÃ¬nh" Ä‘á»ƒ thÃªm mÃ´ táº£' : undefined,
+      action: !course.description?.trim() ? 'Nhấn "Cấu hình" để thêm mô tả' : undefined,
     },
     {
-      label: 'CÃ³ thumbnail khÃ³a há»c',
+      label: 'Có thumbnail khóa học',
       ok: !!course.thumbnail,
-      action: !course.thumbnail ? 'Nháº¥n "Cáº¥u hÃ¬nh" Ä‘á»ƒ táº£i lÃªn thumbnail' : undefined,
+      action: !course.thumbnail ? 'Nhấn "Cấu hình" để tải lên thumbnail' : undefined,
     },
     {
-      label: 'CÃ³ Ã­t nháº¥t 1 chÆ°Æ¡ng',
+      label: 'Có ít nhất 1 chương',
       ok: hasChapters,
-      action: !hasChapters ? 'Nháº¥n "ChÆ°Æ¡ng trÃ¬nh" Ä‘á»ƒ táº¡o chÆ°Æ¡ng' : undefined,
+      action: !hasChapters ? 'Nhấn "Chương trình" để tạo chương' : undefined,
     },
     {
-      label: 'CÃ³ Ã­t nháº¥t 1 bÃ i há»c Ä‘Ã£ xuáº¥t báº£n',
+      label: 'Có ít nhất 1 bài học đã xuất bản',
       ok: publishedLessons > 0,
-      action: publishedLessons === 0 ? 'Nháº¥n "ChÆ°Æ¡ng trÃ¬nh" Ä‘á»ƒ xuáº¥t báº£n bÃ i há»c' : undefined,
+      action: publishedLessons === 0 ? 'Nhấn "Chương trình" để xuất bản bài học' : undefined,
     },
     {
-      label: 'CÃ³ Ã­t nháº¥t 1 bÃ i há»c xem trÆ°á»›c (free)',
+      label: 'Có ít nhất 1 bài học xem trước (free)',
       ok: !!previewLesson,
-      action: !previewLesson ? 'Nháº¥n "ChÆ°Æ¡ng trÃ¬nh" Ä‘á»ƒ Ä‘Ã¡nh dáº¥u 1 bÃ i miá»…n phÃ­' : undefined,
+      action: !previewLesson ? 'Nhấn "Chương trình" để đánh dấu 1 bài miễn phí' : undefined,
     },
     {
-      label: 'KhÃ³a há»c cÃ³ giÃ¡ há»£p lá»‡',
+      label: 'Khóa học có giá hợp lệ',
       ok: course.price > 0,
-      action: course.price <= 0 ? 'Nháº¥n "Cáº¥u hÃ¬nh" Ä‘á»ƒ Ä‘áº·t giÃ¡' : undefined,
+      action: course.price <= 0 ? 'Nhấn "Cấu hình" để đặt giá' : undefined,
     },
     {
-      label: 'CÃ³ thá»ƒ xem trÆ°á»›c khÃ³a há»c',
+      label: 'Có thể xem trước khóa học',
       ok: !!previewLesson?.lesson.videoUrl || !!previewLesson?.lesson.content?.trim(),
-      action: 'Kiá»ƒm tra bÃ i há»c free cÃ³ video hoáº·c ná»™i dung',
+      action: 'Kiểm tra bài học free có video hoặc n�™i dung',
     },
   ];
 
@@ -183,7 +183,7 @@ export default function InstructorCourseDetailPage() {
   return (
     <div className="p-8 space-y-6">
       <Link href="/instructor/courses" className="flex items-center text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors w-fit">
-        <ArrowLeft className="w-4 h-4 mr-2" /> Quay láº¡i danh sÃ¡ch
+        <ArrowLeft className="w-4 h-4 mr-2" /> Quay lại danh sách
       </Link>
 
       {statusMessage && <StatusMessage type={statusType} message={statusMessage} />}
@@ -191,14 +191,14 @@ export default function InstructorCourseDetailPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="workspace-page-title">{course.title}</h1>
-          <p className="text-muted-foreground mt-1 text-sm font-medium">Trang chi tiáº¿t Ä‘áº§y Ä‘á»§ dÃ nh cho giáº£ng viÃªn.</p>
+          <p className="text-muted-foreground mt-1 text-sm font-medium">Trang chi tiết đầy đủ dành cho giảng viên.</p>
         </div>
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => router.push(`/instructor/courses/${courseId}?step=2`)}>
-            <FileEdit className="w-4 h-4 mr-2" /> Cáº¥u hÃ¬nh
+            <FileEdit className="w-4 h-4 mr-2" /> Cấu hình
           </Button>
           <Button variant="outline" onClick={() => router.push(`/instructor/courses/${courseId}?step=3`)}>
-            <List className="w-4 h-4 mr-2" /> ChÆ°Æ¡ng trÃ¬nh
+            <List className="w-4 h-4 mr-2" /> Chương trình
           </Button>
         </div>
       </div>
@@ -215,21 +215,21 @@ export default function InstructorCourseDetailPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className={`font-bold text-base ${allPass ? 'text-green-800' : 'text-amber-800'}`}>
-              Kiá»ƒm tra sáºµn sÃ ng xuáº¥t báº£n
+              Kiểm tra sẵn sàng xuất bản
             </h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {passCount}/{checklist.length} Ä‘iá»u kiá»‡n Ä‘Ã£ Ä‘áº¡t
+              {passCount}/{checklist.length} điều kiện đã đạt
             </p>
           </div>
           {allPass ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              Sáºµn sÃ ng
+              Sẵn sàng
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
               <XCircle className="w-3.5 h-3.5" />
-              Cáº§n bá»• sung
+              Cần bổ sung
             </span>
           )}
         </div>
@@ -255,12 +255,12 @@ export default function InstructorCourseDetailPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 rounded-2xl border-white/60 bg-white/70 backdrop-blur-xl shadow-sm">
           <CardHeader>
-            <CardTitle>ThÃ´ng tin khÃ³a há»c</CardTitle>
+            <CardTitle>Thông tin khóa học</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <p className="text-slate-500 font-semibold">Tráº¡ng thÃ¡i</p>
+                <p className="text-slate-500 font-semibold">Trạng thái</p>
                 <p className="font-bold">{course.status || 'DRAFT'}</p>
               </div>
               <div>
@@ -268,26 +268,26 @@ export default function InstructorCourseDetailPage() {
                 <p className="font-bold">{course.level}</p>
               </div>
               <div>
-                <p className="text-slate-500 font-semibold">GiÃ¡</p>
-                <p className="font-bold">{Number(course.price).toLocaleString('vi-VN')} Ä‘</p>
+                <p className="text-slate-500 font-semibold">Giá</p>
+                <p className="font-bold">{Number(course.price).toLocaleString('vi-VN')} đ</p>
               </div>
               <div>
-                <p className="text-slate-500 font-semibold">Tá»•ng bÃ i há»c</p>
+                <p className="text-slate-500 font-semibold">Tổng bài học</p>
                 <p className="font-bold">{totalLessons}</p>
               </div>
               <div>
-                <p className="text-slate-500 font-semibold">NgÃ y táº¡o</p>
+                <p className="text-slate-500 font-semibold">Ngày tạo</p>
                 <p className="font-bold">{new Date(course.createdAt).toLocaleString('vi-VN')}</p>
               </div>
               <div>
-                <p className="text-slate-500 font-semibold">Cáº­p nháº­t gáº§n nháº¥t</p>
+                <p className="text-slate-500 font-semibold">Cập nhật gần nhất</p>
                 <p className="font-bold">{course.updatedAt ? new Date(course.updatedAt).toLocaleString('vi-VN') : '-'}</p>
               </div>
             </div>
 
             <div>
-              <p className="text-slate-500 font-semibold">MÃ´ táº£</p>
-              <p className="font-medium text-slate-700 whitespace-pre-line">{course.description || 'ChÆ°a cÃ³ mÃ´ táº£.'}</p>
+              <p className="text-slate-500 font-semibold">Mô tả</p>
+              <p className="font-medium text-slate-700 whitespace-pre-line">{course.description || 'Chưa có mô tả.'}</p>
             </div>
 
             {course.thumbnail ? (
@@ -301,11 +301,11 @@ export default function InstructorCourseDetailPage() {
 
         <Card className="rounded-2xl border-white/60 bg-white/70 backdrop-blur-xl shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Eye className="w-4 h-4" /> Danh sÃ¡ch bÃ i há»c</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Eye className="w-4 h-4" /> Danh sách bài học</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 max-h-155 overflow-auto">
             {lessons.length === 0 ? (
-              <p className="text-sm text-muted-foreground">ChÆ°a cÃ³ bÃ i há»c nÃ o.</p>
+              <p className="text-sm text-muted-foreground">Chưa có bài học nào.</p>
             ) : (
               lessons.map((item) => (
                 <button
@@ -315,7 +315,7 @@ export default function InstructorCourseDetailPage() {
                 >
                   <p className="text-xs text-slate-500 font-semibold">{item.chapterTitle}</p>
                   <p className="font-bold text-sm text-slate-800">{item.lesson.title}</p>
-                  <p className="text-[11px] text-slate-500 mt-1">{item.lesson.sourceType} â€¢ {item.lesson.isPublished ? 'PUBLISHED' : 'DRAFT'} â€¢ {item.lesson.isFree ? 'FREE' : 'PAID'}</p>
+                  <p className="text-[11px] text-slate-500 mt-1">{item.lesson.sourceType} • {item.lesson.isPublished ? 'PUBLISHED' : 'DRAFT'} • {item.lesson.isFree ? 'FREE' : 'PAID'}</p>
                 </button>
               ))
             )}
@@ -325,13 +325,13 @@ export default function InstructorCourseDetailPage() {
 
       <Card className="rounded-2xl border-white/60 bg-white/70 backdrop-blur-xl shadow-sm">
         <CardHeader>
-          <CardTitle>Video bÃ i há»c</CardTitle>
+          <CardTitle>Video bài học</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {!selected ? (
-            <p className="text-muted-foreground">ChÆ°a chá»n bÃ i há»c.</p>
+            <p className="text-muted-foreground">Chưa chọn bài học.</p>
           ) : !selected.lesson.videoUrl ? (
-            <p className="text-muted-foreground">BÃ i há»c chÆ°a cÃ³ video URL.</p>
+            <p className="text-muted-foreground">Bài học chưa có video URL.</p>
           ) : selected.lesson.sourceType === 'YOUTUBE' ? (
             getYoutubeEmbedUrl(selected.lesson.videoUrl) ? (
               <iframe
@@ -342,7 +342,7 @@ export default function InstructorCourseDetailPage() {
                 allowFullScreen
               />
             ) : (
-              <p className="text-muted-foreground">URL YouTube chÆ°a Ä‘Ãºng Ä‘á»‹nh dáº¡ng Ä‘á»ƒ nhÃºng.</p>
+              <p className="text-muted-foreground">URL YouTube chưa đúng định dạng để nhúng.</p>
             )
           ) : (
             <video
@@ -351,13 +351,13 @@ export default function InstructorCourseDetailPage() {
               className={`w-full rounded-xl border border-slate-200 bg-black ${isPreviewExpanded ? 'h-130' : 'h-75'}`}
               src={selected.lesson.videoUrl}
             >
-              TrÃ¬nh duyá»‡t khÃ´ng há»— trá»£ phÃ¡t video.
+              Trình duyệt không hỗ trợ phát video.
             </video>
           )}
 
           {selected?.lesson.videoUrl ? (
             <Button variant="outline" size="sm" onClick={() => setIsPreviewExpanded((prev) => !prev)}>
-              {isPreviewExpanded ? 'Thu nhá»' : 'PhÃ³ng to'}
+              {isPreviewExpanded ? 'Thu nhỏ' : 'Phóng to'}
             </Button>
           ) : null}
         </CardContent>

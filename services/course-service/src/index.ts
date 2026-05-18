@@ -46,7 +46,7 @@ import {
   getLessonPlayback,
 } from './controllers/lesson.controller';
 import { listCategories, createCategory } from './controllers/category.controller';
-import { getCourseByIdInternal, getLessonByIdInternal, getCourseCurriculumInternal, getInstructorCourseIdsInternal } from './controllers/internal.controller';
+import { getCourseByIdInternal, getLessonByIdInternal, getCourseCurriculumInternal, getInstructorCourseIdsInternal, getLessonAiContextStatus, getLessonTranscript, createManualTranscript, retryTranscript } from './controllers/internal.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import adminRouter from './routes/admin.routes';
 import prisma from './lib/prisma';
@@ -94,6 +94,11 @@ app.get('/internal/courses/:id', requireInternal, getCourseByIdInternal);
 app.get('/internal/courses/:id/curriculum', requireInternal, getCourseCurriculumInternal);
 app.get('/internal/lessons/:id', requireInternal, getLessonByIdInternal);
 app.get('/internal/instructors/:instructorId/courses', requireInternal, getInstructorCourseIdsInternal);
+// AI service endpoints
+app.get('/internal/lessons/:id/ai-context-status', requireInternal, getLessonAiContextStatus);
+app.get('/internal/lessons/:id/transcript', requireInternal, getLessonTranscript);
+app.post('/internal/lessons/:id/transcript/manual', requireInternal, createManualTranscript);
+app.post('/internal/lessons/:id/transcript/retry', requireInternal, retryTranscript);
 
 // ─── Instructor Profile Routes ─────────────────────────────────────────────
 app.get('/api/instructors/profile', ...requireRole('instructor', 'admin'), getMyInstructorProfile);
@@ -143,6 +148,9 @@ app.put('/api/courses/:courseId/chapters/reorder', ...requireRole('instructor', 
 app.post('/api/courses/:courseId/chapters/:chapterId/lessons', ...requireRole('instructor', 'admin'), createLesson);
 app.put('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), updateLesson);
 app.delete('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), deleteLesson);
+app.get('/api/lessons/:id/transcript', requireAuth, getLessonTranscript as any);
+app.post('/api/lessons/:id/transcript/manual', requireAuth, createManualTranscript as any);
+app.post('/api/lessons/:id/transcript/retry', requireAuth, retryTranscript as any);
 app.get('/api/lessons/:lessonId/playback', getLessonPlayback);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────

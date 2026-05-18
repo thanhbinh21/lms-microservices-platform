@@ -124,9 +124,44 @@ model Lesson {
 
   // Relations
   chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  transcripts LessonTranscript[]
 
   @@index([chapterId])
   @@map("lessons")
+}
+
+// ─── AI Transcript ─────────────────────────────────────────────────────────────
+// Transcript tu video/upload hoac YouTube, phuc vu AI chatbot va quiz.
+// Model nam trong course_db vi transcript gan voi lesson.
+
+model LessonTranscript {
+  id           String    @id @default(uuid())
+  lessonId     String    @map("lesson_id")
+  sourceType   String    @map("source_type")
+  // MP4_AUTO | YOUTUBE_AUTO | MANUAL | SUBTITLE_UPLOAD
+
+  provider     String?   // whisper | youtube_api | manual
+  language     String    @default("vi")
+  status       String    @default("PENDING") @map("status")
+  // PENDING | PROCESSING | READY | FAILED | NEEDS_MANUAL_TRANSCRIPT | TOO_LARGE | UNSUPPORTED_SOURCE
+
+  fullText     String?   @db.Text @map("full_text")
+  segments     Json?     // [{ start: number, end: number, text: string }]
+  durationSec  Int?      @map("duration_sec")
+  fileSizeMb   Int?      @map("file_size_mb")
+  confidence   Float?
+  contentHash  String?   @map("content_hash")
+  errorCode    String?   @map("error_code")
+  errorMessage String?   @map("error_message")
+  generatedAt  DateTime? @map("generated_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+  @@index([status])
+  @@map("lesson_transcripts")
 }
 
 // Enrollment signals tu learning-service (idempotent theo orderId)

@@ -144,7 +144,10 @@ export async function getCourseCurriculum(
       return null;
     }
     const json = (await res.json()) as any;
-    return json?.data ?? null;
+    const data = json?.data;
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.curriculum)) return data.curriculum;
+    return null;
   } catch (err) {
     logger.warn({ err, courseId }, '[learning-service] getCourseCurriculum failed');
     return null;

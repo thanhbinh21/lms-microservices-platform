@@ -5,6 +5,9 @@ import { logger } from '@lms/logger';
 import prisma from '../lib/prisma.js';
 import { getCourseById, getLessonById, getCourseCurriculum, type ChapterWithLessons } from '../lib/course-client.js';
 
+const AI_SERVICE_URL = (process.env.AI_SERVICE_URL || 'http://localhost:3008').replace(/\/$/, '');
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function createCertificateNumber(): string {
@@ -14,6 +17,45 @@ function createCertificateNumber(): string {
   const d = String(today.getDate()).padStart(2, '0');
   const suffix = randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
   return `LMS-${y}${m}${d}-${suffix}`;
+}
+
+// Kiem tra final course quiz da passed chua (goi ai-service).
+// KHONG co graceful fallback — certificate chi duoc cap khi quiz passed va ai-service available.
+async function checkFinalQuizPassed(userId: string, courseId: string): Promise<{
+  passed: boolean;
+  bestScore: number;
+  attemptCount: number;
+  serviceAvailable: boolean;
+}> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+
+    const res = await fetch(
+      `${AI_SERVICE_URL}/internal/quiz/check?userId=${userId}&courseId=${courseId}`,
+      {
+        headers: {
+          'x-internal-call': 'learning-service',
+          'x-internal-secret': INTERNAL_SERVICE_SECRET,
+        },
+        signal: controller.signal,
+      },
+    );
+
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      logger.warn({ userId, courseId, status: res.status }, 'checkFinalQuizPassed: ai-service returned error');
+      return { passed: false, bestScore: 0, attemptCount: 0, serviceAvailable: false };
+    }
+
+    const json = (await res.json()) as { data?: { passed: boolean; bestScore: number; attemptCount: number } };
+    const data = json.data ?? { passed: false, bestScore: 0, attemptCount: 0 };
+    return { ...data, serviceAvailable: true };
+  } catch (err) {
+    logger.warn({ err, userId, courseId }, 'checkFinalQuizPassed: ai-service unavailable');
+    return { passed: false, bestScore: 0, attemptCount: 0, serviceAvailable: false };
+  }
 }
 
 // Tinh progress dua tren lessonProgress cua user cho 1 course
@@ -28,7 +70,7 @@ async function computeCourseCompletion(userId: string, courseId: string, totalLe
   return { totalLessons, completedLessons, progressPercent, isCompleted };
 }
 
-// Phat chung chi neu du dieu kien
+// Phat chung chi neu du dieu kien: 100% lessons + final quiz passed (khong fallback).
 async function issueCertificateIfEligible(params: {
   userId: string;
   courseId: string;
@@ -39,7 +81,40 @@ async function issueCertificateIfEligible(params: {
   const completion = await computeCourseCompletion(userId, courseId, totalLessons);
 
   if (!completion.isCompleted) {
-    return { issued: false, certificates: [], completion };
+    return {
+      issued: false,
+      certificates: [],
+      completion,
+      reason: 'NOT_COMPLETED',
+      quizResult: null,
+    };
+  }
+
+  // Kiem tra final quiz — STRICT, khong fallback
+  const quizResult = await checkFinalQuizPassed(userId, courseId);
+
+  if (!quizResult.serviceAvailable) {
+    return {
+      issued: false,
+      certificates: [],
+      completion,
+      reason: 'AI_SERVICE_UNAVAILABLE',
+      message: 'Hệ thống kiểm tra tạm thời không khả dụng. Vui lòng thử lại sau.',
+      quizResult,
+    };
+  }
+
+  if (!quizResult.passed) {
+    return {
+      issued: false,
+      certificates: [],
+      completion,
+      reason: 'QUIZ_NOT_PASSED',
+      quizRequired: true,
+      quizBestScore: quizResult.bestScore,
+      quizAttemptCount: quizResult.attemptCount,
+      quizResult,
+    };
   }
 
   // Kiem tra da co chung chi chua (idempotent)
@@ -48,7 +123,7 @@ async function issueCertificateIfEligible(params: {
   });
 
   if (existed) {
-    return { issued: false, certificates: [existed], completion };
+    return { issued: false, certificates: [existed], completion, reason: 'ALREADY_ISSUED', quizResult };
   }
 
   const cert = await prisma.certificate.create({
@@ -61,7 +136,8 @@ async function issueCertificateIfEligible(params: {
     },
   });
 
-  return { issued: true, certificates: [cert], completion };
+  logger.info({ userId, courseId, certificateId: cert.id }, 'Certificate issued after final quiz passed');
+  return { issued: true, certificates: [cert], completion, reason: 'ISSUED', quizResult };
 }
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
@@ -294,6 +370,9 @@ export const completeLesson = async (req: Request, res: Response): Promise<Respo
       courseCompleted: boolean;
       progressPercent: number;
       certificate: (typeof certResult.certificates)[0] | null;
+      certificateBlockedReason?: string;
+      quizBestScore?: number;
+      quizAttemptCount?: number;
     }> = {
       success: true,
       code: 200,
@@ -303,6 +382,14 @@ export const completeLesson = async (req: Request, res: Response): Promise<Respo
         courseCompleted: certResult.completion.isCompleted,
         progressPercent: certResult.completion.progressPercent,
         certificate: certResult.certificates[0] ?? null,
+        ...(certResult.reason === 'AI_SERVICE_UNAVAILABLE' && {
+          certificateBlockedReason: certResult.message,
+        }),
+        ...(certResult.reason === 'QUIZ_NOT_PASSED' && {
+          certificateBlockedReason: 'Bạn cần đạt điểm ≥70% trong bài kiểm tra cuối khóa để nhận chứng chỉ.',
+          quizBestScore: certResult.quizBestScore ?? 0,
+          quizAttemptCount: certResult.quizAttemptCount ?? 0,
+        }),
       },
       trace_id: traceId,
     };

@@ -22,8 +22,9 @@ pnpm seed
 ```
 
 Ghi chu:
-- `pnpm setup:db` se chay `prisma migrate deploy` + `prisma generate` cho tat ca services.
+- `pnpm setup:db` se chay `prisma migrate deploy` + `prisma generate` cho tat ca services (bao gom `ai-service`).
 - Neu da co data test quan trong, can xac nhan truoc khi chay `pnpm seed`.
+- `ai-service` can cac bien moi truong: `GEMINI_API_KEY`, `DATABASE_URL` (ai_db tren Neon), `REDIS_URL`. Copy `services/ai-service/.env.example` sang `.env` va dien day du.
 
 ## 3) Chay he thong de dev
 

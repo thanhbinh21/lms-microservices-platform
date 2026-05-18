@@ -26,7 +26,7 @@ export default function InstructorCoursesPage() {
     const fetchCourses = async () => {
       const result = await getInstructorCoursesAction();
       if (!result.success || !result.data) {
-        setErrorMessage(result.message || 'KhÃ´ng thá»ƒ táº£i danh sÃ¡ch khÃ³a há»c.');
+        setErrorMessage(result.message || 'Không thể tải danh sách khóa học.');
         setCourses([]);
         setLoading(false);
         return;
@@ -58,14 +58,14 @@ export default function InstructorCoursesPage() {
             <Sparkles className="size-3.5" />
             NexEdu Studio
           </div>
-          <h1 className="workspace-page-title">KhÃ³a há»c</h1>
+          <h1 className="workspace-page-title">Khóa học</h1>
           <p className="workspace-page-description">
-            Táº¡o, chá»‰nh sá»­a vÃ  xuáº¥t báº£n khÃ³a há»c cá»§a báº¡n.
+            Tạo, chỉnh sửa và xuất bản khóa học của bạn.
           </p>
         </div>
         <Button onClick={() => router.push('/instructor/courses/create')} className="rounded-xl font-bold shadow-md md:w-auto w-full">
           <PlusCircle className="mr-2 size-4" />
-          Táº¡o khÃ³a há»c má»›i
+          Tạo khóa học mới
         </Button>
       </div>
 
@@ -78,20 +78,20 @@ export default function InstructorCoursesPage() {
         )}
         {loading && (
           <div className="rounded-2xl border border-dashed border-border bg-white/30 py-16 text-center">
-            <p className="text-sm text-muted-foreground">Äang táº£i danh sÃ¡ch khÃ³a há»c...</p>
+            <p className="text-sm text-muted-foreground">Đang tải danh sách khóa học...</p>
           </div>
         )}
 
         {!loading && courses.length === 0 && (
           <div className="rounded-3xl border border-dashed border-border bg-white/30 py-16 text-center">
             <BookOpen className="mx-auto mb-4 size-10 text-muted-foreground/40" />
-            <h3 className="text-lg font-bold">ChÆ°a cÃ³ khÃ³a há»c nÃ o</h3>
+            <h3 className="text-lg font-bold">Chưa có khóa học nào</h3>
             <p className="text-muted-foreground mt-1 mb-6 text-sm font-medium">
-              Báº¯t Ä‘áº§u hÃ nh trÃ¬nh giáº£ng dáº¡y báº±ng cÃ¡ch táº¡o khÃ³a há»c Ä‘áº§u tiÃªn.
+              Bắt đầu hành trình giảng dạy bằng cách tạo khóa học đầu tiên.
             </p>
             <Button onClick={() => router.push('/instructor/courses/create')} className="rounded-xl font-bold shadow-md">
               <PlusCircle className="mr-2 size-4" />
-              Táº¡o khÃ³a há»c má»›i
+              Tạo khóa học mới
             </Button>
           </div>
         )}
@@ -112,9 +112,9 @@ export default function InstructorCoursesPage() {
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-4 text-xs text-muted-foreground font-medium">
-                  <span>GiÃ¡: {course.price.toLocaleString('vi-VN')} Ä‘</span>
-                  <span>Há»c viÃªn: {course.enrollments}</span>
-                  <span>Cáº­p nháº­t: {course.updatedAt}</span>
+                  <span>Giá: {course.price.toLocaleString('vi-VN')} đ</span>
+                  <span>Học viên: {course.enrollments}</span>
+                  <span>Cập nhật: {course.updatedAt}</span>
                 </div>
               </div>
 
@@ -123,19 +123,19 @@ export default function InstructorCoursesPage() {
                   event.stopPropagation();
                   router.push(`/instructor/courses/${course.id}/detail`);
                 }}>
-                  <Eye className="mr-1.5 size-3.5" /> Chi tiáº¿t
+                  <Eye className="mr-1.5 size-3.5" /> Chi tiết
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-xl font-semibold text-xs h-8" onClick={(event) => {
                   event.stopPropagation();
                   router.push(`/instructor/courses/${course.id}?step=1`);
                 }}>
-                  <FileEdit className="mr-1.5 size-3.5" /> Cáº¥u hÃ¬nh
+                  <FileEdit className="mr-1.5 size-3.5" /> Cấu hình
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-xl font-semibold text-xs h-8" onClick={(event) => {
                   event.stopPropagation();
                   router.push(`/instructor/courses/${course.id}?step=3`);
                 }}>
-                  ChÆ°Æ¡ng trÃ¬nh
+                  Chương trình
                 </Button>
                 <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground" onClick={(event) => event.stopPropagation()}>
                   <MoreHorizontal className="size-4" />

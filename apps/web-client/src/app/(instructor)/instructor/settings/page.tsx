@@ -20,10 +20,10 @@ import {
 } from '@/app/actions/instructor';
 
 const PAYOUT_STATUS_LABEL: Record<InstructorPayoutDto['status'], string> = {
-  PENDING: 'Chá» xá»­ lÃ½',
-  APPROVED: 'ÄÃ£ duyá»‡t',
-  REJECTED: 'Tá»« chá»‘i',
-  PAID: 'ÄÃ£ chi tráº£',
+  PENDING: 'Chờ xử lý',
+  APPROVED: 'Đã duyệt',
+  REJECTED: 'Từ chối',
+  PAID: 'Đã chi trả',
 };
 
 const PAYOUT_STATUS_CLASS: Record<InstructorPayoutDto['status'], string> = {
@@ -75,7 +75,7 @@ export default function InstructorChannelSettingsPage() {
     void loadData();
   }, []);
 
-  const formatVND = (value: number) => `${value.toLocaleString('vi-VN')} Ä‘`;
+  const formatVND = (value: number) => `${value.toLocaleString('vi-VN')} đ`;
   const payoutSharePct = earnings[0]?.revenueSharePct ? Math.round(earnings[0].revenueSharePct * 100) : 70;
   const platformSharePct = earnings[0]?.platformFeePct ? Math.round(earnings[0].platformFeePct * 100) : 30;
   const hasPendingPayout = useMemo(() => payouts.some((item) => item.status === 'PENDING'), [payouts]);
@@ -95,12 +95,12 @@ export default function InstructorChannelSettingsPage() {
     setSaving(true);
     const result = await saveInstructorPayoutProfileAction({ bankAccount, bankName, accountHolder });
     if (result.success && result.data) {
-      setStatusMessage({ type: 'success', message: 'ÄÃ£ lÆ°u thÃ´ng tin nháº­n thanh toÃ¡n.' });
+      setStatusMessage({ type: 'success', message: 'Đã lưu thông tin nhận thanh toán.' });
       toast('success', 'Đã lưu thông tin nhận thanh toán');
       setBankAccount('');
       setBankAccountMasked(result.data.bankAccountMasked);
     } else {
-      setStatusMessage({ type: 'error', message: result.message || 'KhÃ´ng thá»ƒ lÆ°u thÃ´ng tin nháº­n thanh toÃ¡n.' });
+      setStatusMessage({ type: 'error', message: result.message || 'Không thể lưu thông tin nhận thanh toán.' });
       toast('error', 'Lưu thông tin thất bại', result.message || 'Vui lòng thử lại.');
     }
     setSaving(false);
@@ -112,11 +112,11 @@ export default function InstructorChannelSettingsPage() {
     setRequestingPayout(true);
     const result = await createInstructorPayoutAction(parsedPayoutAmount);
     if (result.success) {
-      setStatusMessage({ type: 'success', message: 'ÄÃ£ táº¡o yÃªu cáº§u rÃºt tiá»n. Admin sáº½ xá»­ lÃ½ trong thá»i gian sá»›m nháº¥t.' });
+      setStatusMessage({ type: 'success', message: 'Đã tạo yêu cầu rút tiền. Admin sẽ xử lý trong thời gian sớm nhất.' });
       toast('success', 'Đã tạo yêu cầu rút tiền');
       await loadData();
     } else {
-      setStatusMessage({ type: 'error', message: result.message || 'KhÃ´ng thá»ƒ táº¡o yÃªu cáº§u rÃºt tiá»n.' });
+      setStatusMessage({ type: 'error', message: result.message || 'Không thể tạo yêu cầu rút tiền.' });
       toast('error', 'Tạo yêu cầu rút tiền thất bại', result.message || 'Vui lòng thử lại.');
     }
     setRequestingPayout(false);
@@ -129,9 +129,9 @@ export default function InstructorChannelSettingsPage() {
           <Sparkles className="size-3.5" />
           NexEdu Studio
         </div>
-        <h1 className="workspace-page-title">KÃªnh vÃ  thu nháº­p</h1>
+        <h1 className="workspace-page-title">Kênh và thu nhập</h1>
         <p className="workspace-page-description">
-          Quáº£n lÃ½ thÃ´ng tin nháº­n thanh toÃ¡n, theo dÃµi doanh thu vÃ  gá»­i yÃªu cáº§u rÃºt tiá»n.
+          Quản lý thông tin nhận thanh toán, theo dõi doanh thu và gửi yêu cầu rút tiền.
         </p>
       </div>
 
@@ -142,50 +142,50 @@ export default function InstructorChannelSettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Wallet className="size-4 text-primary" />
-              <CardTitle className="text-sm font-bold">Thu nháº­p cá»§a báº¡n</CardTitle>
+              <CardTitle className="text-sm font-bold">Thu nhập của bạn</CardTitle>
             </div>
-            <CardDescription className="text-xs">Tá»•ng quan thu nháº­p tá»« cÃ¡c khÃ³a há»c Ä‘Ã£ bÃ¡n.</CardDescription>
+            <CardDescription className="text-xs">Tổng quan thu nhập từ các khóa học đã bán.</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-sm text-muted-foreground">Äang táº£i dá»¯ liá»‡u...</p>
+              <p className="text-sm text-muted-foreground">Đang tải dữ liệu...</p>
             ) : summary ? (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Kháº£ dá»¥ng</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Khả dụng</p>
                   <p className="text-xl font-bold text-emerald-600">{formatVND(summary.availableBalance)}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">ÄÃ£ rÃºt</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Đã rút</p>
                   <p className="text-xl font-bold">{formatVND(summary.withdrawnBalance)}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Tá»•ng thu nháº­p</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Tổng thu nhập</p>
                   <p className="text-xl font-bold">{formatVND(summary.totalEarned)}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">ÄÆ¡n hÃ ng</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Đơn hàng</p>
                   <p className="text-xl font-bold">{summary.totalOrders}</p>
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">ChÆ°a cÃ³ dá»¯ liá»‡u thu nháº­p.</p>
+              <p className="text-sm text-muted-foreground">Chưa có dữ liệu thu nhập.</p>
             )}
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
           <CardHeader>
-            <CardTitle className="text-sm font-bold">ChÃ­nh sÃ¡ch chia doanh thu</CardTitle>
-            <CardDescription className="text-xs">Má»—i Ä‘Æ¡n hÃ ng thÃ nh cÃ´ng Ä‘Æ°á»£c tá»± Ä‘á»™ng chia theo tá»· lá»‡ hiá»‡n táº¡i.</CardDescription>
+            <CardTitle className="text-sm font-bold">Chính sách chia doanh thu</CardTitle>
+            <CardDescription className="text-xs">Mỗi đơn hàng thành công được tự đ�™ng chia theo tỷ lệ hiện tại.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-              <p className="text-xs text-emerald-700">Giáº£ng viÃªn nháº­n</p>
+              <p className="text-xs text-emerald-700">Giảng viên nhận</p>
               <p className="text-lg font-bold text-emerald-700">{payoutSharePct}%</p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs text-slate-600">Ná»n táº£ng giá»¯ phÃ­</p>
+              <p className="text-xs text-slate-600">Nền tảng giữ phí</p>
               <p className="text-lg font-bold">{platformSharePct}%</p>
             </div>
           </CardContent>
@@ -195,27 +195,27 @@ export default function InstructorChannelSettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <CreditCard className="size-4 text-primary" />
-              <CardTitle className="text-sm font-bold">Nháº­n thanh toÃ¡n</CardTitle>
+              <CardTitle className="text-sm font-bold">Nhận thanh toán</CardTitle>
             </div>
-            <CardDescription className="text-xs">LÆ°u tÃ i khoáº£n ngÃ¢n hÃ ng Ä‘á»ƒ admin xá»­ lÃ½ yÃªu cáº§u rÃºt tiá»n.</CardDescription>
+            <CardDescription className="text-xs">Lưu tài khoản ngân hàng để admin xử lý yêu cầu rút tiền.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {bankAccountMasked && (
               <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
-                TÃ i khoáº£n Ä‘ang lÆ°u: {bankName} - {bankAccountMasked} - {accountHolder}
+                Tài khoản đang lưu: {bankName} - {bankAccountMasked} - {accountHolder}
               </p>
             )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label htmlFor="bank-account" className="text-xs font-bold text-muted-foreground">Sá»‘ tÃ i khoáº£n</label>
+                <label htmlFor="bank-account" className="text-xs font-bold text-muted-foreground">Số tài khoản</label>
                 <Input id="bank-account" placeholder="VD: 1234567890" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} className="rounded-xl" />
               </div>
               <div className="space-y-2">
-                <label htmlFor="bank-name" className="text-xs font-bold text-muted-foreground">TÃªn ngÃ¢n hÃ ng</label>
+                <label htmlFor="bank-name" className="text-xs font-bold text-muted-foreground">Tên ngân hàng</label>
                 <Input id="bank-name" placeholder="VD: Vietcombank" value={bankName} onChange={(e) => setBankName(e.target.value)} className="rounded-xl" />
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <label htmlFor="account-holder" className="text-xs font-bold text-muted-foreground">TÃªn chá»§ tÃ i khoáº£n</label>
+                <label htmlFor="account-holder" className="text-xs font-bold text-muted-foreground">Tên chủ tài khoản</label>
                 <Input id="account-holder" placeholder="VD: NGUYEN VAN A" value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} className="rounded-xl" />
               </div>
             </div>
@@ -225,7 +225,7 @@ export default function InstructorChannelSettingsPage() {
               onClick={savePayoutProfile}
               disabled={!bankAccount || !bankName || !accountHolder || saving}
             >
-              {saving ? 'Äang lÆ°u...' : 'LÆ°u thÃ´ng tin'}
+              {saving ? 'Đang lưu...' : 'Lưu thông tin'}
             </Button>
           </CardContent>
         </Card>
@@ -234,10 +234,10 @@ export default function InstructorChannelSettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <ArrowDownToLine className="size-4 text-primary" />
-              <CardTitle className="text-sm font-bold">RÃºt tiá»n</CardTitle>
+              <CardTitle className="text-sm font-bold">Rút tiền</CardTitle>
             </div>
             <CardDescription className="text-xs">
-              Má»—i giáº£ng viÃªn chá»‰ cÃ³ má»™t yÃªu cáº§u rÃºt tiá»n Ä‘ang chá» xá»­ lÃ½ táº¡i má»™t thá»i Ä‘iá»ƒm.
+              Mỗi giảng viên chỉ có m�™t yêu cầu rút tiền đang chờ xử lý tại m�™t thời điểm.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -248,21 +248,21 @@ export default function InstructorChannelSettingsPage() {
                 max={summary?.availableBalance ?? 0}
                 value={payoutAmount}
                 onChange={(e) => setPayoutAmount(e.target.value)}
-                placeholder="Nháº­p sá»‘ tiá»n muá»‘n rÃºt"
+                placeholder="Nhập số tiền muốn rút"
                 className="rounded-xl"
               />
               <Button type="button" className="rounded-xl font-bold" disabled={!canRequestPayout} onClick={requestPayout}>
-                {requestingPayout ? 'Äang gá»­i...' : 'Gá»­i yÃªu cáº§u rÃºt'}
+                {requestingPayout ? 'Đang gửi...' : 'Gửi yêu cầu rút'}
               </Button>
             </div>
             {hasPendingPayout && (
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Báº¡n Ä‘ang cÃ³ má»™t yÃªu cáº§u rÃºt tiá»n chá» xá»­ lÃ½. HÃ£y Ä‘á»£i admin duyá»‡t trÆ°á»›c khi táº¡o yÃªu cáº§u má»›i.
+                Bạn đang có m�™t yêu cầu rút tiền chờ xử lý. Hãy đợi admin duyệt trước khi tạo yêu cầu mới.
               </p>
             )}
             {!bankAccountMasked && (
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Vui lÃ²ng lÆ°u thÃ´ng tin nháº­n thanh toÃ¡n trÆ°á»›c khi gá»­i yÃªu cáº§u rÃºt tiá»n.
+                Vui lòng lưu thông tin nhận thanh toán trước khi gửi yêu cầu rút tiền.
               </p>
             )}
           </CardContent>
@@ -272,15 +272,15 @@ export default function InstructorChannelSettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Wallet className="size-4 text-primary" />
-              <CardTitle className="text-sm font-bold">Lá»‹ch sá»­ rÃºt tiá»n</CardTitle>
+              <CardTitle className="text-sm font-bold">Lịch sử rút tiền</CardTitle>
             </div>
-            <CardDescription className="text-xs">Theo dÃµi tráº¡ng thÃ¡i cÃ¡c yÃªu cáº§u rÃºt tiá»n Ä‘Ã£ gá»­i.</CardDescription>
+            <CardDescription className="text-xs">Theo dõi trạng thái các yêu cầu rút tiền đã gửi.</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-sm text-muted-foreground">Äang táº£i...</p>
+              <p className="text-sm text-muted-foreground">Đang tải...</p>
             ) : payouts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">ChÆ°a cÃ³ yÃªu cáº§u rÃºt tiá»n nÃ o.</p>
+              <p className="text-sm text-muted-foreground">Chưa có yêu cầu rút tiền nào.</p>
             ) : (
               <div className="space-y-3">
                 {payouts.map((item) => (
@@ -290,7 +290,7 @@ export default function InstructorChannelSettingsPage() {
                       <p className="text-[11px] text-muted-foreground">
                         {item.bankAccountMasked} - {new Date(item.createdAt).toLocaleDateString('vi-VN')}
                       </p>
-                      {item.adminNote && <p className="mt-1 text-[11px] text-rose-600">Ghi chÃº admin: {item.adminNote}</p>}
+                      {item.adminNote && <p className="mt-1 text-[11px] text-rose-600">Ghi chú admin: {item.adminNote}</p>}
                     </div>
                     <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${PAYOUT_STATUS_CLASS[item.status]}`}>
                       {PAYOUT_STATUS_LABEL[item.status]}
@@ -306,9 +306,9 @@ export default function InstructorChannelSettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Bell className="size-4 text-primary" />
-              <CardTitle className="text-sm font-bold">ThÃ´ng bÃ¡o</CardTitle>
+              <CardTitle className="text-sm font-bold">Thông báo</CardTitle>
             </div>
-            <CardDescription className="text-xs">ThÃ´ng bÃ¡o vá» Ä‘Äƒng kÃ½ má»›i, há»i Ä‘Ã¡p vÃ  thanh toÃ¡n sáº½ hiá»ƒn thá»‹ qua chuÃ´ng thÃ´ng bÃ¡o.</CardDescription>
+            <CardDescription className="text-xs">Thông báo về đăng ký mới, hỏi đáp và thanh toán sẽ hiển thị qua chuông thông báo.</CardDescription>
           </CardHeader>
         </Card>
       </div>

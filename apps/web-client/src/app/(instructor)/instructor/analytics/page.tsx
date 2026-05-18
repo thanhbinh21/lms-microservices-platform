@@ -14,7 +14,7 @@ function SimpleBarChart({ data, maxValue }: { data: ChartBar[]; maxValue: number
   if (data.length === 0 || maxValue === 0) {
     return (
       <div className="flex h-44 items-center justify-center rounded-xl bg-gradient-to-br from-primary/5 to-transparent text-sm font-medium text-muted-foreground">
-        ChÆ°a cÃ³ dá»¯ liá»‡u doanh thu
+        Chưa có dữ liệu doanh thu
       </div>
     );
   }
@@ -32,7 +32,7 @@ function SimpleBarChart({ data, maxValue }: { data: ChartBar[]; maxValue: number
                 style={{ height: `${heightPct}%`, minHeight: bar.value > 0 ? '4px' : '0' }}
               />
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                {bar.value.toLocaleString('vi-VN')}Ä‘
+                {bar.value.toLocaleString('vi-VN')}đ
               </div>
             </div>
             <span className="text-[10px] font-semibold text-muted-foreground">{bar.label}</span>
@@ -100,9 +100,9 @@ export default function InstructorAnalyticsPage() {
           <Sparkles className="size-3.5" />
           NexEdu Studio
         </div>
-        <h1 className="workspace-page-title">PhÃ¢n tÃ­ch</h1>
+        <h1 className="workspace-page-title">Phân tích</h1>
         <p className="workspace-page-description">
-          Theo dÃµi doanh thu, lÆ°á»£t xem vÃ  tÄƒng trÆ°á»Ÿng há»c viÃªn.
+          Theo dõi doanh thu, lượt xem và tăng trưởng học viên.
         </p>
       </div>
 
@@ -110,22 +110,22 @@ export default function InstructorAnalyticsPage() {
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         {[
           {
-            label: 'Thu nháº­p kháº£ dá»¥ng',
-            value: isLoading ? '...' : (availableBalance > 0 ? availableBalance.toLocaleString('vi-VN') + ' Ä‘' : '0 Ä‘'),
-            note: 'CÃ³ thá»ƒ rÃºt ngay',
+            label: 'Thu nhập khả dụng',
+            value: isLoading ? '...' : (availableBalance > 0 ? availableBalance.toLocaleString('vi-VN') + ' đ' : '0 đ'),
+            note: 'Có thể rút ngay',
             icon: Wallet,
             highlight: availableBalance > 0,
           },
           {
-            label: 'Tá»•ng thu nháº­p',
-            value: isLoading ? '...' : (totalEarned > 0 ? totalEarned.toLocaleString('vi-VN') + ' Ä‘' : '0 Ä‘'),
-            note: 'Sau khi trá»« phÃ­ 30%',
+            label: 'Tổng thu nhập',
+            value: isLoading ? '...' : (totalEarned > 0 ? totalEarned.toLocaleString('vi-VN') + ' đ' : '0 đ'),
+            note: 'Sau khi trừ phí 30%',
             icon: TrendingUp,
           },
           {
-            label: 'ÄÆ¡n hÃ ng',
+            label: 'Đơn hàng',
             value: isLoading ? '...' : (summary?.totalOrders ?? 0).toLocaleString('vi-VN'),
-            note: 'ÄÆ¡n Ä‘Ã£ hoÃ n táº¥t',
+            note: 'Đơn đã hoàn tất',
             icon: BarChart3,
           },
         ].map((row) => (
@@ -150,17 +150,17 @@ export default function InstructorAnalyticsPage() {
       {/* Chart */}
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
-          <CardTitle className="text-base">Doanh thu 6 thÃ¡ng gáº§n nháº¥t</CardTitle>
+          <CardTitle className="text-base">Doanh thu 6 tháng gần nhất</CardTitle>
           <CardDescription className="text-xs">
             {earnings.length > 0
-              ? `Dá»±a trÃªn ${earnings.length} giao dá»‹ch Ä‘Ã£ hoÃ n táº¥t. ÄÃ£ trá»« phÃ­ platform 30%.`
-              : 'ChÆ°a cÃ³ giao dá»‹ch nÃ o Ä‘Æ°á»£c ghi nháº­n.'}
+              ? `Dựa trên ${earnings.length} giao dịch đã hoàn tất. Đã trừ phí platform 30%.`
+              : 'Chưa có giao dịch nào được ghi nhận.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex h-44 items-center justify-center">
-              <div className="text-sm text-muted-foreground animate-pulse">Äang táº£i biá»ƒu Ä‘á»“...</div>
+              <div className="text-sm text-muted-foreground animate-pulse">Đang tải biểu đồ...</div>
             </div>
           ) : (
             <SimpleBarChart data={chartData} maxValue={maxValue} />
