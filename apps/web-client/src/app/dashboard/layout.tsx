@@ -16,7 +16,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   const normalizedRole = (user?.role || '').toUpperCase();
-  const isBlockedRole = normalizedRole === 'INSTRUCTOR' || normalizedRole === 'ADMIN';
+  const isBlockedRole = normalizedRole === 'ADMIN';
 
   useEffect(() => {
     if (!isMounted || isLoading) return;

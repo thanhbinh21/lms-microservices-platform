@@ -6,6 +6,7 @@ import { logger } from '@lms/logger';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
 import { fetchWithTimeout } from '../lib/http';
+import { upsertAutoContextAndQueueStt } from '../lib/transcript-jobs';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -81,7 +82,10 @@ async function checkEnrollment(userId: string, courseId: string, traceId: string
 
 // Kiem tra quyen so huu chapter, admin co the bypass
 async function verifyChapterOwnership(courseId: string, chapterId: string, instructorId: string, userRole?: string) {
-  const course = await prisma.course.findUnique({ where: { id: courseId } });
+  const course = await prisma.course.findUnique({
+    where: { id: courseId },
+    include: { category: { select: { name: true } } },
+  });
   if (!course) return { error: 'Course not found', status: 404 };
   if (course.instructorId !== instructorId && userRole?.toLowerCase() !== 'admin') return { error: 'Forbidden — not your course', status: 403 };
 
@@ -100,10 +104,10 @@ export async function createLesson(req: Request, res: Response) {
   const userRole = res.locals.userRole as string;
 
   try {
-    const { error, status } = await verifyChapterOwnership(req.params.courseId, req.params.chapterId, instructorId, userRole);
-    if (error) {
-      const response: ApiResponse<null> = { success: false, code: status!, message: error, data: null, trace_id: traceId };
-      return res.status(status!).json(response);
+    const ownership = await verifyChapterOwnership(req.params.courseId, req.params.chapterId, instructorId, userRole);
+    if (ownership.error) {
+      const response: ApiResponse<null> = { success: false, code: ownership.status!, message: ownership.error, data: null, trace_id: traceId };
+      return res.status(ownership.status!).json(response);
     }
 
     const validated = createLessonSchema.parse(req.body);
@@ -131,6 +135,15 @@ export async function createLesson(req: Request, res: Response) {
         chapterId: req.params.chapterId,
       },
     });
+
+    await upsertAutoContextAndQueueStt({
+      ...lesson,
+      chapterTitle: ownership.chapter?.title ?? null,
+      courseTitle: ownership.course?.title ?? null,
+      courseDescription: ownership.course?.description ?? null,
+      courseLevel: ownership.course?.level ?? null,
+      courseCategory: ownership.course?.category?.name ?? null,
+    }, traceId);
 
     const lessonResponse = {
       ...lesson,
@@ -163,10 +176,10 @@ export async function updateLesson(req: Request, res: Response) {
   const userRole = res.locals.userRole as string;
 
   try {
-    const { error, status } = await verifyChapterOwnership(req.params.courseId, req.params.chapterId, instructorId, userRole);
-    if (error) {
-      const response: ApiResponse<null> = { success: false, code: status!, message: error, data: null, trace_id: traceId };
-      return res.status(status!).json(response);
+    const ownership = await verifyChapterOwnership(req.params.courseId, req.params.chapterId, instructorId, userRole);
+    if (ownership.error) {
+      const response: ApiResponse<null> = { success: false, code: ownership.status!, message: ownership.error, data: null, trace_id: traceId };
+      return res.status(ownership.status!).json(response);
     }
 
     const validated = updateLessonSchema.parse(req.body);
@@ -194,6 +207,15 @@ export async function updateLesson(req: Request, res: Response) {
       where: { id: req.params.lessonId, chapterId: req.params.chapterId },
       data: validated,
     });
+
+    await upsertAutoContextAndQueueStt({
+      ...lesson,
+      chapterTitle: ownership.chapter?.title ?? null,
+      courseTitle: ownership.course?.title ?? null,
+      courseDescription: ownership.course?.description ?? null,
+      courseLevel: ownership.course?.level ?? null,
+      courseCategory: ownership.course?.category?.name ?? null,
+    }, traceId);
 
     const lessonResponse = {
       ...lesson,

@@ -115,7 +115,7 @@ export async function refresh(req: Request, res: Response) {
       const response: ApiResponse<null> = {
         success: false,
         code: 409,
-        message: 'Refresh token already rotated',
+        message: 'Refresh token already rotated — concurrent refresh detected',
         data: null,
         trace_id: traceId,
       };

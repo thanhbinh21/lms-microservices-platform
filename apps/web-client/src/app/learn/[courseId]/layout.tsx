@@ -8,6 +8,8 @@ import { useAppSelector } from '@/lib/redux/hooks';
 import { Button } from '@/components/ui/button';
 import { CurriculumSidebar } from '@/components/learning/curriculum-sidebar';
 import { getLearnDataAction, enrollFreeAction, type LearnDataDto } from '@/app/actions/learning';
+import { getCourseQuizStatusAction } from '@/app/actions/ai';
+import { FinalQuizBanner } from '@/components/ai/quiz/final-quiz-banner';
 import { cn } from '@/lib/utils';
 
 export default function LearnLayout({ children }: { children: React.ReactNode }) {
@@ -21,17 +23,37 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
   const [enrolling, setEnrolling] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quizStatus, setQuizStatus] = useState<{
+    bestScore?: number;
+    attemptCount?: number;
+    serviceAvailable: boolean;
+  } | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    const learnDataResult = await getLearnDataAction(courseId);
+    const [learnDataResult, quizStatusResult] = await Promise.allSettled([
+      getLearnDataAction(courseId),
+      getCourseQuizStatusAction(courseId),
+    ]);
 
-    if (learnDataResult.success && learnDataResult.data) {
-      setData(learnDataResult.data);
+    const learnData = learnDataResult.status === 'fulfilled' ? learnDataResult.value : null;
+    if (learnData?.success && learnData.data) {
+      setData(learnData.data);
     } else {
-      setError(learnDataResult.message || 'Không thể tải dữ liệu khóa học');
+      setError(learnData?.message || 'Không thể tải dữ liệu khóa học');
+    }
+
+    const quiz = quizStatusResult.status === 'fulfilled' ? quizStatusResult.value : null;
+    if (quiz?.success && quiz.data) {
+      setQuizStatus({
+        bestScore: quiz.data.bestScore,
+        attemptCount: quiz.data.attemptCount,
+        serviceAvailable: true,
+      });
+    } else {
+      setQuizStatus({ serviceAvailable: false });
     }
 
     setLoading(false);
@@ -217,6 +239,22 @@ export default function LearnLayout({ children }: { children: React.ReactNode })
 
         {/* Content slot */}
         <div className="flex-1 px-4 py-6 md:px-8 lg:px-12">
+          {/* Final Quiz Banner — shown when 100% lessons completed */}
+          {data && (
+            <div className="mb-4">
+              <FinalQuizBanner
+                courseId={courseId}
+                progressPercent={data.progressPercent}
+                quizBestScore={quizStatus?.bestScore}
+                quizAttemptCount={quizStatus?.attemptCount}
+                serviceAvailable={quizStatus?.serviceAvailable ?? false}
+                onStartFinalQuiz={() => {
+                  // Navigate to final quiz modal
+                  router.push(`/learn/${courseId}/quiz`);
+                }}
+              />
+            </div>
+          )}
           {children}
         </div>
       </main>

@@ -55,8 +55,7 @@ export default function LoginForm() {
 
         const redirectPath =
           result.user.role === 'ADMIN' ? '/admin'
-            : result.user.role === 'INSTRUCTOR' ? '/instructor/courses'
-              : '/dashboard';
+            : '/dashboard';
 
         setTimeout(() => router.push(redirectPath), 800);
       } else {

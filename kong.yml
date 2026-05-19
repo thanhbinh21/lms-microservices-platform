@@ -1,4 +1,4 @@
-﻿_format_version: "3.0"
+_format_version: "3.0"
 _transform: true
 
 # JWT consumer for access token verification (HS256)
@@ -572,6 +572,112 @@ services:
                   end
                   return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
 
+  - name: ai-service
+    url: http://host.docker.internal:3008
+    routes:
+      - name: ai-protected-route
+        paths:
+          - /ai
+        strip_path: true
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        headers:
+          authorization:
+            - "~*.+"
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100
+              policy: local
+          - name: jwt
+            config:
+              key_claim_name: type
+              claims_to_verify: [exp, nbf]
+              run_on_preflight: false
+              header_names: [authorization]
+              uri_param_names: []
+              cookie_names: [accessToken]
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+          - name: post-function
+            config:
+              access:
+                - |
+                  local jwt = kong.ctx.shared.authenticated_jwt_token
+                  local payload = (jwt and jwt.payload) or (jwt and jwt.claims) or kong.ctx.shared.authenticated_jwt_claims or {}
+                  kong.service.request.set_header("x-user-id", payload.userId or payload.user_id or "")
+                  kong.service.request.set_header("x-user-role", payload.role or payload.user_role or "")
+                  kong.service.request.set_header("x-user-email", payload.email or payload.user_email or "")
+
+      - name: ai-cookie-protected-route
+        paths:
+          - /ai
+        strip_path: true
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        headers:
+          cookie:
+            - "~*accessToken="
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 100
+              policy: local
+          - name: jwt
+            config:
+              key_claim_name: type
+              claims_to_verify: [exp, nbf]
+              run_on_preflight: false
+              header_names: [authorization]
+              uri_param_names: []
+              cookie_names: [accessToken]
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+          - name: post-function
+            config:
+              access:
+                - |
+                  local jwt = kong.ctx.shared.authenticated_jwt_token
+                  local payload = (jwt and jwt.payload) or (jwt and jwt.claims) or kong.ctx.shared.authenticated_jwt_claims or {}
+                  kong.service.request.set_header("x-user-id", payload.userId or payload.user_id or "")
+                  kong.service.request.set_header("x-user-role", payload.role or payload.user_role or "")
+                  kong.service.request.set_header("x-user-email", payload.email or payload.user_email or "")
+
+      - name: ai-public-route
+        paths:
+          - /ai
+        strip_path: true
+        methods: [GET, OPTIONS]
+        plugins:
+          - name: request-transformer
+            config:
+              remove:
+                headers:
+                  - x-user-id
+                  - x-user-role
+                  - x-user-email
+          - name: pre-function
+            config:
+              access:
+                - |
+                  local method = kong.request.get_method()
+                  if method == "OPTIONS" then
+                    return
+                  end
+                  local path = kong.request.get_path()
+                  if path == "/ai/health" then
+                    return
+                  end
+                  return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
+
 plugins:
   - name: cors
     config:
@@ -579,7 +685,7 @@ plugins:
         - "http://localhost:3000"
       methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
       headers: [Accept, Authorization, Content-Type, x-trace-id]
-      exposed_headers: [x-trace-id]
+      exposed_headers: [x-trace-id, X-RateLimit-Remaining, X-RateLimit-Reset]
       credentials: true
       max_age: 3600
 
@@ -588,8 +694,3 @@ plugins:
       header_name: x-trace-id
       generator: uuid
       echo_downstream: true
-
-
-
-
-

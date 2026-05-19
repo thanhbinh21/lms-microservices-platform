@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Seed Script Tổng Hợp: Mô phỏng dữ liệu hệ thống hoạt động 1 tháng
  *
  * Chạy: pnpm seed
@@ -21,6 +21,12 @@ import { PrismaClient as PaymentPrisma } from '../services/payment-service/src/g
 import { PrismaClient as NotificationPrisma } from '../services/notification-service/src/generated/prisma/index.js';
 import { PrismaClient as LearningPrisma } from '../services/learning-service/src/generated/prisma/index.js';
 import { PrismaClient as CommunityPrisma } from '../services/community-service/src/generated/prisma/index.js';
+import {
+  buildAutoContextText,
+  buildAutoContextTranscriptId,
+  computeContentHash,
+  computeVideoHash,
+} from '../services/course-service/src/lib/transcript-context';
 import bcrypt from 'bcryptjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,6 +37,27 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const BCRYPT_SALT_ROUNDS = 10;
+
+const CATEGORY_SEEDS = [
+  { name: 'Web Frontend', slug: 'web-frontend', order: 1 },
+  { name: 'Web Backend', slug: 'web-backend', order: 2 },
+  { name: 'Mobile Development', slug: 'mobile', order: 3 },
+  { name: 'DevOps & Cloud', slug: 'devops', order: 4 },
+  { name: 'AI & Data Science', slug: 'ai-ml', order: 5 },
+  { name: 'Soft Skills', slug: 'soft-skills', order: 6 },
+] as const;
+
+type CourseSeed = {
+  title: string;
+  catIdx: number;
+  price: number;
+  level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  audience: string;
+  outcomes: string[];
+  keywords: string[];
+  project: string;
+  chapters: string[];
+};
 
 function readEnvVarFromFile(filePath: string, variableName: string): string | undefined {
   if (!fs.existsSync(filePath)) return undefined;
@@ -134,6 +161,8 @@ async function clearOldData() {
     // 5. Course (course-service)
     await coursePrisma.review.deleteMany();
     await coursePrisma.enrollmentSignal.deleteMany();
+    await coursePrisma.transcriptJob.deleteMany();
+    await coursePrisma.lessonTranscript.deleteMany();
     await coursePrisma.courseCertificateTemplate.deleteMany();
     await coursePrisma.certificateTemplate.deleteMany();
     await coursePrisma.lesson.deleteMany();
@@ -234,17 +263,8 @@ async function seedInstructorProfiles(instructors: any[]) {
 async function seedCategories() {
   console.log('\n🏷️  BƯỚC 4: TẠO DANH MỤC...');
 
-  const categories = [
-    { name: 'Web Frontend', slug: 'web-frontend', order: 1 },
-    { name: 'Web Backend', slug: 'web-backend', order: 2 },
-    { name: 'Mobile Development', slug: 'mobile', order: 3 },
-    { name: 'DevOps & Cloud', slug: 'devops', order: 4 },
-    { name: 'AI & Data Science', slug: 'ai-ml', order: 5 },
-    { name: 'Soft Skills', slug: 'soft-skills', order: 6 },
-  ];
-
   const categoryIds: string[] = [];
-  for (const cat of categories) {
+  for (const cat of CATEGORY_SEEDS) {
     const c = await coursePrisma.category.create({ data: cat });
     categoryIds.push(c.id);
   }
@@ -254,39 +274,290 @@ async function seedCategories() {
 
 // ─── Step 5: Courses & Curriculum ─────────────────────────────────────────────
 
+const COURSE_SEEDS: CourseSeed[] = [
+  {
+    title: 'ReactJS Pro Mastery',
+    catIdx: 0,
+    price: 599000,
+    level: 'ADVANCED',
+    audience: 'frontend developer da biet HTML, CSS, JavaScript va muon xay dung ung dung React lon, de bao tri.',
+    outcomes: ['thiet ke component tree ro rang', 'quan ly state voi hooks va context', 'toi uu render bang memoization', 'viet form, validation va data fetching an toan'],
+    keywords: ['react', 'jsx', 'component', 'hooks', 'state', 'props', 'context', 'performance', 'frontend architecture'],
+    project: 'xay dung dashboard quan ly khoa hoc co bang du lieu, filter, modal form va optimistic UI.',
+    chapters: ['Tu duy component va JSX', 'Hooks, state va data flow', 'Toi uu hieu nang va kien truc frontend'],
+  },
+  {
+    title: 'Next.js 15 Fullstack',
+    catIdx: 0,
+    price: 799000,
+    level: 'INTERMEDIATE',
+    audience: 'lap trinh vien muon lam san pham fullstack bang App Router, Server Actions va API routes.',
+    outcomes: ['phan biet server component va client component', 'xu ly form voi server action', 'cache va revalidate du lieu', 'bao ve route can dang nhap'],
+    keywords: ['next.js', 'app router', 'server actions', 'server component', 'client component', 'cache', 'revalidate', 'fullstack'],
+    project: 'xay dung trang hoc truc tuyen co danh sach khoa hoc, trang chi tiet, dang nhap va dashboard hoc vien.',
+    chapters: ['Nen tang App Router', 'Data fetching va Server Actions', 'Auth, cache va deploy'],
+  },
+  {
+    title: 'NodeJS Microservices',
+    catIdx: 1,
+    price: 1200000,
+    level: 'ADVANCED',
+    audience: 'backend developer muon tach he thong thanh service doc lap va giao tiep bang API/Kafka.',
+    outcomes: ['thiet ke service boundary', 'dung message broker cho async flow', 'xu ly retry va DLQ', 'quan sat log, trace va health check'],
+    keywords: ['nodejs', 'microservices', 'express', 'kafka', 'event-driven', 'retry', 'dlq', 'service boundary', 'observability'],
+    project: 'xay dung flow order -> payment -> enrollment voi idempotency, retry topic va dead letter queue.',
+    chapters: ['Tu monolith den microservices', 'Giao tiep dong bo va bat dong bo', 'Reliability, retry va observability'],
+  },
+  {
+    title: 'Go Lang for Backend',
+    catIdx: 1,
+    price: 850000,
+    level: 'BEGINNER',
+    audience: 'nguoi moi hoc Go nhung da co kien thuc lap trinh co ban va muon viet API backend.',
+    outcomes: ['nam cu phap Go can thiet', 'viet REST API voi net/http', 'xu ly goroutine va channel co kiem soat', 'ket noi database va test handler'],
+    keywords: ['golang', 'go', 'backend', 'goroutine', 'channel', 'rest api', 'struct', 'interface', 'database'],
+    project: 'xay dung API quan ly task co CRUD, middleware log request va ket noi PostgreSQL.',
+    chapters: ['Cu phap Go cho backend', 'HTTP server va middleware', 'Concurrency va database'],
+  },
+  {
+    title: 'Flutter App Essentials',
+    catIdx: 2,
+    price: 450000,
+    level: 'BEGINNER',
+    audience: 'nguoi moi bat dau mobile development va muon tao ung dung Android/iOS bang mot codebase.',
+    outcomes: ['hieu widget tree', 'tao layout responsive', 'quan ly state don gian', 'goi API va hien thi loading/error state'],
+    keywords: ['flutter', 'dart', 'widget', 'stateful', 'stateless', 'layout', 'navigation', 'mobile ui', 'api'],
+    project: 'xay dung app ghi chu co danh sach, form tao moi, man hinh chi tiet va luu local.',
+    chapters: ['Dart va widget tree', 'Layout, navigation va form', 'State va API trong mobile app'],
+  },
+  {
+    title: 'React Native Advanced',
+    catIdx: 2,
+    price: 990000,
+    level: 'ADVANCED',
+    audience: 'developer da biet React Native va muon nang cap app mobile production.',
+    outcomes: ['toi uu list dai', 'xu ly navigation phuc tap', 'dong bo offline-first', 'debug performance va memory'],
+    keywords: ['react native', 'mobile performance', 'navigation', 'flatlist', 'offline-first', 'native module', 'debugging'],
+    project: 'xay dung app ban hang mobile co cart, auth, offline cache va push notification mau.',
+    chapters: ['Kien truc app React Native', 'Performance va offline data', 'Native integration va release'],
+  },
+  {
+    title: 'Docker for Beginners',
+    catIdx: 3,
+    price: 0,
+    level: 'BEGINNER',
+    audience: 'lap trinh vien muon dong goi ung dung va chay moi truong dev on dinh bang container.',
+    outcomes: ['viet Dockerfile co layer hop ly', 'dung docker compose cho multi-service', 'quan ly volume va network', 'debug container bi loi'],
+    keywords: ['docker', 'container', 'image', 'dockerfile', 'compose', 'volume', 'network', 'environment variables'],
+    project: 'dong goi ung dung Node.js + PostgreSQL + Redis bang docker compose cho local development.',
+    chapters: ['Container va image', 'Dockerfile thuc chien', 'Docker Compose cho he thong nhieu service'],
+  },
+  {
+    title: 'Kubernetes in Practice',
+    catIdx: 3,
+    price: 1500000,
+    level: 'ADVANCED',
+    audience: 'developer/DevOps da biet Docker va muon van hanh ung dung tren Kubernetes.',
+    outcomes: ['hieu pod, deployment, service va ingress', 'quan ly config/secret', 'rolling update va rollback', 'giam sat health check'],
+    keywords: ['kubernetes', 'pod', 'deployment', 'service', 'ingress', 'configmap', 'secret', 'helm', 'autoscaling'],
+    project: 'deploy he thong microservices co API gateway, backend, database secret va health probe.',
+    chapters: ['Kubernetes primitives', 'Networking, config va secret', 'Deployment strategy va monitoring'],
+  },
+  {
+    title: 'Python for Data Science',
+    catIdx: 4,
+    price: 0,
+    level: 'BEGINNER',
+    audience: 'nguoi moi vao data science can nen tang Python, pandas va truc quan hoa du lieu.',
+    outcomes: ['lam sach du lieu bang pandas', 'phan tich thong ke co ban', 've bieu do de trinh bay insight', 'chuan bi dataset cho machine learning'],
+    keywords: ['python', 'data science', 'pandas', 'numpy', 'matplotlib', 'data cleaning', 'eda', 'statistics'],
+    project: 'phan tich tap du lieu ban hang, tim san pham ban chay, xu huong doanh thu va nhom khach hang.',
+    chapters: ['Python cho phan tich du lieu', 'Pandas va exploratory data analysis', 'Truc quan hoa va insight'],
+  },
+  {
+    title: 'Deep Learning with PyTorch',
+    catIdx: 4,
+    price: 2500000,
+    level: 'ADVANCED',
+    audience: 'nguoi da biet Python/ML co ban va muon huan luyen neural network bang PyTorch.',
+    outcomes: ['hieu tensor va autograd', 'xay dung training loop', 'danh gia overfitting/underfitting', 'luu va load model de inference'],
+    keywords: ['deep learning', 'pytorch', 'tensor', 'autograd', 'neural network', 'training loop', 'cnn', 'optimization'],
+    project: 'train model phan loai anh don gian, theo doi loss/accuracy va export model inference.',
+    chapters: ['Tensor, autograd va module', 'Training loop va optimization', 'Computer vision va deployment co ban'],
+  },
+  {
+    title: 'HTML & CSS Co Ban',
+    catIdx: 0,
+    price: 0,
+    level: 'BEGINNER',
+    audience: 'nguoi moi bat dau web development can nen tang ve semantic HTML va CSS layout.',
+    outcomes: ['viet HTML semantic', 'dung CSS selector va box model', 'xay dung layout flex/grid', 'lam giao dien responsive co ban'],
+    keywords: ['html', 'css', 'semantic', 'box model', 'flexbox', 'grid', 'responsive', 'accessibility'],
+    project: 'xay dung landing page khoa hoc co header, section noi dung, card khoa hoc va footer responsive.',
+    chapters: ['HTML semantic va accessibility', 'CSS core va box model', 'Layout responsive voi Flexbox/Grid'],
+  },
+  {
+    title: 'JavaScript Fundamentals',
+    catIdx: 0,
+    price: 0,
+    level: 'BEGINNER',
+    audience: 'nguoi moi hoc lap trinh web can JavaScript vung de hoc React/Node ve sau.',
+    outcomes: ['hieu bien, function va scope', 'lam viec voi array/object', 'xu ly DOM event', 'hieu promise va async/await'],
+    keywords: ['javascript', 'variable', 'function', 'scope', 'array', 'object', 'dom', 'event', 'promise', 'async await'],
+    project: 'xay dung todo app co filter, local storage, validation va goi API mau.',
+    chapters: ['Cu phap va tu duy JavaScript', 'DOM, event va browser API', 'Async JavaScript va fetch API'],
+  },
+  {
+    title: 'Git & GitHub Workflow',
+    catIdx: 3,
+    price: 0,
+    level: 'BEGINNER',
+    audience: 'hoc vien can lam viec nhom voi Git, branch, pull request va review code.',
+    outcomes: ['hieu commit history', 'tao branch va merge', 'xu ly conflict', 'lam pull request va code review co quy trinh'],
+    keywords: ['git', 'github', 'commit', 'branch', 'merge', 'rebase', 'pull request', 'code review', 'conflict'],
+    project: 'mo phong workflow team: tao feature branch, sua conflict, mo PR va viet checklist review.',
+    chapters: ['Git local co ban', 'Branching va conflict', 'GitHub pull request workflow'],
+  },
+  {
+    title: 'Ky nang Viet CV IT',
+    catIdx: 5,
+    price: 0,
+    level: 'BEGINNER',
+    audience: 'sinh vien IT va fresher can CV ro rang, dung trong tam va phu hop vi tri ung tuyen.',
+    outcomes: ['viet summary ngan gon', 'mo ta project bang ket qua', 'chon keyword theo JD', 'tranh loi CV pho bien'],
+    keywords: ['cv it', 'resume', 'portfolio', 'project description', 'ats keyword', 'job description', 'interview'],
+    project: 'viet lai CV fresher frontend/backend voi 2 project, tech stack va thanh tuu do luong duoc.',
+    chapters: ['Cau truc CV IT', 'Mo ta project va kinh nghiem', 'Toi uu CV theo job description'],
+  },
+  {
+    title: 'Tieng Anh cho Developers',
+    catIdx: 5,
+    price: 299000,
+    level: 'INTERMEDIATE',
+    audience: 'developer muon doc tai lieu, trao doi task va tham gia phong van bang tieng Anh.',
+    outcomes: ['doc docs nhanh hon', 'viet comment/PR ro rang', 'trao doi bug va requirement', 'tra loi phong van ky thuat co cau truc'],
+    keywords: ['technical english', 'documentation', 'pull request', 'bug report', 'requirement', 'standup', 'interview'],
+    project: 'viet bug report, PR description va cau tra loi phong van cho mot tinh huong backend/frontend.',
+    chapters: ['Tu vung ky thuat cot loi', 'Viet docs, bug report va PR', 'Giao tiep trong meeting va interview'],
+  },
+];
+
+const LESSON_PATTERNS = [
+  'Nen tang va ly do can hoc',
+  'Khái niệm cốt lõi và ví dụ thực tế',
+  'Thực hành áp dụng vào dự án',
+];
+
+function buildCourseDescription(seed: CourseSeed): string {
+  return [
+    `${seed.title} la khoa hoc ${seed.level.toLowerCase()} danh cho ${seed.audience}`,
+    `Sau khoa hoc, hoc vien co the ${seed.outcomes.join(', ')}.`,
+    `Noi dung tap trung vao cac chu de: ${seed.keywords.join(', ')}.`,
+    `Du an cuoi khoa: ${seed.project}`,
+  ].join(' ');
+}
+
+function buildLessonContent(seed: CourseSeed, chapterTitle: string, lessonTitle: string, lessonOrder: number): string {
+  const focus = seed.keywords.slice((lessonOrder - 1) * 3, (lessonOrder - 1) * 3 + 5);
+  const focusText = focus.length > 0 ? focus.join(', ') : seed.keywords.slice(0, 5).join(', ');
+
+  return [
+    `Bai hoc "${lessonTitle}" thuoc chuong "${chapterTitle}" cua khoa "${seed.title}".`,
+    `Muc tieu chinh la giup hoc vien nam duoc ${focusText} va biet cach ap dung vao cong viec thuc te.`,
+    `Giang vien se giai thich boi canh van de, cac thuat ngu quan trong, loi ich khi ap dung dung cach va cac loi sai thuong gap khi moi hoc.`,
+    `Hoc vien nen tu dat cau hoi: khi nao dung ky thuat nay, dau la dau vao/dau ra, dieu gi can kiem tra, va rui ro nao can tranh trong du an production.`,
+    `Vi du thuc hanh gan voi du an: ${seed.project}`,
+    `Sau bai hoc, hoc vien co the tu tom tat khái niệm, giai thich bang ngon ngu cua minh, so sanh voi cach lam thay the va tao mot checklist nho de ap dung.`,
+    `Tu khoa nen nho: ${seed.keywords.join(', ')}.`,
+  ].join('\n\n');
+}
+
+async function createAutoContextForSeedLesson(params: {
+  lesson: {
+    id: string;
+    title: string;
+    content: string | null;
+    videoUrl: string | null;
+    sourceType: string;
+    duration: number | null;
+  };
+  chapterTitle: string;
+  courseTitle: string;
+  courseDescription: string;
+  courseLevel: string;
+  courseCategory: string;
+}) {
+  const contextInput = {
+    id: params.lesson.id,
+    title: params.lesson.title,
+    content: params.lesson.content,
+    videoUrl: params.lesson.videoUrl,
+    sourceType: params.lesson.sourceType,
+    duration: params.lesson.duration,
+    chapterTitle: params.chapterTitle,
+    courseTitle: params.courseTitle,
+    courseDescription: params.courseDescription,
+    courseLevel: params.courseLevel,
+    courseCategory: params.courseCategory,
+  };
+  const fullText = buildAutoContextText(contextInput);
+
+  await coursePrisma.lessonTranscript.upsert({
+    where: { id: buildAutoContextTranscriptId(params.lesson.id) },
+    create: {
+      id: buildAutoContextTranscriptId(params.lesson.id),
+      lessonId: params.lesson.id,
+      sourceType: 'AUTO_CONTEXT',
+      contentKind: 'AI_CONTEXT',
+      provider: 'seed-all',
+      language: 'vi',
+      status: 'READY',
+      fullText,
+      durationSec: params.lesson.duration ?? null,
+      contentHash: computeContentHash(fullText),
+      videoHash: computeVideoHash(contextInput),
+      generatedAt: new Date(),
+    },
+    update: {
+      sourceType: 'AUTO_CONTEXT',
+      contentKind: 'AI_CONTEXT',
+      provider: 'seed-all',
+      language: 'vi',
+      status: 'READY',
+      fullText,
+      durationSec: params.lesson.duration ?? null,
+      contentHash: computeContentHash(fullText),
+      videoHash: computeVideoHash(contextInput),
+      errorCode: null,
+      errorMessage: null,
+      generatedAt: new Date(),
+    },
+  });
+}
+
 async function seedCourses(instructorIds: string[], categoryIds: string[]) {
   console.log('\n📚 BƯỚC 5: TẠO 15 KHÓA HỌC & CHƯƠNG TRÌNH HỌC...');
 
-  const courseTitles = [
-    { title: 'ReactJS Pro Mastery', catIdx: 0, price: 599000, level: 'ADVANCED' },
-    { title: 'Next.js 15 Fullstack', catIdx: 0, price: 799000, level: 'INTERMEDIATE' },
-    { title: 'NodeJS Microservices', catIdx: 1, price: 1200000, level: 'ADVANCED' },
-    { title: 'Go Lang for Backend', catIdx: 1, price: 850000, level: 'BEGINNER' },
-    { title: 'Flutter App Essentials', catIdx: 2, price: 450000, level: 'BEGINNER' },
-    { title: 'React Native Advanced', catIdx: 2, price: 990000, level: 'ADVANCED' },
-    { title: 'Docker for Beginners', catIdx: 3, price: 0, level: 'BEGINNER' },
-    { title: 'Kubernetes in Practice', catIdx: 3, price: 1500000, level: 'ADVANCED' },
-    { title: 'Python for Data Science', catIdx: 4, price: 0, level: 'BEGINNER' },
-    { title: 'Deep Learning with PyTorch', catIdx: 4, price: 2500000, level: 'ADVANCED' },
-    { title: 'HTML & CSS Cơ Bản', catIdx: 0, price: 0, level: 'BEGINNER' },
-    { title: 'JavaScript Fundamentals', catIdx: 0, price: 0, level: 'BEGINNER' },
-    { title: 'Git & GitHub Workflow', catIdx: 3, price: 0, level: 'BEGINNER' },
-    { title: 'Kỹ năng Viết CV IT', catIdx: 5, price: 0, level: 'BEGINNER' },
-    { title: 'Tiếng Anh cho Developers', catIdx: 5, price: 299000, level: 'INTERMEDIATE' },
+  const lessonVideoUrls = [
+    'https://youtu.be/GDVNkenmIHU?si=S-C-B0StdUQo9leN',
+    'https://youtu.be/bl2m9eXfm_A?si=V7Zqivtc6Cozy31y',
+    'https://youtu.be/oPVTQEP_5B0?si=Zq0AebEFY-_8NDpv',
   ];
 
   const courses: any[] = [];
-  for (let i = 0; i < courseTitles.length; i++) {
-    const item = courseTitles[i];
+  for (let i = 0; i < COURSE_SEEDS.length; i++) {
+    const item = COURSE_SEEDS[i];
     const instId = instructorIds[i % instructorIds.length];
     const catId = categoryIds[item.catIdx];
+    const categoryName = CATEGORY_SEEDS[item.catIdx].name;
     const slug = generateSlug(item.title);
+    const description = buildCourseDescription(item);
 
     const course = await coursePrisma.course.create({
       data: {
         title: item.title,
         slug,
-        description: `Khóa học chuyên sâu về ${item.title}. Bạn sẽ được học từ lý thuyết đến thực hành dự án thực tế.`,
+        description,
         thumbnail: `https://picsum.photos/seed/${slug}/800/450`,
         price: item.price,
         level: item.level as any,
@@ -299,32 +570,43 @@ async function seedCourses(instructorIds: string[], categoryIds: string[]) {
     // Create Chapters & Lessons
     let totalLessons = 0;
     let totalDuration = 0;
-    const chapterCount = randomInt(2, 4);
-    for (let c = 1; c <= chapterCount; c++) {
+    for (let c = 1; c <= item.chapters.length; c++) {
+      const chapterTitle = `Chương ${c}: ${item.chapters[c - 1]}`;
       const chapter = await coursePrisma.chapter.create({
         data: {
-          title: `Chương ${c}: Nội dung cốt lõi ${c}`,
+          title: chapterTitle,
           order: c,
           isPublished: true,
           courseId: course.id,
         }
       });
 
-      const lessonCount = randomInt(3, 6);
-      for (let l = 1; l <= lessonCount; l++) {
-        const duration = randomInt(300, 1200);
-        await coursePrisma.lesson.create({
+      for (let l = 1; l <= LESSON_PATTERNS.length; l++) {
+        const duration = randomInt(480, 1080);
+        const urlIndex = (totalLessons + l - 1) % lessonVideoUrls.length;
+        const lessonTitle = `Bài ${l}: ${LESSON_PATTERNS[l - 1]}`;
+        const content = buildLessonContent(item, chapterTitle, lessonTitle, l);
+        const lesson = await coursePrisma.lesson.create({
           data: {
-            title: `Bài ${l}: Kiến thức quan trọng ${l}`,
+            title: lessonTitle,
             order: l,
-            videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            videoUrl: lessonVideoUrls[urlIndex],
             sourceType: 'YOUTUBE',
-            content: 'Đây là nội dung chi tiết của bài học. Học viên cần chú ý ghi chép và thực hành theo hướng dẫn.',
+            content,
             duration,
             isPublished: true,
             isFree: c === 1 && l === 1,
             chapterId: chapter.id,
           }
+        });
+
+        await createAutoContextForSeedLesson({
+          lesson,
+          chapterTitle,
+          courseTitle: course.title,
+          courseDescription: description,
+          courseLevel: item.level,
+          courseCategory: categoryName,
         });
         totalLessons++;
         totalDuration += duration;

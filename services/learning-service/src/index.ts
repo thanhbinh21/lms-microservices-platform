@@ -18,6 +18,7 @@ import {
   getCourseProgress,
   internalCheckEnrollment,
   internalGetCourseCompletion,
+  internalCheckLessonCompletion,
 } from './controllers/learning.controller.js';
 import {
   listFailedEvents,
@@ -104,6 +105,9 @@ app.get('/internal/enrollment/check', requireInternal, internalCheckEnrollment);
 
 // Course-service goi de kiem tra hoan thanh khoa hoc (x-internal-call header)
 app.get('/internal/courses/:courseId/completion', requireInternal, internalGetCourseCompletion);
+
+// AI-service goi de kiem tra bai hoc cu the da hoan thanh chua (truoc khi tao quiz)
+app.get('/internal/lessons/:lessonId/completion', requireInternal, internalCheckLessonCompletion);
 
 // ─── DLQ Admin Routes ────────────────────────────────────────────────────────
 

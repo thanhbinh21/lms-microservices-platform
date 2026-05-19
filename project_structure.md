@@ -1,29 +1,31 @@
 # Project Structure - INTERNAL ARCHITECTURE GUIDE
 
-
-
-
 ## Monorepo Layout
 
+```text
 /lms-platform
-├── apps
-│   ├── web-client          # Next.js 15 (Student + Instructor UI)
-│   ├── admin-dashboard    # React/Vite (Admin)
-│
-├── services
-│   ├── auth-service
-│   ├── course-service
-│   ├── payment-service
-│   ├── media-service
-│   ├── notification-service
-│
-├── packages
-│   ├── db-prisma
-│   ├── kafka-client
-│   ├── logger
-│   ├── ui
-│
-├── docker-compose.yml
+|-- apps
+|   |-- web-client          # Next.js 15 (Student + Instructor UI)
+|   |-- admin-dashboard     # React/Vite (Admin)
+|
+|-- services
+|   |-- auth-service
+|   |-- course-service
+|   |-- learning-service
+|   |-- community-service
+|   |-- payment-service
+|   |-- media-service
+|   |-- notification-service
+|   |-- ai-service
+|
+|-- packages
+|   |-- db-prisma
+|   |-- kafka-client
+|   |-- logger
+|   |-- ui
+|
+|-- docker-compose.yml
+```
 
 ## Infrastructure
 
@@ -33,28 +35,37 @@
 - Redis khong chay local nua; dung Upstash/cloud Redis qua `REDIS_URL` / `CACHE_REDIS_URL`
 
 ### Serverless Services (Neon)
-- PostgreSQL Databases (5 separate instances)
+- PostgreSQL Databases (database per service)
   - auth_db
   - course_db
+  - learning_db
+  - community_db
   - payment_db
   - media_db
   - notification_db
+  - ai_db
 
 **Benefits:**
-- Auto-pause after 5 min idle → 0 resource usage
+- Auto-pause after 5 min idle -> 0 resource usage
 - ~400MB RAM saved on local machine
 - Free tier: 0.5GB per database
 
 ## Data Flow
 
-Client → API Gateway  
-Gateway → Microservices  
-Microservices → Neon PostgreSQL (serverless)
-Payment → Kafka → Course/Notification  
+Client -> API Gateway  
+Gateway -> Microservices  
+Microservices -> Neon PostgreSQL (serverless)  
+Payment -> Kafka -> Course/Notification  
 
-Media flow (updated):
+Media flow:
 - Upload/Image/Video URL: Web Client -> Gateway -> Media Service -> Cloudinary Free
 - Local storage chi dung fallback cho local development/test
+
+AI flow:
+- Web Client -> Kong `/ai/*` -> ai-service
+- ai-service -> course-service `/internal/lessons/:id/ai-context-status`
+- ai-service -> learning-service `/internal/enrollment/check` va `/internal/courses/:courseId/completion`
+- learning-service -> ai-service `/internal/quiz/check` de gate certificate
 
 ## BFF Pattern
 
@@ -84,6 +95,7 @@ Next.js Server Actions:
 - VNPay checksum required
 - Use JSONB audit logs
 - DB connections use SSL (sslmode=require)
+- Internal service calls require `x-internal-secret`
 
 ## Media Provider Rules
 
