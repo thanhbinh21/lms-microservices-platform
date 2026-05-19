@@ -37,13 +37,48 @@ export interface AiContextStatus {
   sources: string[];
   transcriptStatus?: string;
   contentLength?: number;
+  sourceType?: string;
+  contentKind?: string;
+  quality?: string;
+  fallbackUsed?: boolean;
+  processing?: boolean;
+  failedAutoStt?: boolean;
   reason?: string;
+}
+
+export interface LessonAiContext {
+  lessonId: string;
+  courseId: string;
+  courseTitle: string;
+  lessonTitle: string;
+  available: boolean;
+  sourceType: string;
+  contentKind: string;
+  quality: 'HIGH' | 'MEDIUM' | 'LOW';
+  fallbackUsed: boolean;
+  processing: boolean;
+  failedAutoStt: boolean;
+  transcriptStatus: string;
+  contentLength: number;
+  reason?: string;
+  textContent: string;
+  segments: unknown[] | null;
+  language: string;
+  sources: string[];
+  metadata: LessonContextForAI & {
+    chapterTitle?: string | null;
+    courseTitle: string;
+    courseDescription?: string | null;
+    level: string;
+    category: string;
+  };
 }
 
 export interface TranscriptData {
   id: string;
   lessonId: string;
   sourceType: string;
+  contentKind?: string;
   status: string;
   fullText: string | null;
   segments: unknown[] | null;
@@ -111,6 +146,24 @@ export async function fetchAiContextStatus(lessonId: string, traceId: string): P
   }
 }
 
+export async function fetchLessonAiContext(lessonId: string, traceId: string): Promise<LessonAiContext | null> {
+  try {
+    const res = await fetchWithTimeout(
+      `${COURSE_SERVICE}/internal/lessons/${lessonId}/ai-context`,
+      { headers: internalHeaders(traceId) },
+    );
+    if (!res.ok) {
+      logger.warn({ lessonId, status: res.status }, 'fetchLessonAiContext failed');
+      return null;
+    }
+    const json = (await res.json()) as { data?: LessonAiContext };
+    return json.data ?? null;
+  } catch (err) {
+    logger.warn({ err, lessonId }, 'fetchLessonAiContext error');
+    return null;
+  }
+}
+
 export async function fetchTranscript(lessonId: string, traceId: string): Promise<TranscriptData | null> {
   try {
     const res = await fetchWithTimeout(
@@ -154,6 +207,32 @@ export async function fetchCompletionStatus(
     if (!res.ok) return null;
     const json = (await res.json()) as { data?: CompletionStatus };
     return json.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Kiem tra bai hoc cu the da hoan thanh chua (dung truoc khi tao lesson quiz).
+export async function fetchLessonCompletionStatus(
+  userId: string,
+  lessonId: string,
+  traceId: string,
+): Promise<boolean | null> {
+  try {
+    const res = await fetchWithTimeout(
+      `${AI_SERVICE_ENV.LEARNING_SERVICE_URL}/internal/lessons/${lessonId}/completion?userId=${userId}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-call': 'ai-service',
+          'x-internal-secret': INTERNAL_SECRET,
+          'x-trace-id': traceId,
+        },
+      },
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: { isCompleted: boolean } };
+    return json.data?.isCompleted ?? false;
   } catch {
     return null;
   }

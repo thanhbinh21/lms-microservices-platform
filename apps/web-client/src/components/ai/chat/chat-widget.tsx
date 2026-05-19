@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useChat } from '@/components/ai/hooks/use-chat';
 import { useConversation, useConversations } from '@/components/ai/hooks/use-conversations';
-import { ChatUnavailable } from './chat-unavailable';
 import { cn } from '@/lib/utils';
 
 interface ChatWidgetProps {
@@ -14,29 +13,45 @@ interface ChatWidgetProps {
   lessonId?: string;
   aiAvailable?: boolean;
   aiUnavailableReason?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   className?: string;
 }
 
-export function ChatWidget({ courseId, lessonId, aiAvailable = true, aiUnavailableReason, className }: ChatWidgetProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function ChatWidget({
+  courseId,
+  lessonId,
+  aiAvailable = true,
+  aiUnavailableReason,
+  open,
+  onOpenChange,
+  className,
+}: ChatWidgetProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const isOpen = open ?? internalOpen;
 
-  // If AI is not available, disable the button
-  const isDisabled = !aiAvailable;
+  const setIsOpen = (nextOpen: boolean) => {
+    if (onOpenChange) onOpenChange(nextOpen);
+    else setInternalOpen(nextOpen);
+  };
+
+  const isDisabled = false;
 
   if (!isOpen) {
     return (
       <button
-        onClick={() => !isDisabled && setIsOpen(true)}
+        onClick={() => setIsOpen(true)}
         className={cn(
           'fixed bottom-6 right-6 z-40 flex size-14 items-center justify-center rounded-full',
           'bg-primary text-primary-foreground shadow-lg transition-all',
-          aiAvailable ? 'hover:bg-primary/90 hover:shadow-xl cursor-pointer' : 'opacity-40 cursor-not-allowed',
+          'cursor-pointer hover:bg-primary/90 hover:shadow-xl',
+          aiAvailable === false && 'ring-1 ring-amber-200',
           className,
         )}
         aria-label="Mở trợ lý AI"
         disabled={isDisabled}
-        title={isDisabled ? (aiUnavailableReason || 'AI chưa khả dụng cho bài học này') : 'Mở trợ lý AI'}
+        title={isDisabled ? (aiUnavailableReason || 'AI sẽ dùng ngữ cảnh hiện có của khóa học') : 'Mở trợ lý AI'}
       >
         <MessageSquare className="size-6" />
       </button>
@@ -57,7 +72,6 @@ export function ChatWidget({ courseId, lessonId, aiAvailable = true, aiUnavailab
         conversationId={selectedConversationId ?? undefined}
         onClose={() => setIsOpen(false)}
         onSelectConversation={setSelectedConversationId}
-        aiUnavailableReason={aiUnavailableReason ?? null}
       />
     </div>
   );
@@ -69,7 +83,6 @@ interface ChatPanelProps {
   conversationId?: string;
   onClose: () => void;
   onSelectConversation: (id: string | null) => void;
-  aiUnavailableReason: string | null;
 }
 
 export function ChatPanel({
@@ -78,16 +91,18 @@ export function ChatPanel({
   conversationId,
   onClose,
   onSelectConversation,
-  aiUnavailableReason,
 }: ChatPanelProps) {
   const [message, setMessage] = useState('');
   const [streamingContent, setStreamingContent] = useState('');
   const [messages, setMessages] = useState<{ id: string; role: string; content: string; isError?: boolean }[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Ref giu noi dung streaming moi nhat de tranh stale closure trong onDone.
+  const streamingRef = useRef('');
+  const pendingMessageRef = useRef('');
 
   const { conversations, fetchConversations } = useConversations({ courseId });
-  const { messages: loadedMessages, fetchMessages, loadMore } = useConversation(conversationId ?? '');
+  const { messages: loadedMessages, fetchMessages } = useConversation(conversationId ?? '');
 
   const {
     sendMessage,
@@ -95,27 +110,35 @@ export function ChatPanel({
     error,
   } = useChat({
     conversationId: conversationId ?? '',
-    onChunk: (text) => setStreamingContent((prev) => prev + text),
+    onChunk: (text) => {
+      streamingRef.current += text;
+      setStreamingContent((prev) => prev + text);
+    },
     onDone: () => {
-      // Add completed message
-      if (streamingContent) {
+      const content = streamingRef.current;
+      if (content) {
         setMessages((prev) => [
           ...prev,
-          { id: crypto.randomUUID(), role: 'assistant', content: streamingContent },
+          { id: crypto.randomUUID(), role: 'assistant', content },
         ]);
+        streamingRef.current = '';
         setStreamingContent('');
       }
     },
     onError: (errMsg) => {
+      streamingRef.current = '';
+      setStreamingContent('');
       setMessages((prev) => [
         ...prev,
         { id: crypto.randomUUID(), role: 'assistant', content: errMsg, isError: true },
       ]);
     },
     onMessageId: (id) => {
+      // Reset ref truoc khi bat dau stream moi.
+      streamingRef.current = '';
       setMessages((prev) => [
         ...prev,
-        { id, role: 'user', content: message },
+        { id, role: 'user', content: pendingMessageRef.current || message },
       ]);
       setMessage('');
     },
@@ -126,7 +149,13 @@ export function ChatPanel({
     if (conversationId) {
       void fetchMessages();
     }
-  }, [conversationId]);
+  }, [conversationId, fetchMessages]);
+
+  useEffect(() => {
+    if (!conversationId) {
+      void fetchConversations();
+    }
+  }, [conversationId, fetchConversations]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -134,6 +163,7 @@ export function ChatPanel({
 
   const handleSend = async () => {
     if (!message.trim() || !conversationId || isStreaming) return;
+    pendingMessageRef.current = message;
     await sendMessage(message, lessonId);
   };
 
@@ -143,10 +173,6 @@ export function ChatPanel({
       void handleSend();
     }
   };
-
-  if (aiUnavailableReason) {
-    return <ChatUnavailable reason={aiUnavailableReason} onClose={onClose} />;
-  }
 
   return (
     <div className="flex h-full flex-col">

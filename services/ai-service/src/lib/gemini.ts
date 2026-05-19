@@ -4,32 +4,26 @@ import { Redis } from 'ioredis';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
-export interface GeminiMessage {
-  role: 'user' | 'model';
-  parts: { text: string }[];
+export interface LlmMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
 }
 
-export interface GeminiGenerateContentRequest {
-  contents: GeminiMessage[];
-  systemInstruction?: { parts: { text: string }[] };
-  generationConfig?: {
-    temperature?: number;
-    topP?: number;
-    topK?: number;
-    maxOutputTokens?: number;
-    responseMimeType?: string;
-  };
+export interface OpenAiChatRequest {
+  model: string;
+  messages: LlmMessage[];
+  temperature?: number;
+  max_tokens?: number;
+  stream?: boolean;
 }
 
-export interface GeminiGenerateContentResponse {
-  candidates?: {
-    content: { parts: { text: string }[] };
-    finishReason: string;
-    safetyRatings?: unknown[];
+export interface OpenAiChatResponse {
+  choices?: {
+    message?: { content?: string };
+    delta?: { content?: string };
+    finish_reason?: string | null;
   }[];
-  promptFeedback?: {
-    safetyRatings?: unknown[];
-  };
+  error?: { message?: string; type?: string; code?: string | number };
 }
 
 // ─── Rate Limiter ───────────────────────────────────────────────────────────────
@@ -124,41 +118,174 @@ export async function checkRateLimit(
   return { allowed: true, remaining: maxRequests - valid.length, resetAt: now + windowMs };
 }
 
-// ─── Gemini Client ─────────────────────────────────────────────────────────────
+// ─── LLM Client (DeepSeek -> Groq -> OpenRouter) ─────────────────────────────
 
-const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const PROVIDER_BASE_URLS: Record<string, string> = {
+  deepseek: 'https://api.deepseek.com/v1',
+  groq: 'https://api.groq.com/openai/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
+};
+
+const STATIC_FALLBACK_TEXT = 'He thong AI tam thoi khong san sang. Vui long thu lai sau.';
 
 interface LlmStreamChunk {
   text: string;
   done: boolean;
   error?: string;
+  code?: 'RATE_LIMITED' | 'FAILED';
+  retryAfterMs?: number;
 }
 
-async function makeGeminiRequest(
-  model: string,
-  body: GeminiGenerateContentRequest,
+interface ParsedGeminiError {
+  message?: string;
+  status?: string;
+  retryAfterMs?: number;
+}
+
+export class GeminiRateLimitError extends Error {
+  retryAfterMs?: number;
+
+  constructor(message: string, retryAfterMs?: number) {
+    super(message);
+    this.name = 'GeminiRateLimitError';
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+export function isGeminiRateLimitError(err: unknown): err is GeminiRateLimitError {
+  return err instanceof GeminiRateLimitError
+    || (typeof err === 'object' && err !== null && (err as { name?: string }).name === 'GeminiRateLimitError');
+}
+
+type ProviderName = 'deepseek' | 'groq' | 'openrouter';
+
+interface ProviderConfig {
+  name: ProviderName;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  extraHeaders?: Record<string, string>;
+}
+
+function getProviderOrder(): ProviderName[] {
+  const raw = (AI_SERVICE_ENV.AI_PROVIDER_ORDER || '').trim();
+  if (!raw) return ['deepseek', 'groq', 'openrouter'];
+
+  return raw
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+    .filter((item): item is ProviderName => ['deepseek', 'groq', 'openrouter'].includes(item));
+}
+
+function buildProviderConfigs(): ProviderConfig[] {
+  const order = getProviderOrder();
+  const configs: ProviderConfig[] = [];
+
+  for (const name of order) {
+    if (name === 'deepseek') {
+      if (AI_SERVICE_ENV.DEEPSEEK_API_KEY && AI_SERVICE_ENV.DEEPSEEK_MODEL) {
+        configs.push({
+          name,
+          baseUrl: PROVIDER_BASE_URLS.deepseek,
+          apiKey: AI_SERVICE_ENV.DEEPSEEK_API_KEY,
+          model: AI_SERVICE_ENV.DEEPSEEK_MODEL,
+        });
+      }
+      continue;
+    }
+
+    if (name === 'groq') {
+      if (AI_SERVICE_ENV.GROQ_API_KEY && AI_SERVICE_ENV.GROQ_MODEL) {
+        configs.push({
+          name,
+          baseUrl: PROVIDER_BASE_URLS.groq,
+          apiKey: AI_SERVICE_ENV.GROQ_API_KEY,
+          model: AI_SERVICE_ENV.GROQ_MODEL,
+        });
+      }
+      continue;
+    }
+
+    if (name === 'openrouter') {
+      if (AI_SERVICE_ENV.OPENROUTER_API_KEY && AI_SERVICE_ENV.OPENROUTER_MODEL) {
+        const extraHeaders: Record<string, string> = {};
+        if (AI_SERVICE_ENV.OPENROUTER_APP_URL) extraHeaders['HTTP-Referer'] = AI_SERVICE_ENV.OPENROUTER_APP_URL;
+        if (AI_SERVICE_ENV.OPENROUTER_APP_NAME) extraHeaders['X-Title'] = AI_SERVICE_ENV.OPENROUTER_APP_NAME;
+
+        configs.push({
+          name,
+          baseUrl: PROVIDER_BASE_URLS.openrouter,
+          apiKey: AI_SERVICE_ENV.OPENROUTER_API_KEY,
+          model: AI_SERVICE_ENV.OPENROUTER_MODEL,
+          extraHeaders: Object.keys(extraHeaders).length > 0 ? extraHeaders : undefined,
+        });
+      }
+    }
+  }
+
+  return configs;
+}
+
+async function makeChatRequest(
+  provider: ProviderConfig,
+  body: OpenAiChatRequest,
   stream = false,
 ): Promise<Response> {
-  const apiKey = AI_SERVICE_ENV.GEMINI_API_KEY;
-  const action = stream ? 'streamGenerateContent' : 'generateContent';
-  const params = new URLSearchParams({ key: apiKey });
-  if (stream) params.set('alt', 'sse');
-  const requestUrl = `${GEMINI_BASE_URL}/${model}:${action}?${params.toString()}`;
+  const requestUrl = `${provider.baseUrl}/chat/completions`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${provider.apiKey}`,
+    ...(provider.extraHeaders || {}),
+  };
 
   return fetch(requestUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    headers,
+    body: JSON.stringify({ ...body, stream }),
     signal: AbortSignal.timeout(60_000),
   });
-  const url = `${GEMINI_BASE_URL}/${model}:generateContent?key=${apiKey}&${stream ? 'alt=sse&' : ''}力=${stream ? 'streamGenerateContent' : 'generateContent'}`;
+}
 
-  return fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(60_000),
-  });
+function parseRetryDelay(retryDelay?: string): number | undefined {
+  if (!retryDelay) return undefined;
+  const match = retryDelay.match(/^(\d+(?:\.\d+)?)s$/);
+  if (!match) return undefined;
+  const seconds = Number(match[1]);
+  return Number.isFinite(seconds) ? Math.ceil(seconds * 1000) : undefined;
+}
+
+function parseGeminiError(errText: string): ParsedGeminiError {
+  try {
+    const parsed = JSON.parse(errText) as {
+      error?: { message?: string; status?: string; details?: { retryDelay?: string }[] };
+    };
+    const retryDelay = parsed.error?.details?.find((detail) => detail.retryDelay)?.retryDelay;
+    return {
+      message: parsed.error?.message,
+      status: parsed.error?.status,
+      retryAfterMs: parseRetryDelay(retryDelay),
+    };
+  } catch {
+    return { message: errText };
+  }
+}
+
+function parseRetryAfterHeader(res: Response): number | undefined {
+  const raw = res.headers.get('retry-after');
+  if (!raw) return undefined;
+  const seconds = Number(raw);
+  if (!Number.isNaN(seconds)) {
+    return Math.max(0, Math.ceil(seconds * 1000));
+  }
+  return undefined;
+}
+
+function isRateLimitError(status: number, parsed: ParsedGeminiError): boolean {
+  if (status === 429) return true;
+  if (parsed.status === 'RESOURCE_EXHAUSTED') return true;
+  if (!parsed.message) return false;
+  return /quota exceeded|rate limit|resource exhausted/i.test(parsed.message);
 }
 
 export async function generateText(
@@ -166,36 +293,49 @@ export async function generateText(
   systemInstruction?: string,
   options?: { temperature?: number; maxTokens?: number },
 ): Promise<string> {
-  const body: GeminiGenerateContentRequest = {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: options?.temperature ?? 0.7,
-      maxOutputTokens: options?.maxTokens ?? 2048,
-      responseMimeType: 'text/plain',
-    },
+  const messages: LlmMessage[] = systemInstruction
+    ? [{ role: 'system', content: systemInstruction }, { role: 'user', content: prompt }]
+    : [{ role: 'user', content: prompt }];
+
+  const body: OpenAiChatRequest = {
+    model: 'unused',
+    messages,
+    temperature: options?.temperature ?? 0.7,
+    max_tokens: options?.maxTokens ?? 2048,
   };
 
-  if (systemInstruction) {
-    body.systemInstruction = { parts: [{ text: systemInstruction }] };
+  const providers = buildProviderConfigs();
+  if (providers.length === 0) {
+    throw new Error('No LLM providers configured');
   }
+  let rateLimitInfo: ParsedGeminiError | undefined;
 
-  const models = [AI_SERVICE_ENV.GEMINI_MODEL, AI_SERVICE_ENV.GEMINI_FALLBACK_MODEL, 'gemini-1.5-flash'];
-
-  for (const model of models) {
+  for (const provider of providers) {
     try {
-      const res = await makeGeminiRequest(model, body);
+      const res = await makeChatRequest({ ...provider, model: provider.model }, { ...body, model: provider.model });
       if (!res.ok) {
         const errText = await res.text().catch(() => 'unknown');
-        logger.warn({ model, status: res.status, err: errText }, 'Gemini request failed');
+        const parsedError = parseGeminiError(errText);
+        logger.warn({ provider: provider.name, model: provider.model, status: res.status, err: errText }, 'LLM request failed');
+        if (isRateLimitError(res.status, parsedError)) {
+          rateLimitInfo = {
+            ...parsedError,
+            retryAfterMs: parsedError.retryAfterMs ?? parseRetryAfterHeader(res),
+          };
+        }
         continue;
       }
 
-      const json = (await res.json()) as GeminiGenerateContentResponse;
-      const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+      const json = (await res.json()) as OpenAiChatResponse;
+      const text = json.choices?.[0]?.message?.content;
       if (text) return text;
     } catch (err) {
-      logger.warn({ model, err }, 'Gemini stream/generate error');
+      logger.warn({ provider: provider.name, err }, 'LLM generate error');
     }
+  }
+
+  if (rateLimitInfo) {
+    throw new GeminiRateLimitError('Gemini rate limit exceeded', rateLimitInfo.retryAfterMs);
   }
 
   throw new Error('All Gemini models failed');
@@ -206,27 +346,36 @@ export async function* streamGenerateText(
   systemInstruction?: string,
   options?: { temperature?: number },
 ): AsyncGenerator<LlmStreamChunk> {
-  const body: GeminiGenerateContentRequest = {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: options?.temperature ?? 0.7,
-      maxOutputTokens: 8192,
-      responseMimeType: 'text/plain',
-    },
+  const messages: LlmMessage[] = systemInstruction
+    ? [{ role: 'system', content: systemInstruction }, { role: 'user', content: prompt }]
+    : [{ role: 'user', content: prompt }];
+
+  const body: OpenAiChatRequest = {
+    model: 'unused',
+    messages,
+    temperature: options?.temperature ?? 0.7,
+    max_tokens: 2048,
   };
 
-  if (systemInstruction) {
-    body.systemInstruction = { parts: [{ text: systemInstruction }] };
-  }
+  const providers = buildProviderConfigs();
 
-  const models = [AI_SERVICE_ENV.GEMINI_MODEL, AI_SERVICE_ENV.GEMINI_FALLBACK_MODEL];
-
-  for (const model of models) {
+  for (const provider of providers) {
     try {
-      const res = await makeGeminiRequest(model, body, true);
+      const res = await makeChatRequest({ ...provider, model: provider.model }, { ...body, model: provider.model }, true);
       if (!res.ok) {
         const errText = await res.text().catch(() => 'unknown');
-        logger.warn({ model, status: res.status, err: errText }, 'Gemini stream failed');
+        const parsedError = parseGeminiError(errText);
+        logger.warn({ provider: provider.name, model: provider.model, status: res.status, err: errText }, 'LLM stream failed');
+        if (isRateLimitError(res.status, parsedError)) {
+          yield {
+            text: '',
+            done: true,
+            error: 'RATE_LIMITED',
+            code: 'RATE_LIMITED',
+            retryAfterMs: parsedError.retryAfterMs ?? parseRetryAfterHeader(res),
+          };
+          return;
+        }
         continue;
       }
 
@@ -247,11 +396,15 @@ export async function* streamGenerateText(
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
           const data = line.slice(6).trim();
-          if (!data || data === '[DONE]') continue;
+          if (!data) continue;
+          if (data === '[DONE]') {
+            yield { text: '', done: true };
+            return;
+          }
 
           try {
-            const parsed = JSON.parse(data) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-            const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+            const parsed = JSON.parse(data) as OpenAiChatResponse;
+            const text = parsed.choices?.[0]?.delta?.content;
             if (text) {
               yield { text, done: false };
             }
@@ -264,11 +417,12 @@ export async function* streamGenerateText(
       yield { text: '', done: true };
       return;
     } catch (err) {
-      logger.warn({ model, err }, 'Gemini stream error');
+      logger.warn({ provider: provider.name, err }, 'LLM stream error');
     }
   }
 
-  yield { text: '', done: true, error: 'All models failed' };
+  yield { text: STATIC_FALLBACK_TEXT, done: false };
+  yield { text: '', done: true, error: 'All models failed', code: 'FAILED' };
 }
 
 export { initRedis, closeRedis } from './cache.js';

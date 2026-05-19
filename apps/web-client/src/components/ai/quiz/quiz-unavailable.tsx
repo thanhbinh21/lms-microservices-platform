@@ -1,8 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { AlertCircle, Loader2, Lock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -11,29 +10,35 @@ interface QuizUnavailableProps {
   className?: string;
 }
 
-const REASONS: Record<string, { icon: React.ReactNode; title: string; description: string; severity: 'info' | 'warning' | 'error' }> = {
+const REASONS: Record<string, { icon: ReactNode; title: string; description: string; severity: 'info' | 'warning' | 'error' }> = {
   TRANSCRIPT_NOT_READY: {
     icon: <Loader2 className="size-4 animate-spin" />,
-    title: 'AI đang xử lý nội dung bài học',
-    description: 'Quiz sẽ khả dụng sau khi transcript được tạo xong.',
+    title: 'AI đang chuẩn bị ngữ cảnh',
+    description: 'Hệ thống sẽ dùng title, mô tả, nội dung bài học và từ khóa khóa học để tạo quiz.',
     severity: 'info',
   },
   VIDEO_TOO_LARGE: {
     icon: <AlertCircle className="size-4" />,
-    title: 'Video quá lớn để tạo quiz',
-    description: 'Video vượt giới hạn xử lý (60 phút / 500MB). Giảng viên cần chia nhỏ video.',
+    title: 'Video cần được chia nhỏ',
+    description: 'Quiz vẫn có thể tạo từ metadata, nhưng video quá dài có thể làm giảm chất lượng ngữ cảnh.',
     severity: 'warning',
   },
   INSUFFICIENT_CONTENT: {
     icon: <AlertCircle className="size-4" />,
-    title: 'Bài học chưa có đủ nội dung',
-    description: 'Cần ít nhất 1000 ký tự nội dung text để tạo quiz.',
+    title: 'Chưa tạo được quiz từ ngữ cảnh hiện có',
+    description: 'AI đã thử dùng title, mô tả và nội dung giảng viên cung cấp. Vui lòng thử lại sau hoặc bổ sung mô tả bài học.',
     severity: 'warning',
   },
   INSUFFICIENT_COURSE_COVERAGE: {
     icon: <AlertCircle className="size-4" />,
-    title: 'Chưa đủ bài học có nội dung',
-    description: 'Cần ≥50% bài học có transcript/nội dung text. Giảng viên cần bổ sung.',
+    title: 'Ngữ cảnh khóa học chưa sẵn sàng',
+    description: 'Hệ thống đang dùng cơ chế best-effort từ metadata khóa học, không còn yêu cầu transcript.',
+    severity: 'warning',
+  },
+  EMPTY_COURSE: {
+    icon: <AlertCircle className="size-4" />,
+    title: 'Khóa học chưa có bài học',
+    description: 'Cần có ít nhất một bài học được xuất bản để tạo quiz cuối khóa.',
     severity: 'warning',
   },
   COURSE_NOT_COMPLETED: {

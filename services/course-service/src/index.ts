@@ -1,3 +1,4 @@
+import './lib/load-env';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -46,12 +47,13 @@ import {
   getLessonPlayback,
 } from './controllers/lesson.controller';
 import { listCategories, createCategory } from './controllers/category.controller';
-import { getCourseByIdInternal, getLessonByIdInternal, getCourseCurriculumInternal, getInstructorCourseIdsInternal, getLessonAiContextStatus, getLessonTranscript, createManualTranscript, retryTranscript } from './controllers/internal.controller';
+import { getCourseByIdInternal, getLessonByIdInternal, getCourseCurriculumInternal, getInstructorCourseIdsInternal, getLessonAiContextStatus, getLessonAiContext, getLessonTranscript, createManualTranscript, createSubtitleTranscript, retryTranscript } from './controllers/internal.controller';
 import { requireAuth, requireRole } from './middleware/require-auth';
 import adminRouter from './routes/admin.routes';
 import prisma from './lib/prisma';
 import { disconnectProducer } from './lib/kafka-producer';
 import { startKafkaConsumers } from './lib/kafka-consumer';
+import { startTranscriptWorker } from './workers/transcript.worker';
 import { initCache, closeCache } from '@lms/cache';
 
 // Validate bien moi truong khi khoi dong
@@ -96,8 +98,10 @@ app.get('/internal/lessons/:id', requireInternal, getLessonByIdInternal);
 app.get('/internal/instructors/:instructorId/courses', requireInternal, getInstructorCourseIdsInternal);
 // AI service endpoints
 app.get('/internal/lessons/:id/ai-context-status', requireInternal, getLessonAiContextStatus);
+app.get('/internal/lessons/:id/ai-context', requireInternal, getLessonAiContext);
 app.get('/internal/lessons/:id/transcript', requireInternal, getLessonTranscript);
 app.post('/internal/lessons/:id/transcript/manual', requireInternal, createManualTranscript);
+app.post('/internal/lessons/:id/transcript/subtitle', requireInternal, createSubtitleTranscript);
 app.post('/internal/lessons/:id/transcript/retry', requireInternal, retryTranscript);
 
 // ─── Instructor Profile Routes ─────────────────────────────────────────────
@@ -150,6 +154,7 @@ app.put('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requi
 app.delete('/api/courses/:courseId/chapters/:chapterId/lessons/:lessonId', ...requireRole('instructor', 'admin'), deleteLesson);
 app.get('/api/lessons/:id/transcript', requireAuth, getLessonTranscript as any);
 app.post('/api/lessons/:id/transcript/manual', requireAuth, createManualTranscript as any);
+app.post('/api/lessons/:id/transcript/subtitle', requireAuth, createSubtitleTranscript as any);
 app.post('/api/lessons/:id/transcript/retry', requireAuth, retryTranscript as any);
 app.get('/api/lessons/:lessonId/playback', getLessonPlayback);
 
@@ -184,6 +189,22 @@ const server = app.listen(PORT, () => {
   logger.info(`Moi truong: ${process.env.NODE_ENV}`);
 });
 
+const transcriptWorkerProvider = process.env.TRANSCRIPT_STT_PROVIDER || 'disabled';
+const transcriptWorkerEnabled =
+  process.env.TRANSCRIPT_AUTO_STT_ENABLED === 'true'
+  && process.env.TRANSCRIPT_WORKER_ENABLED === 'true'
+  && transcriptWorkerProvider !== 'disabled';
+const transcriptWorker = transcriptWorkerEnabled
+  ? startTranscriptWorker()
+  : null;
+
+if (!transcriptWorkerEnabled) {
+  logger.warn({
+    provider: transcriptWorkerProvider,
+    enabled: process.env.TRANSCRIPT_WORKER_ENABLED,
+  }, '[COURSE-SERVICE] Bo qua embedded transcript worker');
+}
+
 // Khoi dong Redis cache (Upstash) — non-blocking
 if (process.env.CACHE_REDIS_URL) {
   initCache(process.env.CACHE_REDIS_URL).catch((err) => {
@@ -215,6 +236,7 @@ const shutdown = async (signal: string) => {
 
   server.close(async () => {
     try {
+      await transcriptWorker?.stop(signal);
       await disconnectProducer();
       await prisma.$disconnect();
       await closeCache();

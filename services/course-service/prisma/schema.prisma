@@ -125,6 +125,7 @@ model Lesson {
   // Relations
   chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   transcripts LessonTranscript[]
+  transcriptJobs TranscriptJob[]
 
   @@index([chapterId])
   @@map("lessons")
@@ -138,12 +139,14 @@ model LessonTranscript {
   id           String    @id @default(uuid())
   lessonId     String    @map("lesson_id")
   sourceType   String    @map("source_type")
-  // MP4_AUTO | YOUTUBE_AUTO | MANUAL | SUBTITLE_UPLOAD
+  // MANUAL | SUBTITLE_UPLOAD | AUTO_STT | AUTO_CONTEXT
 
+  contentKind  String    @default("VERBATIM_TRANSCRIPT") @map("content_kind")
+  // VERBATIM_TRANSCRIPT | AI_CONTEXT
   provider     String?   // whisper | youtube_api | manual
   language     String    @default("vi")
   status       String    @default("PENDING") @map("status")
-  // PENDING | PROCESSING | READY | FAILED | NEEDS_MANUAL_TRANSCRIPT | TOO_LARGE | UNSUPPORTED_SOURCE
+  // PENDING | PROCESSING | READY | FAILED | STALE | NEEDS_MANUAL_TRANSCRIPT | TOO_LARGE | UNSUPPORTED_SOURCE
 
   fullText     String?   @db.Text @map("full_text")
   segments     Json?     // [{ start: number, end: number, text: string }]
@@ -151,6 +154,8 @@ model LessonTranscript {
   fileSizeMb   Int?      @map("file_size_mb")
   confidence   Float?
   contentHash  String?   @map("content_hash")
+  videoHash    String?   @map("video_hash")
+  jobId        String?   @map("job_id")
   errorCode    String?   @map("error_code")
   errorMessage String?   @map("error_message")
   generatedAt  DateTime? @map("generated_at")
@@ -161,7 +166,33 @@ model LessonTranscript {
 
   @@index([lessonId])
   @@index([status])
+  @@index([sourceType, status])
+  @@index([videoHash])
   @@map("lesson_transcripts")
+}
+
+model TranscriptJob {
+  id          String    @id @default(uuid())
+  lessonId    String    @map("lesson_id")
+  sourceType  String    @map("source_type")
+  sourceUrl   String?   @db.Text @map("source_url")
+  videoHash   String?   @map("video_hash")
+  provider    String?
+  status      String    @default("QUEUED")
+  // QUEUED | PROCESSING | COMPLETED | FAILED | STALE
+  attempts    Int       @default(0)
+  lastError   String?   @db.Text @map("last_error")
+  lockedAt    DateTime? @map("locked_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([lessonId])
+  @@index([videoHash])
+  @@map("transcript_jobs")
 }
 
 // Enrollment signals tu learning-service (idempotent theo orderId)

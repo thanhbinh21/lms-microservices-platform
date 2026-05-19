@@ -27,7 +27,13 @@ export async function initRedis(redisUrl: string): Promise<RedisClientType> {
     logger.info('Redis da ket noi thanh cong');
   });
 
-  await redisClient.connect();
+  try {
+    await redisClient.connect();
+  } catch (connectErr) {
+    logger.error({ connectErr }, 'Khong the ket noi Redis — service se chay khong co session cache');
+    redisClient = null;
+    return null as unknown as RedisClientType;
+  }
   return redisClient;
 }
 
@@ -40,7 +46,10 @@ export async function setSession(
   sessionData: Record<string, any>,
   ttlSeconds: number = SESSION_TTL_SECONDS,
 ) {
-  if (!redisClient) throw new Error('Redis not initialized');
+  if (!redisClient) {
+    logger.warn({ userId }, 'Redis chua ket noi — skip setSession');
+    return;
+  }
 
   const key = `session:${userId}`;
   await redisClient.setEx(key, ttlSeconds, JSON.stringify(sessionData));
@@ -49,7 +58,10 @@ export async function setSession(
 
 /** Lay session tu Redis */
 export async function getSession(userId: string): Promise<Record<string, any> | null> {
-  if (!redisClient) throw new Error('Redis not initialized');
+  if (!redisClient) {
+    logger.warn({ userId }, 'Redis chua ket noi — skip session check');
+    return null;
+  }
 
   const key = `session:${userId}`;
   const data = await redisClient.get(key);
@@ -64,7 +76,10 @@ export async function getSession(userId: string): Promise<Record<string, any> | 
 
 /** Xoa session (logout) */
 export async function deleteSession(userId: string) {
-  if (!redisClient) throw new Error('Redis not initialized');
+  if (!redisClient) {
+    logger.warn({ userId }, 'Redis chua ket noi — skip deleteSession');
+    return;
+  }
 
   const key = `session:${userId}`;
   await redisClient.del(key);

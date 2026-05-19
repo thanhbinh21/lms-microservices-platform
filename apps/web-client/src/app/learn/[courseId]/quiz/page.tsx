@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { generateQuizAction, submitQuizAction } from '@/app/actions/ai';
@@ -19,7 +19,7 @@ export default function FinalQuizPage() {
   const [loading, setLoading] = useState(true);
   const [unavailableReason, setUnavailableReason] = useState<string | null>(null);
 
-  const startQuiz = async () => {
+  const startQuiz = useCallback(async () => {
     setLoading(true);
     setUnavailableReason(null);
 
@@ -28,10 +28,15 @@ export default function FinalQuizPage() {
 
     if (!res.success) {
       const msg = res.message || '';
+      const lowerMsg = msg.toLowerCase();
       if (msg.includes('100%')) setUnavailableReason('COURSE_NOT_COMPLETED');
-      else if (msg.includes('50%')) setUnavailableReason('INSUFFICIENT_COURSE_COVERAGE');
-      else if (msg.toLowerCase().includes('service') || msg.toLowerCase().includes('tạm')) setUnavailableReason('COURSE_SERVICE_UNAVAILABLE');
-      else setUnavailableReason('INSUFFICIENT_COURSE_COVERAGE');
+      else if (lowerMsg.includes('service') || lowerMsg.includes('unavailable') || lowerMsg.includes('không thể lấy')) {
+        setUnavailableReason('COURSE_SERVICE_UNAVAILABLE');
+      } else if (lowerMsg.includes('chưa có bài học') || lowerMsg.includes('empty')) {
+        setUnavailableReason('EMPTY_COURSE');
+      } else {
+        setUnavailableReason('INSUFFICIENT_CONTENT');
+      }
       return;
     }
 
@@ -40,11 +45,14 @@ export default function FinalQuizPage() {
       setQuestions(res.data.questions);
       setExpiresAt(res.data.expiresAt);
     }
-  };
+  }, [courseId]);
 
   useEffect(() => {
-    void startQuiz();
-  }, [courseId]);
+    const timer = window.setTimeout(() => {
+      void startQuiz();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [startQuiz]);
 
   const handleSubmit = async (answers: number[]) => {
     if (!sessionId) return { success: false, message: 'No session' };

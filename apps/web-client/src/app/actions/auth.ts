@@ -166,6 +166,18 @@ async function refreshWithToken(refreshToken: string): Promise<{ accessToken: st
   });
 
   const result = await response.json();
+
+  // Concurrent refresh: tab khac da rotate token roi — doc token moi tu cookie va retry 1 lan.
+  if (response.status === 409) {
+    const cookieStore = await cookies();
+    const newRefreshToken = cookieStore.get('refreshToken')?.value;
+    if (newRefreshToken && newRefreshToken !== refreshToken) {
+      return refreshWithToken(newRefreshToken);
+    }
+    await clearAuthCookies();
+    return null;
+  }
+
   if (!response.ok || !result.success) {
     if (response.status === 401 || response.status === 403) {
       await clearAuthCookies();

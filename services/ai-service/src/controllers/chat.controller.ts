@@ -6,23 +6,18 @@ import { logger } from '../lib/logger.js';
 import prisma from '../lib/prisma.js';
 import { handlePrismaError } from '../lib/prisma-errors.js';
 import { checkRateLimit } from '../lib/gemini.js';
-import { cacheGet, cacheSet } from '../lib/cache.js';
 import { guardInput, redactPII } from '../lib/input-guard.js';
 import { verifyEnrollment } from '../lib/access-control.js';
-import { fetchAiContextStatus, fetchTranscript, fetchCourseContext, fetchLessonContext } from '../lib/course-client.js';
+import { fetchAiContextStatus, fetchCourseContext, fetchLessonAiContext } from '../lib/course-client.js';
 import { streamGenerateText } from '../lib/gemini.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
 const MAX_CHAT_PER_HOUR = 30;
 const CHAT_RATE_LIMIT_WINDOW = 3600; // 1 hour in seconds
-const MAX_RECENT_MESSAGES = 20;
+const MAX_RECENT_MESSAGES = 6;
 const MAX_SUMMARY_MESSAGES = 10;
-const MIN_CONTEXT_LENGTH = 500;
-const MIN_QUIZ_CONTEXT_LENGTH = 1000;
-const MIN_FINAL_QUIZ_COVERAGE = 0.5;
-const QUIZ_PASS_SCORE = 70;
-const QUIZ_SESSION_EXPIRY_MINUTES = 30;
+const MIN_CONTEXT_LENGTH = 1;
 
 // ─── Public: AI Context Status ───────────────────────────────────────────────
 
@@ -41,7 +36,19 @@ export async function getAiContextStatus(req: Request, res: Response) {
     return res.status(200).json(createSuccessResponse(status, undefined, traceId));
   } catch (err) {
     logger.warn({ err, lessonId, traceId }, 'getAiContextStatus error');
-    return res.status(503).json(createErrorResponse('AI service temporarily unavailable', 503, traceId));
+    return res.status(200).json(createSuccessResponse({
+      available: true,
+      sources: ['BEST_EFFORT'],
+      transcriptStatus: 'READY',
+      contentLength: 0,
+      sourceType: 'AUTO_CONTEXT',
+      contentKind: 'KEYWORD_CONTEXT',
+      quality: 'LOW',
+      fallbackUsed: true,
+      processing: false,
+      failedAutoStt: false,
+      reason: 'CONTEXT_STATUS_UNAVAILABLE',
+    }, undefined, traceId));
   }
 }
 
@@ -68,52 +75,61 @@ function buildSystemPrompt(
   recentMessages?: { role: string; content: string }[],
   summaryText?: string,
 ): string {
-  let prompt = `Bạn là trợ lý học tập AI của hệ thống OLMS.
+  let prompt = `Ban la tro ly hoc tap AI cua he thong OLMS.
 
-VAI TRÒ:
-- Hỗ trợ học viên hiểu bài học sâu hơn
-- Trả lời dựa trên nội dung text bên dưới (lesson content, transcript, subtitle)
-- Gợi ý bài học tiếp theo khi phù hợp
+VAI TRO:
+- Ho tro hoc vien hieu bai hoc sau hon.
+- Dung chu de, tu khoa va text giang vien cung cap lam neo ngu canh.
+- Duoc phep mo rong kien thuc nen tang lien quan truc tiep den khoa hoc/bai hoc.
+- Neu cau tra loi la kien thuc mo rong ngoai text giang vien cung cap, hay noi ro do la "phan mo rong tham khao".
 
-KHÓA HỌC: "${courseTitle}"
-TRÌNH ĐỘ: ${level}
+KHOA HOC: "${courseTitle}"
+TRINH DO: ${level}
 `;
 
   if (lessonTitle && textContent) {
     prompt += `
-BÀI HỌC HIỆN TẠI: "${lessonTitle}"
-NỘI DUNG:
+BAI HOC HIEN TAI: "${lessonTitle}"
+NGU CANH/TU KHOA:
 ${textContent}
 `;
   }
 
   if (summaryText) {
-    prompt += `\nTÓM TẮT CUỘC HỘI THOẠI TRƯỚC ĐÓ:\n${summaryText}\n`;
+    prompt += `\nTOM TAT CUOC HOI THOAI TRUOC DO:\n${summaryText}\n`;
   }
 
   if (recentMessages && recentMessages.length > 0) {
-    const history = recentMessages.slice(-MAX_RECENT_MESSAGES).map((m) => `${m.role === 'user' ? 'Học viên' : 'AI'}: ${m.content}`).join('\n');
-    prompt += `\nTIN NHẮN GẦN ĐÂY:\n${history}\n`;
+    const history = recentMessages
+      .slice(-MAX_RECENT_MESSAGES)
+      .map((m) => {
+        // Cat ngan de tiet kiem token.
+        const text = m.content.length > 200 ? m.content.slice(0, 200) + '...' : m.content;
+        return `${m.role === 'user' ? 'Hoc vien' : 'AI'}: ${text}`;
+      })
+      .join('\n');
+    prompt += `\nTIN NHAN GAN DAY:\n${history}\n`;
   }
 
   prompt += `
-QUY TẮC:
-1. CHỈ trả lời dựa trên nội dung text đã cung cấp. Không bịa đặt.
-2. Nếu không có thông tin → nói rõ "Nội dung được cung cấp không đề cập đến..."
-3. Dùng markdown: **bold**, \`code\`, danh sách, code block.
-4. Giải thích đơn giản, kèm ví dụ cụ thể.
-5. Trả lời bằng tiếng Việt.
+QUY TAC:
+1. Uu tien noi dung/tu khoa trong ngu canh; khong dua cau tra loi di xa chu de khoa hoc.
+2. Duoc mo rong kien thuc nen tang de giai thich, tao vi du, so sanh va goi y cach hoc.
+3. Khong khang dinh chi tiet la noi dung trong video neu ngu canh khong neu ro.
+4. Neu hoc vien hoi ve chi tiet can tinh chinh xac cua bai giang, hay khuyen xem lai bai hoc hoac hoi giang vien.
+5. Dung markdown: **bold**, \`code\`, danh sach, code block khi can.
+6. Tra loi bang tieng Viet.
 
-GIỚI HẠN:
-- Không trả lời ngoài phạm vi học tập.
-- Không tiết lộ thông tin cá nhân.
+GIOI HAN:
+- Khong tra loi ngoai pham vi hoc tap.
+- Khong tiet lo thong tin ca nhan.
 `;
 
   return prompt;
 }
 
 async function buildChatContext(
-  courseId: string,
+  courseContext: NonNullable<Awaited<ReturnType<typeof fetchCourseContext>>>,
   lessonId: string | undefined,
   currentTimeSec: number | undefined,
   traceId: string,
@@ -121,37 +137,58 @@ async function buildChatContext(
   const sources: string[] = [];
   const contentParts: string[] = [];
 
-  // 1. Lesson content
   if (lessonId) {
-    const lesson = await fetchLessonContext(lessonId, traceId);
-    if (lesson?.content && lesson.content.trim().length >= MIN_CONTEXT_LENGTH) {
-      contentParts.push(`[NỘI DUNG BÀI HỌC]\n${lesson.content}`);
-      sources.push('LESSON_CONTENT');
-    }
+    const aiContext = await fetchLessonAiContext(lessonId, traceId);
+    if (aiContext?.available && aiContext.textContent) {
+      const segments = (aiContext.segments || []) as { start: number; end: number; text: string }[];
+      let contextText = aiContext.textContent;
 
-    // 2. Transcript (with window if currentTimeSec)
-    const transcript = await fetchTranscript(lessonId, traceId);
-    if (transcript?.status === 'READY' && transcript.fullText) {
-      const segments = (transcript.segments || []) as { start: number; end: number; text: string }[];
-
-      let transcriptText: string;
       if (currentTimeSec !== undefined && segments.length > 0) {
-        transcriptText = getTranscriptWindow(segments, currentTimeSec);
-      } else if (transcript.fullText.length <= 3000) {
-        transcriptText = transcript.fullText;
-      } else {
-        // Truncate long transcripts
-        transcriptText = transcript.fullText.slice(0, 3000);
+        const windowText = getTranscriptWindow(segments, currentTimeSec);
+        contextText = windowText.trim() || aiContext.textContent;
       }
 
-      if (transcriptText.trim().length > 0) {
-        contentParts.push(`[TRANSCRIPT]\n${transcriptText}`);
-        sources.push(transcript.sourceType);
+      // Groq free tier gioi han 6000 TPM — giu context nho de du cho system prompt + history.
+      if (contextText.length > 1500) {
+        contextText = contextText.slice(0, 1500);
       }
+
+      contentParts.push(`[${aiContext.sourceType}]\n${contextText}`);
+      sources.push(...aiContext.sources);
     }
   }
 
-  return { textContent: contentParts.join('\n\n---\n\n'), sources };
+  // Fallback: chi dung metadata bai hoc hien tai, KHONG dump toan bo danh sach lessons.
+  if (contentParts.length === 0) {
+    const allLessons = courseContext.curriculum.flatMap((ch) =>
+      ch.lessons.map((lesson) => ({ ...lesson, chapterTitle: ch.title })),
+    );
+    const currentLesson = lessonId ? allLessons.find((lesson) => lesson.id === lessonId) : undefined;
+    const fallbackParts = [
+      `Khoa hoc: ${courseContext.title}`,
+      courseContext.description?.trim() ? `Mo ta: ${courseContext.description.trim().slice(0, 200)}` : '',
+      courseContext.level ? `Trinh do: ${courseContext.level}` : '',
+    ];
+
+    if (currentLesson) {
+      fallbackParts.push(
+        `Chuong: ${currentLesson.chapterTitle}`,
+        `Bai hoc hien tai: ${currentLesson.title}`,
+      );
+      if (currentLesson.content?.trim()) {
+        fallbackParts.push(`Noi dung giang vien: ${currentLesson.content.trim().slice(0, 500)}`);
+      }
+    } else {
+      // Khong co lessonId — chi liet ke ten bai hoc (khong content) de tiet kiem token.
+      const lessonNames = allLessons.slice(0, 10).map((l, i) => `${i + 1}. ${l.title}`).join('\n');
+      fallbackParts.push(`Danh sach bai hoc:\n${lessonNames}`);
+    }
+
+    contentParts.push(`[AUTO_CONTEXT]\n${fallbackParts.filter(Boolean).join('\n')}`);
+    sources.push('COURSE_METADATA', 'LESSON_METADATA', 'AUTO_CONTEXT');
+  }
+
+  return { textContent: contentParts.join('\n\n---\n\n'), sources: Array.from(new Set(sources)) };
 }
 
 async function getRecentMessages(conversationId: string): Promise<{ role: string; content: string }[]> {
@@ -439,24 +476,24 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
     // AI Context Check
     const effectiveLessonId = lessonId || conversation.lessonId;
     if (effectiveLessonId) {
-      const lessonContext = await fetchLessonContext(effectiveLessonId, traceId);
-      if (!lessonContext || lessonContext.courseId !== conversation.courseId) {
+      const lessonContext = await fetchLessonAiContext(effectiveLessonId, traceId);
+      if (!lessonContext) {
+        logger.warn({ lessonId: effectiveLessonId, traceId }, 'Lesson AI context unavailable, using course fallback');
+      } else if (lessonContext.courseId !== conversation.courseId) {
         return res.status(403).json(createErrorResponse('Lesson does not belong to this course', 403, traceId));
       }
 
-      const ctxStatus = await fetchAiContextStatus(effectiveLessonId, traceId);
-
-      if (!ctxStatus.available) {
+      if (process.env.AI_STRICT_CONTEXT_GATE === 'true' && lessonContext && !lessonContext.available) {
         const errorMessages: Record<string, string> = {
           TRANSCRIPT_PROCESSING: 'AI đang xử lý nội dung video. Vui lòng quay lại sau.',
           TRANSCRIPT_FAILED: 'Không thể tạo transcript tự động. Vui lòng liên hệ giảng viên.',
-          NEEDS_MANUAL_TRANSCRIPT: 'Bài học chưa có transcript. Giảng viên cần bổ sung transcript hoặc subtitle.',
+          NEEDS_MANUAL_TRANSCRIPT: 'Bài học chưa có nội dung chi tiết. AI sẽ dùng ngữ cảnh khóa học khi tắt strict gate.',
           VIDEO_TOO_LARGE: 'Video vượt giới hạn xử lý. Giảng viên cần chia nhỏ video.',
-          NO_CONTEXT: 'AI chưa khả dụng cho bài học này vì chưa có transcript hoặc nội dung text.',
+          NO_CONTEXT: 'Bài học chưa có ngữ cảnh AI.',
           COURSE_SERVICE_UNAVAILABLE: 'Hệ thống tạm thời không khả dụng. Vui lòng thử lại sau.',
         };
 
-        const message = errorMessages[ctxStatus.reason || ''] || 'AI chưa khả dụng cho bài học này.';
+        const message = errorMessages[lessonContext.reason || ''] || 'AI chưa có đủ ngữ cảnh cho bài học này.';
         return res.status(422).json(createErrorResponse(message, 422, traceId));
       }
     }
@@ -483,7 +520,7 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
     }
 
     const { textContent: contextText, sources } = await buildChatContext(
-      conversation.courseId,
+      courseContext,
       effectiveLessonId ?? undefined,
       currentTimeSec,
       traceId,
@@ -495,12 +532,12 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
         data: {
           conversationId: id,
           role: 'assistant',
-          content: 'AI chưa khả dụng cho bài học này vì chưa có đủ nội dung text để tạo context.',
+          content: 'AI chưa tạo được ngữ cảnh cho bài học này. Vui lòng thử lại sau hoặc bổ sung mô tả bài học.',
           isError: true,
         },
       });
       return res.status(422).json(createErrorResponse(
-        'AI chưa khả dụng cho bài học này vì chưa có transcript hoặc nội dung text.',
+        'AI chưa tạo được ngữ cảnh cho bài học này. Vui lòng thử lại sau hoặc bổ sung mô tả bài học.',
         422,
         traceId,
       ));
@@ -543,8 +580,15 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
       for await (const chunk of streamGenerateText(content, systemPrompt)) {
         if (chunk.error) {
           errorOccurred = true;
-          fullResponse = 'Xin lỗi, đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại.';
-          sendEvent('error', { message: fullResponse });
+          if (chunk.code === 'RATE_LIMITED') {
+            const retrySeconds = chunk.retryAfterMs ? Math.ceil(chunk.retryAfterMs / 1000) : undefined;
+            fullResponse = retrySeconds
+              ? `AI dang tam het quota. Vui long thu lai sau ${retrySeconds} giay.`
+              : 'AI dang tam het quota. Vui long thu lai sau.';
+          } else {
+            fullResponse = 'Xin lỗi, đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại.';
+          }
+          sendEvent('error', { message: fullResponse, code: chunk.code, retryAfterMs: chunk.retryAfterMs });
           break;
         }
 

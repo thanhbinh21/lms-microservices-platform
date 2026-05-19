@@ -22,13 +22,20 @@ function readUserIdFromHeaders(headers: Record<string, string | string[] | undef
   if (headerId) return headerId;
 
   const auth = readHeaderValue(headers.authorization);
-  if (!auth || !auth.toLowerCase().startsWith('bearer ')) return '';
+  if (auth && auth.toLowerCase().startsWith('bearer ')) {
+    const token = auth.slice(7).trim();
+    const payload = decodeJwtPayload(token);
+    if (payload) return (payload.userId as string) || (payload.user_id as string) || '';
+  }
 
-  const token = auth.slice(7).trim();
-  const payload = decodeJwtPayload(token);
-  if (!payload) return '';
+  // Fallback: client-side fetch gui cookie thay vi Authorization header.
+  const cookieToken = extractTokenFromCookie(headers);
+  if (cookieToken) {
+    const payload = decodeJwtPayload(cookieToken);
+    if (payload) return (payload.userId as string) || (payload.user_id as string) || '';
+  }
 
-  return (payload.userId as string) || (payload.user_id as string) || '';
+  return '';
 }
 
 function readUserRoleFromHeaders(headers: Record<string, string | string[] | undefined>): string {
@@ -36,13 +43,27 @@ function readUserRoleFromHeaders(headers: Record<string, string | string[] | und
   if (headerRole) return headerRole;
 
   const auth = readHeaderValue(headers.authorization);
-  if (!auth || !auth.toLowerCase().startsWith('bearer ')) return '';
+  if (auth && auth.toLowerCase().startsWith('bearer ')) {
+    const token = auth.slice(7).trim();
+    const payload = decodeJwtPayload(token);
+    if (payload) return (payload.role as string) || (payload.user_role as string) || '';
+  }
 
-  const token = auth.slice(7).trim();
-  const payload = decodeJwtPayload(token);
-  if (!payload) return '';
+  // Fallback: decode tu cookie khi khong co Authorization header.
+  const cookieToken = extractTokenFromCookie(headers);
+  if (cookieToken) {
+    const payload = decodeJwtPayload(cookieToken);
+    if (payload) return (payload.role as string) || (payload.user_role as string) || '';
+  }
 
-  return (payload.role as string) || (payload.user_role as string) || '';
+  return '';
+}
+
+function extractTokenFromCookie(headers: Record<string, string | string[] | undefined>): string | null {
+  const cookie = readHeaderValue(headers.cookie);
+  if (!cookie) return null;
+  const match = cookie.match(/accessToken=([^;]+)/);
+  return match ? match[1].trim() : null;
 }
 
 /** Require auth middleware — doc x-user-id tu Gateway headers */

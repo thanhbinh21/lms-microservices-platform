@@ -6,23 +6,17 @@ import { createSuccessResponse, createErrorResponse } from '@lms/types';
 import { logger } from '../lib/logger.js';
 import prisma from '../lib/prisma.js';
 import { handlePrismaError } from '../lib/prisma-errors.js';
-import { checkRateLimit } from '../lib/gemini.js';
-import { cacheGet, cacheSet } from '../lib/cache.js';
-import { generateText } from '../lib/gemini.js';
+import { checkRateLimit, generateText, isGeminiRateLimitError } from '../lib/gemini.js';
 import { verifyEnrollment } from '../lib/access-control.js';
-import { fetchAiContextStatus, fetchTranscript, fetchCourseContext, fetchLessonContext, fetchCompletionStatus } from '../lib/course-client.js';
+import { fetchCourseContext, fetchLessonAiContext, fetchCompletionStatus, fetchLessonCompletionStatus } from '../lib/course-client.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
 const MAX_QUIZ_PER_DAY = 20;
 const QUIZ_RATE_LIMIT_WINDOW = 86400; // 24 hours
-const MIN_QUIZ_CONTEXT_LENGTH = 1000;
-const MIN_FINAL_QUIZ_COVERAGE = 0.5;
 const QUIZ_PASS_SCORE = 70;
 const QUIZ_SESSION_EXPIRY_MINUTES = 30;
-const LESSON_QUIZ_DEFAULT_QUESTIONS = 5;
 const LESSON_QUIZ_MAX_QUESTIONS = 10;
-const FINAL_QUIZ_DEFAULT_QUESTIONS = 15;
 const FINAL_QUIZ_MAX_QUESTIONS = 20;
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -48,33 +42,62 @@ interface QuizCorrectData {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
+type CourseContext = NonNullable<Awaited<ReturnType<typeof fetchCourseContext>>>;
+type LessonContext = CourseContext['curriculum'][number]['lessons'][number];
+
+function buildLessonKeywordContext(course: CourseContext, lesson: LessonContext | undefined): string {
+  const lessonChapter = lesson
+    ? course.curriculum.find((chapter) => chapter.lessons.some((item) => item.id === lesson.id))
+    : undefined;
+
+  return [
+    `Khoa hoc: ${course.title}`,
+    course.description?.trim() ? `Mo ta khoa hoc: ${course.description.trim()}` : '',
+    course.category ? `Danh muc: ${course.category}` : '',
+    course.level ? `Trinh do: ${course.level}` : '',
+    lessonChapter ? `Chuong: ${lessonChapter.title}` : '',
+    lesson ? `Bai hoc: ${lesson.title}` : '',
+    lesson?.content?.trim() ? `Noi dung giang vien: ${lesson.content.trim()}` : '',
+    lesson?.videoUrl ? `Nguon video: ${lesson.sourceType} - ${lesson.videoUrl}` : '',
+    lesson?.duration ? `Thoi luong: ${lesson.duration} giay` : '',
+    'Che do AI: Tao cau hoi best-effort tu title, mo ta, noi dung giang vien va tu khoa lien quan truc tiep.',
+  ].filter(Boolean).join('\n');
+}
+
+function buildCourseKeywordContext(course: CourseContext): string {
+  const lessons = course.curriculum.flatMap((chapter) =>
+    chapter.lessons.map((lesson, index) => [
+      `${index + 1}. Chuong "${chapter.title}" - Bai "${lesson.title}"`,
+      lesson.content?.trim() ? `Noi dung: ${lesson.content.trim()}` : '',
+      lesson.videoUrl ? `Video: ${lesson.sourceType} - ${lesson.videoUrl}` : '',
+    ].filter(Boolean).join('\n')),
+  );
+
+  return [
+    `Khoa hoc: ${course.title}`,
+    course.description?.trim() ? `Mo ta khoa hoc: ${course.description.trim()}` : '',
+    course.category ? `Danh muc: ${course.category}` : '',
+    course.level ? `Trinh do: ${course.level}` : '',
+    lessons.join('\n\n'),
+    'Che do AI: Tao quiz tong hop best-effort tu metadata, noi dung giang vien va tu khoa cua toan khoa hoc.',
+  ].filter(Boolean).join('\n');
+}
+
 async function hasValidLessonQuizContext(lessonId: string, traceId: string): Promise<{
   available: boolean;
   reason?: string;
   textContent?: string;
 }> {
-  const ctxStatus = await fetchAiContextStatus(lessonId, traceId);
-
-  if (ctxStatus.transcriptStatus === 'PROCESSING') return { available: false, reason: 'TRANSCRIPT_NOT_READY' };
-  if (ctxStatus.transcriptStatus === 'TOO_LARGE') return { available: false, reason: 'VIDEO_TOO_LARGE' };
-
-  const lesson = await fetchLessonContext(lessonId, traceId);
-  const transcript = await fetchTranscript(lessonId, traceId);
-
-  const contentParts: string[] = [];
-  if (lesson?.content && lesson.content.trim().length >= MIN_QUIZ_CONTEXT_LENGTH) {
-    contentParts.push(lesson.content);
-  }
-  if (transcript?.status === 'READY' && transcript.fullText) {
-    contentParts.push(transcript.fullText);
+  const aiContext = await fetchLessonAiContext(lessonId, traceId);
+  if (!aiContext) {
+    return { available: false, reason: 'COURSE_SERVICE_UNAVAILABLE' };
   }
 
-  const combined = contentParts.join('\n\n');
-  if (combined.length < MIN_QUIZ_CONTEXT_LENGTH) {
+  if (!aiContext.available || aiContext.textContent.trim().length === 0) {
     return { available: false, reason: 'INSUFFICIENT_CONTENT' };
   }
 
-  return { available: true, textContent: combined };
+  return { available: true, textContent: `[${aiContext.sourceType}]\n${aiContext.textContent}` };
 }
 
 async function hasValidFinalQuizContext(courseId: string, traceId: string): Promise<{
@@ -93,19 +116,45 @@ async function hasValidFinalQuizContext(courseId: string, traceId: string): Prom
   let lessonsWithContext = 0;
   const contentParts: string[] = [];
 
-  for (const lesson of allLessons) {
-    const ctx = await hasValidLessonQuizContext(lesson.id, traceId);
+  if (allLessons.length === 0) {
+    return { available: false, reason: 'EMPTY_COURSE', lessonsWithContext: 0, totalLessons: 0 };
+  }
+
+  const lessonContexts = await Promise.all(
+    allLessons.map(async (lesson) => ({
+      lesson,
+      ctx: await hasValidLessonQuizContext(lesson.id, traceId),
+    })),
+  );
+
+  for (const { lesson, ctx } of lessonContexts) {
     if (ctx.available && ctx.textContent) {
       lessonsWithContext++;
       contentParts.push(`[${lesson.title}]\n${ctx.textContent}`);
+      continue;
+    }
+
+    // Fallback cuoi cung de final quiz khong bi chan khi context service tam thoi loi.
+    const fallback = [
+      `Khoa hoc: ${course.title}.`,
+      course.description?.trim() ? `Mo ta khoa hoc: ${course.description.trim()}` : '',
+      `Chuong: ${course.curriculum.find((chapter) => chapter.lessons.some((item) => item.id === lesson.id))?.title ?? ''}.`,
+      `Tieu de bai hoc: ${lesson.title}.`,
+      lesson.content?.trim() ? `Noi dung giang vien: ${lesson.content.trim()}` : '',
+      lesson.videoUrl ? `Video: ${lesson.sourceType} - ${lesson.videoUrl}. Thoi luong: ${lesson.duration ?? 0} giay.` : '',
+      'Ngu canh AI: Mo rong hop ly tu chu de va tu khoa lien quan.',
+    ].filter(Boolean).join('\n');
+
+    if (fallback.trim()) {
+      lessonsWithContext++;
+      contentParts.push(`[${lesson.title}]\n${fallback}`);
     }
   }
 
-  const coverage = allLessons.length > 0 ? lessonsWithContext / allLessons.length : 0;
-  if (coverage < MIN_FINAL_QUIZ_COVERAGE) {
+  if (contentParts.length === 0) {
     return {
       available: false,
-      reason: 'INSUFFICIENT_COURSE_COVERAGE',
+      reason: 'INSUFFICIENT_CONTENT',
       lessonsWithContext,
       totalLessons: allLessons.length,
     };
@@ -119,6 +168,11 @@ async function hasValidFinalQuizContext(courseId: string, traceId: string): Prom
   };
 }
 
+const QUIZ_SYSTEM_INSTRUCTION = `Ban la he thong tao quiz tu dong. Nhiem vu cua ban chi la tra ve mot JSON array, KHONG co bat ky text nao khac.
+Output phai la JSON array hop le bat dau bang [ va ket thuc bang ].
+Moi phan tu trong array la object co cac truong: question (string), options (array of 4 strings), correctIndex (number 0-3), explanation (string).
+TUYET DOI khong viet text giai thich, khong viet 'Day la...' hay bat ky chu nao truoc hoac sau JSON array.`;
+
 function buildLessonQuizPrompt(
   lessonTitle: string,
   textContent: string,
@@ -126,14 +180,13 @@ function buildLessonQuizPrompt(
   level: string,
   count: number,
 ): string {
-  return `Tạo ${count} câu MCQ kiểm tra kiến thức bài "${lessonTitle}" (khóa "${courseTitle}", ${level}).
+  return `Tao ${count} cau MCQ kiem tra kien thuc bai "${lessonTitle}" (khoa "${courseTitle}", trinh do ${level}).
 
-NỘI DUNG:
+NOI DUNG BAI HOC:
 ${textContent}
 
-QUY TẮC: 4 lựa chọn, 1 đáp án đúng, giải thích ngắn, tiếng Việt, JSON thuần.
-OUTPUT: [{ "question": "...", "options": ["A","B","C","D"], "correctIndex": 0, "explanation": "..." }]
-Không có gì khác ngoài JSON array.`;
+Yeu cau: 4 lua chon A/B/C/D, 1 dap an dung, giai thich ngan bang tieng Viet.
+Chi tra ve JSON array, khong co text khac.`;
 }
 
 function buildFinalQuizPrompt(
@@ -142,40 +195,87 @@ function buildFinalQuizPrompt(
   combinedContent: string,
   count: number,
 ): string {
-  return `Tạo ${count} câu MCQ tổng hợp cho TOÀN BỘ khóa học "${courseTitle}" (${level}).
+  return `Tao ${count} cau MCQ tong hop cho khoa hoc "${courseTitle}" (trinh do ${level}).
 
-YÊU CẦU ĐẶC BIỆT:
-- Bao phủ nhiều bài học khác nhau (không tập trung 1 bài).
-- Kết hợp câu hỏi nhớ + hiểu + vận dụng.
-- Độ khó phù hợp ${level}.
-- Đây là bài kiểm tra cuối khóa để nhận chứng chỉ.
+Yeu cau dac biet:
+- Bao phu nhieu bai hoc khac nhau.
+- Ket hop cau hoi nho + hieu + van dung.
+- Day la bai kiem tra cuoi khoa.
 
-NỘI DUNG TOÀN KHÓA:
+NOI DUNG TOAN KHOA:
 ${combinedContent}
 
-QUY TẮC: 4 lựa chọn, 1 đáp án đúng, giải thích ngắn, tiếng Việt, JSON thuần.
-OUTPUT: [{ "question": "...", "options": ["A","B","C","D"], "correctIndex": 0, "explanation": "..." }]
-Không có gì khác ngoài JSON array.`;
+Yeu cau: 4 lua chon A/B/C/D, 1 dap an dung, giai thich ngan bang tieng Viet.
+Chi tra ve JSON array, khong co text khac.`;
+}
+
+function buildStaticFallbackQuiz(
+  courseTitle: string,
+  lessonTitle: string | undefined,
+  count: number,
+): QuizQuestion[] {
+  const subject = lessonTitle ? `bai "${lessonTitle}"` : `khoa hoc "${courseTitle}"`;
+
+  return Array.from({ length: count }, (_, index) => ({
+    question: `Cau hoi du phong ${index + 1} cho ${subject}.`,
+    options: [
+      'Noi dung dang duoc cap nhat.',
+      'Can xem lai bai hoc de nho hon.',
+      'Vui long thu lai sau de nhan quiz day du.',
+      'Lien he giang vien neu can ho tro.',
+    ],
+    correctIndex: 2,
+    explanation: 'Quiz du phong khi he thong AI tam thoi khong san sang.',
+  }));
 }
 
 async function generateQuizWithLLM(
   prompt: string,
   expectedCount: number,
 ): Promise<{ questions: QuizQuestion[]; raw: string }> {
-  const raw = await generateText(prompt, undefined, {
-    temperature: 0.7,
-    maxTokens: 4096,
-  });
+  const maxAttempts = 2;
 
-  // Extract JSON array from response
-  let jsonStr = raw.trim();
-  const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
-  if (jsonMatch) {
-    jsonStr = jsonMatch[0];
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Dung system instruction de ep model tra ve JSON thuần.
+    const raw = await generateText(prompt, QUIZ_SYSTEM_INSTRUCTION, {
+      temperature: attempt === 1 ? 0.3 : 0.1,
+      maxTokens: 2048,
+    });
+
+    try {
+      let jsonStr = raw.trim();
+      // Strip markdown code blocks neu co.
+      jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+      // Strip text truoc/sau JSON array.
+      const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        logger.warn({ attempt, rawPreview: raw.slice(0, 300) }, 'Quiz LLM: khong tim thay JSON array');
+        if (attempt < maxAttempts) continue;
+        throw new Error('LLM response khong chua JSON array');
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]) as QuizQuestion[];
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw new Error('Parsed result khong phai la array hoac rong');
+      }
+
+      const valid = parsed.filter(
+        (q) => q.question && Array.isArray(q.options) && q.options.length >= 2
+          && typeof q.correctIndex === 'number' && q.correctIndex >= 0,
+      );
+
+      if (valid.length === 0) {
+        throw new Error('Khong co question nao hop le sau validation');
+      }
+
+      return { questions: valid, raw };
+    } catch (parseErr) {
+      logger.warn({ attempt, err: parseErr, rawPreview: raw.slice(0, 300) }, 'Quiz LLM: parse/validate that bai');
+      if (attempt >= maxAttempts) throw parseErr;
+    }
   }
 
-  const parsed = JSON.parse(jsonStr) as QuizQuestion[];
-  return { questions: parsed, raw };
+  throw new Error('generateQuizWithLLM: het so lan thu');
 }
 
 function hashQuestions(questions: QuizQuestion[]): string {
@@ -232,6 +332,19 @@ export async function generateQuiz(req: Request, res: Response): Promise<Respons
     }
 
     const effectiveLessonId = quizType === 'LESSON' ? lessonId : undefined;
+
+    // Gate: LESSON quiz chi cho phep khi bai hoc hien tai da duoc hoan thanh.
+    if (quizType === 'LESSON' && effectiveLessonId) {
+      const lessonDone = await fetchLessonCompletionStatus(userId, effectiveLessonId, traceId);
+      // lessonDone = null nghia la learning-service khong phan hoi — cho qua de khong block.
+      if (lessonDone === false) {
+        return res.status(403).json(createErrorResponse(
+          'Bạn cần hoàn thành bài học trước khi làm quiz.',
+          403,
+          traceId,
+        ));
+      }
+    }
     const effectiveCount = Math.min(
       questionCount,
       quizType === 'FINAL_COURSE' ? FINAL_QUIZ_MAX_QUESTIONS : LESSON_QUIZ_MAX_QUESTIONS,
@@ -278,14 +391,25 @@ export async function generateQuiz(req: Request, res: Response): Promise<Respons
     if (quizType === 'LESSON' && effectiveLessonId) {
       const ctx = await hasValidLessonQuizContext(effectiveLessonId, traceId);
       if (!ctx.available) {
-        contextErrorCode = ctx.reason;
+        const lesson = course.curriculum.flatMap((ch) => ch.lessons).find((l) => l.id === effectiveLessonId);
+        const fallback = buildLessonKeywordContext(course, lesson);
+        if (fallback.trim()) {
+          textContent = `[AUTO_CONTEXT]\n${fallback}`;
+        } else {
+          contextErrorCode = ctx.reason;
+        }
       } else {
         textContent = ctx.textContent!;
       }
     } else {
       const ctx = await hasValidFinalQuizContext(courseId, traceId);
       if (!ctx.available) {
-        contextErrorCode = ctx.reason;
+        const fallback = buildCourseKeywordContext(course);
+        if (fallback.trim()) {
+          textContent = `[AUTO_CONTEXT]\n${fallback}`;
+        } else {
+          contextErrorCode = ctx.reason;
+        }
       } else {
         textContent = ctx.combinedContent!;
       }
@@ -293,10 +417,11 @@ export async function generateQuiz(req: Request, res: Response): Promise<Respons
 
     if (contextErrorCode) {
       const errorMessages: Record<string, string> = {
-        TRANSCRIPT_NOT_READY: 'AI đang xử lý transcript cho video này. Vui lòng quay lại sau.',
+        TRANSCRIPT_NOT_READY: 'AI đang chuẩn bị ngữ cảnh bài học. Vui lòng quay lại sau.',
         VIDEO_TOO_LARGE: 'Video vượt giới hạn xử lý. Vui lòng chia nhỏ video.',
-        INSUFFICIENT_CONTENT: 'Bài học chưa có đủ nội dung text (tối thiểu 1000 ký tự) để tạo quiz.',
-        INSUFFICIENT_COURSE_COVERAGE: 'Chưa đủ bài học có nội dung text (cần ≥50% bài học). Giảng viên cần bổ sung transcript.',
+        INSUFFICIENT_CONTENT: 'Bài học chưa có thông tin tối thiểu để tạo quiz.',
+        COURSE_SERVICE_UNAVAILABLE: 'Không thể lấy ngữ cảnh khóa học lúc này. Vui lòng thử lại sau.',
+        EMPTY_COURSE: 'Khóa học chưa có bài học để tạo quiz.',
         COURSE_NOT_FOUND: 'Không tìm thấy khóa học.',
       };
       return res.status(422).json(createErrorResponse(
@@ -319,10 +444,17 @@ export async function generateQuiz(req: Request, res: Response): Promise<Respons
     }
 
     // Generate quiz
-    const courseForPrompt = course;
     if (!course) {
       return res.status(500).json(createErrorResponse('Không thể lấy thông tin khóa học', 500, traceId));
     }
+
+    textContent = `${textContent}
+
+YEU CAU KEYWORD_EXPANSION:
+- Tao quiz dua tren chu de, tu khoa, tieu de, mo ta va text giang vien cung cap.
+- Duoc mo rong sang kien thuc nen tang lien quan truc tiep den khoa hoc/bai hoc.
+- Khong can transcript am thanh day du.
+- Tranh hoi vao chi tiet qua cu the neu ngu canh khong neu ro.`;
 
     let prompt: string;
     if (quizType === 'LESSON' && effectiveLessonId) {
@@ -344,7 +476,19 @@ export async function generateQuiz(req: Request, res: Response): Promise<Respons
       quizQuestions = questions.slice(0, effectiveCount);
     } catch (err) {
       logger.warn({ err, traceId }, 'Quiz generation failed');
-      return res.status(500).json(createErrorResponse('Không thể tạo quiz. Vui lòng thử lại.', 500, traceId));
+      // Tra loi loi thay vi quiz du phong vo nghia.
+      if (isGeminiRateLimitError(err)) {
+        return res.status(429).json(createErrorResponse(
+          'AI đang tạm hết quota. Vui lòng thử lại sau vài phút.',
+          429,
+          traceId,
+        ));
+      }
+      return res.status(503).json(createErrorResponse(
+        'AI tạm thời không thể tạo quiz. Vui lòng thử lại sau.',
+        503,
+        traceId,
+      ));
     }
 
     // Split: questions_client (no correct answers) vs correct_data (server-only)

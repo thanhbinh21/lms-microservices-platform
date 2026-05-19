@@ -604,3 +604,29 @@ export const internalGetCourseCompletion = async (req: Request, res: Response): 
     return res.status(500).json({ success: false, message: 'Internal error' });
   }
 };
+/**
+ * GET /internal/lessons/:lessonId/completion?userId=
+ * Internal API — ai-service goi de kiem tra bai hoc da hoan thanh chua truoc khi tao quiz.
+ */
+export const internalCheckLessonCompletion = async (req: Request, res: Response): Promise<Response | void> => {
+  const { lessonId } = req.params;
+  const { userId } = req.query;
+
+  if (!userId || !lessonId) {
+    return res.status(400).json({ success: false, message: 'Missing userId or lessonId' });
+  }
+
+  try {
+    const progress = await prisma.lessonProgress.findUnique({
+      where: { userId_lessonId: { userId: userId as string, lessonId } },
+      select: { isCompleted: true },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: { isCompleted: progress?.isCompleted ?? false },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Internal error' });
+  }
+};

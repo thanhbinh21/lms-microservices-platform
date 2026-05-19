@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Loader2, Clock3, PlayCircle, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, HelpCircle, Keyboard, ListChecks, X, Award, MessageSquare, Brain } from 'lucide-react';
+import { Loader2, Clock3, PlayCircle, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, HelpCircle, Keyboard, ListChecks, X, Award, MessageSquare } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getLearnDataAction, updateLessonProgressAction, type LearnDataDto, type LearnLessonDto } from '@/app/actions/learning';
 import { generateQuizAction, getAiContextStatusAction, submitQuizAction } from '@/app/actions/ai';
@@ -22,12 +22,6 @@ function formatDuration(seconds: number) {
   const m = Math.ceil((seconds % 3600) / 60);
   if (h > 0) return `${h}h ${m}ph`;
   return `${m} phút`;
-}
-
-function getAllLessons(chapters: LearnDataDto['chapters']) {
-  return chapters.flatMap((ch) =>
-    ch.lessons.map((l) => ({ ...l, chapterTitle: ch.title, chapterLessons: ch.lessons })),
-  );
 }
 
 export default function LessonPage() {
@@ -51,6 +45,7 @@ export default function LessonPage() {
   const [quizUnavailableReason, setQuizUnavailableReason] = useState<string | null>(null);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
   const [aiUnavailableReason, setAiUnavailableReason] = useState<string | undefined>(undefined);
+  const [chatOpen, setChatOpen] = useState(false);
   const hasTriggeredConfetti = useRef(false);
 
   const fetchData = useCallback(async () => {
@@ -70,25 +65,31 @@ export default function LessonPage() {
     void (async () => {
       const ctxRes = await getAiContextStatusAction(lessonId);
       if (ctxRes.success && ctxRes.data) {
-        setAiAvailable(ctxRes.data.available);
-        if (!ctxRes.data.available) {
+        setAiAvailable(true);
+        if (!ctxRes.data.available && ctxRes.data.reason === 'NO_CONTEXT') {
           setAiUnavailableReason(ctxRes.data.reason);
+        } else {
+          setAiUnavailableReason(undefined);
         }
       } else {
-        setAiAvailable(false);
-        setAiUnavailableReason('AI_SERVICE_UNAVAILABLE');
+        setAiAvailable(true);
+        setAiUnavailableReason(undefined);
       }
     })();
   }, [lessonId]);
 
   useEffect(() => {
-    setLoading(true);
-    setQaExpanded(false);
-    setQuizOpen(false);
-    setQuizSessionId(null);
-    setQuizQuestions([]);
-    setQuizUnavailableReason(null);
-    void fetchData();
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setQaExpanded(false);
+      setQuizOpen(false);
+      setQuizSessionId(null);
+      setQuizQuestions([]);
+      setQuizUnavailableReason(null);
+      setChatOpen(false);
+      void fetchData();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchData]);
 
   const startLessonQuiz = async () => {
@@ -102,9 +103,12 @@ export default function LessonPage() {
 
     if (!res.success || !res.data) {
       const msg = res.message || '';
-      if (msg.includes('transcript')) setQuizUnavailableReason('TRANSCRIPT_NOT_READY');
-      else if (msg.includes('1000')) setQuizUnavailableReason('INSUFFICIENT_CONTENT');
-      else if (msg.toLowerCase().includes('video')) setQuizUnavailableReason('VIDEO_TOO_LARGE');
+      const lowerMsg = msg.toLowerCase();
+      if (msg.includes('100%')) setQuizUnavailableReason('COURSE_NOT_COMPLETED');
+      else if (lowerMsg.includes('service') || lowerMsg.includes('không thể lấy')
+        || lowerMsg.includes('tạm thời') || lowerMsg.includes('quota'))
+        setQuizUnavailableReason('COURSE_SERVICE_UNAVAILABLE');
+      else if (lowerMsg.includes('video')) setQuizUnavailableReason('VIDEO_TOO_LARGE');
       else setQuizUnavailableReason('INSUFFICIENT_CONTENT');
       return;
     }
@@ -362,7 +366,7 @@ export default function LessonPage() {
             {/* AI Chat Button — triggers floating ChatWidget */}
             <button
               type="button"
-              onClick={() => {/* ChatWidget is standalone and manages its own state */}}
+              onClick={() => setChatOpen(true)}
               className="flex flex-col items-center gap-0.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[10px] font-semibold text-slate-500 transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
             >
               <MessageSquare className="size-4" />
@@ -451,8 +455,10 @@ export default function LessonPage() {
       <ChatWidget
         courseId={courseId}
         lessonId={lessonId}
-        aiAvailable={aiAvailable ?? false}
+        aiAvailable={aiAvailable ?? true}
         aiUnavailableReason={aiUnavailableReason}
+        open={chatOpen}
+        onOpenChange={setChatOpen}
       />
 
       {quizOpen && (

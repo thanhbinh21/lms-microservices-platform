@@ -2,7 +2,6 @@
 
 import { MessageSquare, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 interface ChatUnavailableProps {
   reason: string;
@@ -11,38 +10,38 @@ interface ChatUnavailableProps {
 
 const REASON_MESSAGES: Record<string, { title: string; description: string }> = {
   TRANSCRIPT_PROCESSING: {
-    title: 'AI đang xử lý nội dung bài học',
-    description: 'Vui lòng quay lại sau khi transcript được tạo xong.',
+    title: 'AI đang chuẩn bị ngữ cảnh',
+    description: 'Hệ thống sẽ ưu tiên ngữ cảnh hiện có của khóa học trong lúc xử lý.',
   },
   TRANSCRIPT_FAILED: {
-    title: 'AI chưa khả dụng cho bài học này',
-    description: 'Đã xảy ra lỗi khi xử lý video. Vui lòng liên hệ giảng viên.',
+    title: 'Ngữ cảnh AI chưa sẵn sàng',
+    description: 'Hệ thống vẫn có thể dùng title, mô tả và nội dung giảng viên cung cấp làm fallback.',
   },
   NEEDS_MANUAL_TRANSCRIPT: {
-    title: 'Bài học chưa có transcript',
-    description: 'Giảng viên chưa bổ sung transcript hoặc phụ đề cho bài học này.',
+    title: 'Bài học chưa có nội dung chi tiết',
+    description: 'AI sẽ dùng ngữ cảnh khóa học và từ khóa liên quan để hỗ trợ best-effort.',
   },
   VIDEO_TOO_LARGE: {
-    title: 'AI không khả dụng',
-    description: 'Video quá dài và cần được chia nhỏ để AI xử lý.',
+    title: 'Video cần được chia nhỏ',
+    description: 'AI vẫn có thể trả lời từ metadata, nhưng chất lượng có thể thấp hơn.',
   },
   NO_CONTEXT: {
-    title: 'AI chưa khả dụng cho bài học này',
-    description: 'Bài học chưa có đủ nội dung text để AI trả lời câu hỏi.',
+    title: 'Ngữ cảnh AI chưa sẵn sàng',
+    description: 'Vui lòng thử lại sau hoặc bổ sung mô tả bài học.',
   },
   COURSE_SERVICE_UNAVAILABLE: {
     title: 'Hệ thống tạm thời không khả dụng',
     description: 'Vui lòng thử lại sau.',
   },
   INSUFFICIENT_CONTENT: {
-    title: 'Bài học chưa có đủ nội dung',
-    description: 'Cần ít nhất 1000 ký tự nội dung text để tạo quiz.',
+    title: 'Ngữ cảnh bài học còn ít',
+    description: 'AI sẽ dùng ngữ cảnh hiện có của bài học và mở rộng hợp lý theo chủ đề.',
   },
 };
 
 export function ChatUnavailable({ reason, onClose }: ChatUnavailableProps) {
   const config = REASON_MESSAGES[reason] ?? {
-    title: 'AI chưa khả dụng cho bài học này',
+    title: 'Ngữ cảnh AI chưa sẵn sàng',
     description: reason,
   };
 
@@ -84,7 +83,7 @@ export function ChatLoading({ reason }: { reason?: string }) {
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
         <Loader2 className="size-6 animate-spin text-primary" />
         <p className="text-xs text-muted-foreground">
-          {reason || 'AI đang xử lý nội dung bài học...'}
+          {reason || 'AI đang chuẩn bị ngữ cảnh bài học...'}
         </p>
       </div>
     </div>

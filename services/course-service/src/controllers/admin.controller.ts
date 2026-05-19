@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import type { ApiResponse } from '@lms/types';
+import type { Prisma } from '../generated/prisma/index.js';
 import { logger } from '@lms/logger';
 import { cacheInvalidate, cacheInvalidatePattern } from '@lms/cache';
 import prisma from '../lib/prisma';
@@ -16,6 +17,19 @@ async function invalidateCourseDiscoveryCachesForStatusChange(): Promise<void> {
 async function invalidateCourseDiscoveryCachesForRatingChange(): Promise<void> {
   await cacheInvalidatePattern('cache:courses:list:*');
 }
+
+type AdminCourse = Prisma.CourseGetPayload<{
+  include: {
+    category: { select: { name: true } };
+    _count: { select: { chapters: true } };
+  };
+}>;
+
+type AdminReview = Prisma.ReviewGetPayload<{
+  include: {
+    course: { select: { title: true } };
+  };
+}>;
 
 /** GET /api/admin/courses */
 export async function listAdminCourses(req: Request, res: Response) {
@@ -36,7 +50,7 @@ export async function listAdminCourses(req: Request, res: Response) {
       where.title = { contains: search, mode: 'insensitive' };
     }
 
-    const [courses, total] = await Promise.all([
+    const [courses, total]: [AdminCourse[], number] = await Promise.all([
       prisma.course.findMany({
         where,
         skip,
@@ -114,7 +128,7 @@ export async function updateCourseStatus(req: Request, res: Response) {
 
     const reopenFromArchive = previousStatus === 'ARCHIVED' && status === 'PUBLISHED';
 
-    const course = await prisma.$transaction(async (tx) => {
+    const course = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const updated = await tx.course.update({
         where: { id },
         data: { status: status as 'PUBLISHED' | 'ARCHIVED' },
@@ -164,7 +178,7 @@ export async function listAdminReviews(req: Request, res: Response) {
     if (isFlaggedParam === 'true') where.isFlagged = true;
     else if (isFlaggedParam === 'false') where.isFlagged = false;
 
-    const [reviews, total] = await Promise.all([
+    const [reviews, total]: [AdminReview[], number] = await Promise.all([
       prisma.review.findMany({
         where,
         skip,

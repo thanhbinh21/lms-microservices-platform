@@ -81,22 +81,17 @@ export function useChat(options: UseChatOptions) {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        const blocks = buffer.split('\n\n');
+        buffer = blocks.pop() || '';
 
-        for (const line of lines) {
-          if (!line.startsWith('event: ')) continue;
-          const colonIdx = line.indexOf(':');
-          if (colonIdx === -1) continue;
+        for (const block of blocks) {
+          const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
+          const eventLine = lines.find((line) => line.startsWith('event: '));
+          const dataLines = lines.filter((line) => line.startsWith('data: '));
+          if (!eventLine || dataLines.length === 0) continue;
 
-          const eventName = line.slice(colonIdx + 1).trim();
-          const dataLineIdx = lines.indexOf(line) + 1;
-          if (dataLineIdx >= lines.length) continue;
-
-          const dataLine = lines[dataLineIdx];
-          if (!dataLine.startsWith('data: ')) continue;
-
-          const dataStr = dataLine.slice(6).trim();
+          const eventName = eventLine.slice('event: '.length).trim();
+          const dataStr = dataLines.map((line) => line.slice('data: '.length)).join('\n').trim();
           if (!dataStr) continue;
 
           try {
@@ -123,8 +118,12 @@ export function useChat(options: UseChatOptions) {
         // Stream was cancelled
         return;
       }
-      setError('Lỗi kết nối. Vui lòng thử lại.');
-      options.onError?.('Lỗi kết nối. Vui lòng thử lại.');
+      // CORS hoac network error deu roi vao day — hien thi chi tiet hon de debug.
+      const errMsg = (err as Error).message?.includes('Failed to fetch')
+        ? 'Không kết nối được AI server. Kiểm tra Kong Gateway và AI Service.'
+        : 'Lỗi kết nối. Vui lòng thử lại.';
+      setError(errMsg);
+      options.onError?.(errMsg);
     } finally {
       setIsStreaming(false);
     }

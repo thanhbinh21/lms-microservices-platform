@@ -132,6 +132,14 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 - [x] **Hotfix:** Restore protected API auth after audit (JWT nbf claim + middleware fallback decode payload khi x-user-id chua duoc inject). done - 2026-05-14
 - [x] **Hotfix:** Community page khong con treo loading khi user chua co group kha dung. done - 2026-05-14
 - [x] **Hotfix:** Admin dashboard stat card empty href guard. done - 2026-05-15 - by BINH
+- [x] **Hotfix:** Next.js image allowlist for picsum host (seed thumbnails). done - 2026-05-18 - by BINH
+- [x] **Hotfix:** AI Gemini quota rate-limit handling (quiz/chat). done - 2026-05-19 - by BINH
+- [x] **Hotfix:** AI provider failover (DeepSeek -> Groq -> OpenRouter). done - 2026-05-19 - by BINH
+- [x] **Hotfix:** AI service dev build fix (generateText no-provider guard). done - 2026-05-19 - by BINH
+- [x] **Hotfix:** Transcript worker ESM import fix (course-service). done - 2026-05-19 - by BINH
+- [x] **Hotfix:** Course-service Prisma ESM import fix (load-env). done - 2026-05-19 - by BINH
+- [x] **Hotfix:** Course-service Prisma ESM import fix (generated client). done - 2026-05-19 - by BINH
+- [x] **Hotfix:** Course-service Prisma import aligns with generated client (dev worker). done - 2026-05-19 - by BINH
 - [ ] **Phase 9.13:** DX Hardening — `pnpm run setup` bootstrap (install + docker:up + setup:db + seed), `.nvmrc` node version pin, Prisma orchestration vao turbo pipeline, cleanup test files.
 - [x] **Phase 9.14:** Become Educator Security Refactor (Audit Phase 9.5). ✅ Completed: Apr 21, 2026
   - Van de: `PATCH /users/role` hien tai la generic endpoint, nhan `userId` + `role` tu request body — bat ky ai co access deu co the nang cap role bat ky user khac thanh ADMIN.
@@ -257,6 +265,17 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 ### Phase AI: AI Features â³ PENDING
 - [x] **AI Feature 1/2 integration hardening:** chuan hoa `ai-service` workspace/build, Kong route `/ai`, course transcript schema + migration deploy, AI chat/quiz Server Actions dung auth helper, lesson quiz modal, final quiz certificate gate strict qua learning-service, va fix regression curriculum response cho learning-service. done - 2026-05-18 - by AI AGENT
 - [x] **Hotfix AI test readiness:** instructor giu du dashboard hoc vien + Studio, sua mojibake Studio pages, va relax Kafka user_id validation cho seed id dang `inst-002`. done - 2026-05-18 - by AI AGENT
+- [x] **Hotfix:** Khong tu dong redirect /learn sang /dashboard/courses khi learn data loi hoac khoa hoc chua co bai hoc. done - 2026-05-18 - by BINH
+- [x] **Hotfix:** Internal curriculum khong bat buoc chapter publish neu co lesson publish (sua learn page khoa hoc moi). done - 2026-05-18 - by BINH
+- [x] **Hotfix:** AI best-effort transcript/context - auto upsert lesson transcript tu metadata khi tao/cap nhat video, relax quiz/chat context gate, va mo duoc AI Chat tu learn bottom bar. done - 2026-05-18 - by AI AGENT
+- [x] **Hotfix:** AI service dev runtime load `.env` truc tiep de VS Code task `dev:ai-service` khong crash thieu env va chat khong bao `AI_SERVICE_UNAVAILABLE`. done - 2026-05-18 - by AI AGENT
+- [x] **Phase AI Transcript Pipeline:** Tach MANUAL/SUBTITLE_UPLOAD/AUTO_STT/AUTO_CONTEXT, them transcript_jobs DB queue + worker FFmpeg/faster-whisper, endpoint best AI context, backfill lesson hien co, va AI chat/quiz dung fallback context de moi khoa hoc co the dung AI. done - 2026-05-18 - by AI AGENT
+- [x] **AI Transcript Runtime Enablement:** Kich hoat worker rieng, cap nhat runtime checklist, va ghi nhan backfill/verification. done - 2026-05-18 - by BINH
+- [x] **AI Transcript API Providers:** Bo bat buoc cai FFmpeg/Python local bang provider API `auto`/Gemini/Deepgram/OpenAI cho worker AUTO_STT, giu faster-whisper lam fallback tuy chon. done - 2026-05-19 - by AI AGENT
+- [x] **AI Transcript Embedded Worker:** Course-service tu khoi dong transcript worker khi service chay, khong can terminal worker rieng sau khi upload video; co `TRANSCRIPT_WORKER_ENABLED` de tat/tach worker. done - 2026-05-19 - by AI AGENT
+- [x] **AI Keyword Context Mode:** Tat mac dinh AUTO_STT de tranh ton quota, chuyen AI chat/quiz sang mo rong kien thuc tu title/mo ta/course/chapter/lesson content va tu khoa do course-service rut trich. done - 2026-05-19 - by AI AGENT
+- [x] **AI Seed Context Data:** Cap nhat `scripts/seed-all.ts` de moi khoa hoc seed co mo ta, chuong, bai hoc va AUTO_CONTEXT day du cho AI chat/quiz, khong phu thuoc video/transcript. done - 2026-05-19 - by AI AGENT
+- [x] **AI Availability Hotfix:** Bo khoa cung transcript/status gate, AI chat/quiz fallback ve AUTO_CONTEXT tu course/lesson metadata, cap nhat UI khong con thong bao 50% transcript, va backfill lai context hien co. done - 2026-05-19 - by AI AGENT
 - [ ] **Phase AI-1:** AI Chatbot Production — AI Service (Express :3007), `ai_db` Neon schema, Kong route `/ai/*`, Redis rate limit (30 msg/user/giờ), Redis cache (course context 5 phút, response 15 phút), Gemini 2.0 Flash (primary) + Flash-Lite (fallback), SSE streaming. Conversation memory: full messages + semantic summary sau mỗi 10 messages. Chat API: conversation CRUD, message SSE, cursor pagination, prompt injection detection, PII redaction. Frontend: ChatWidget + ChatPanel + useChat hook. Context loader: gọi `GET /internal/courses/:id/full-context` từ Course Service. Plan chi tiết: `plan/ai_phase1_chatbot_production.md`. ~6 ngày.
 - [ ] **Phase AI-3:** AI Course Outline + Post Suggestions — Course Outline Generator: gợi ý chapters + lessons từ tiêu đề/mô tả/trình độ, cached 24h, chỉ dành cho Instructor. Post Suggestions: AI cải thiện bài community/Q&A (tiêu đề, format markdown, hashtag), cached 1h. Cả 2 tích hợp trên AI Service (Phase AI-1). Plan chi tiết: `plan/ai_phase3_outline_post_suggest.md`. ~3 ngày.
 - [ ] **Phase AI-4:** AI-Powered Semantic Search — Nâng cấp search từ ILIKE thành hybrid search: keyword (30%) + semantic vector (70%) + RRF merge. pgvector extension trên Neon course_db, Gemini text-embedding-004, embedding stored per course, seed script re-embed existing. Graceful fallback về ILIKE khi AI Service down. Plan chi tiết: `plan/ai_phase4_semantic_search.md`. ~4 ngày.
@@ -295,4 +314,12 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-05-15 - UI Hotfix Admin And Instructor Request
 - [x] Restore become-instructor application form, clamp admin community feed limit to 50, and repair Vietnamese UI text in admin/become-instructor scope. done 2026-05-15
+
+### 2026-05-19 - Fix AI Chatbot & Quiz Features
+- [x] Fix CORS preflight block for AI chat SSE streaming (Kong pre-function allow OPTIONS). done 2026-05-19
+- [x] Fix OpenRouter model name (openrouter/free → meta-llama/llama-3.1-8b-instruct:free). done 2026-05-19
+- [x] Fix stale closure bug in chat widget onDone callback. done 2026-05-19
+- [x] Add exposed_headers for X-RateLimit-* in Kong CORS config. done 2026-05-19
+- [x] Fix chat Unauthorized: add cookie JWT decoding fallback in require-auth middleware. done 2026-05-19
+- [x] Fix quiz fallback: return error instead of meaningless static questions, add retry + validation in generateQuizWithLLM. done 2026-05-19
 

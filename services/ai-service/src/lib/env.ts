@@ -1,4 +1,36 @@
 import { z } from 'zod';
+import fs from 'node:fs';
+import path from 'node:path';
+
+function loadLocalEnv(): void {
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (!fs.existsSync(envPath)) return;
+
+  const content = fs.readFileSync(envPath, 'utf-8');
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex <= 0) continue;
+
+    const key = trimmed.slice(0, eqIndex).trim();
+    let value = trimmed.slice(eqIndex + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"'))
+      || (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    // Giu bien moi truong tu shell neu da duoc set de dev/prod co the override .env.
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+}
+
+loadLocalEnv();
 
 const envSchema = z.object({
   PORT: z.string().default('3008'),
@@ -13,10 +45,21 @@ const envSchema = z.object({
   REDIS_URL: z.string().optional(),
   CACHE_REDIS_URL: z.string().optional(),
 
-  // Gemini
-  GEMINI_API_KEY: z.string().min(1),
-  GEMINI_MODEL: z.string().default('gemini-2.0-flash'),
-  GEMINI_FALLBACK_MODEL: z.string().default('gemini-2.0-flash-lite'),
+  // LLM Providers
+  AI_PROVIDER_ORDER: z.string().optional(),
+
+  DEEPSEEK_API_KEY: z.string().optional(),
+  DEEPSEEK_MODEL: z.string().optional(),
+
+  GROQ_API_KEY: z.string().optional(),
+  GROQ_MODEL: z.string().optional(),
+
+  OPENROUTER_API_KEY: z.string().optional(),
+  OPENROUTER_MODEL: z.string().optional(),
+  OPENROUTER_APP_URL: z.string().optional(),
+  OPENROUTER_APP_NAME: z.string().optional(),
+
+  AI_STRICT_CONTEXT_GATE: z.string().default('false'),
 
   // Internal auth
   INTERNAL_SERVICE_SECRET: z.string().min(1),
