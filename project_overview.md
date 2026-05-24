@@ -323,3 +323,8 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 - [x] Fix chat Unauthorized: add cookie JWT decoding fallback in require-auth middleware. done 2026-05-19
 - [x] Fix quiz fallback: return error instead of meaningless static questions, add retry + validation in generateQuizWithLLM. done 2026-05-19
 
+### 2026-05-23 - CQRS Course Discovery
+- [x] CQRS Course Discovery Redis read model + Kafka catalog events + fallback Prisma listing + warmup script. done 2026-05-23
+
+### 2026-05-23 - Payment Event Sourcing
+- [x] Payment Order Event Sourcing dual-write, admin event history API, order event backfill, and fold/projection verification. done 2026-05-23

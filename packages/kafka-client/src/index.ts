@@ -53,6 +53,13 @@ export const TOPICS = {
   DEAD_LETTER: 'system.dead-letter',
   /** Admin / catalog: course lifecycle (publish, archive, reopen). */
   COURSE_CATALOG_STATUS_CHANGED: 'course.catalog.status-changed',
+  COURSE_PUBLISHED: 'course.catalog.published',
+  COURSE_UPDATED: 'course.catalog.updated',
+  COURSE_ARCHIVED: 'course.catalog.archived',
+  COURSE_DELETED: 'course.catalog.deleted',
+  COURSE_REVIEW_CHANGED: 'course.catalog.review-changed',
+  COURSE_CATALOG_RETRY_5S: 'course.catalog.retry-5s',
+  COURSE_CATALOG_RETRY_1M: 'course.catalog.retry-1m',
 } as const;
 
 export type KafkaTopic = (typeof TOPICS)[keyof typeof TOPICS];
@@ -81,8 +88,39 @@ export const EnrollmentCreatedSchema = z.object({
   enrolled_at: z.string().datetime(),
 });
 
+export const CourseCatalogSnapshotSchema = z.object({
+  title: z.string(),
+  slug: z.string(),
+  description: z.string().nullable(),
+  thumbnail: z.string().nullable(),
+  price: z.number().min(0),
+  level: z.string(),
+  status: z.string(),
+  categoryId: z.string().nullable(),
+  categoryName: z.string().nullable(),
+  categorySlug: z.string().nullable(),
+  instructorId: z.string(),
+  totalLessons: z.number().int().min(0),
+  totalDuration: z.number().int().min(0),
+  averageRating: z.number().min(0),
+  ratingCount: z.number().int().min(0),
+  enrollmentCount: z.number().int().min(0),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const CourseCatalogEventSchema = z.object({
+  course_id: z.string().uuid(),
+  action: z.enum(['published', 'updated', 'archived', 'deleted', 'review_changed']),
+  timestamp: z.string().datetime(),
+  snapshot: CourseCatalogSnapshotSchema.optional(),
+});
+
 export type ValidatedPaymentOrderCompleted = z.infer<typeof PaymentOrderCompletedSchema>;
 export type ValidatedEnrollmentCreated = z.infer<typeof EnrollmentCreatedSchema>;
+export type CourseCatalogSnapshot = z.infer<typeof CourseCatalogSnapshotSchema>;
+export type CourseCatalogEvent = z.infer<typeof CourseCatalogEventSchema>;
+export type CourseCatalogAction = CourseCatalogEvent['action'];
 
 /**
  * Validate Kafka event payload against Zod schema.
@@ -150,6 +188,13 @@ export interface TopicEventMap {
   [TOPICS.LESSON_COMPLETED]: unknown;
   [TOPICS.COURSE_COMPLETED]: unknown;
   [TOPICS.COURSE_CATALOG_STATUS_CHANGED]: unknown;
+  [TOPICS.COURSE_PUBLISHED]: CourseCatalogEvent;
+  [TOPICS.COURSE_UPDATED]: CourseCatalogEvent;
+  [TOPICS.COURSE_ARCHIVED]: CourseCatalogEvent;
+  [TOPICS.COURSE_DELETED]: CourseCatalogEvent;
+  [TOPICS.COURSE_REVIEW_CHANGED]: CourseCatalogEvent;
+  [TOPICS.COURSE_CATALOG_RETRY_5S]: CourseCatalogEvent;
+  [TOPICS.COURSE_CATALOG_RETRY_1M]: CourseCatalogEvent;
 }
 
 // ─── Publish helper ───────────────────────────────────────────────────────────
@@ -367,6 +412,17 @@ export const ENROLLMENT_CREATED_RETRY: RetryPolicy = {
   ],
   deadLetterTopic: TOPICS.DEAD_LETTER,
 };
+
+export function createCourseCatalogRetryPolicy(mainTopic: KafkaTopic): RetryPolicy {
+  return {
+    mainTopic,
+    retryChain: [
+      { topic: TOPICS.COURSE_CATALOG_RETRY_5S, delayMs: 5_000 },
+      { topic: TOPICS.COURSE_CATALOG_RETRY_1M, delayMs: 60_000 },
+    ],
+    deadLetterTopic: TOPICS.DEAD_LETTER,
+  };
+}
 
 export { kafka };
 export default kafka;

@@ -14,7 +14,8 @@
     "prisma:migrate:deploy": "node ../../scripts/prisma-migrate-retry.js",
     "prisma:migrate:status": "prisma migrate status",
     "prisma:studio": "prisma studio",
-    "test": "vitest run"
+    "backfill:order-events": "tsx scripts/backfill-order-events.ts",
+    "test": "vitest run --exclude \"dist/**\""
   },
   "dependencies": {
     "@lms/env-validator": "workspace:*",

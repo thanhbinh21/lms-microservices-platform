@@ -53,6 +53,7 @@ import adminRouter from './routes/admin.routes';
 import prisma from './lib/prisma';
 import { disconnectProducer } from './lib/kafka-producer';
 import { startKafkaConsumers } from './lib/kafka-consumer';
+import { startReadModelConsumer } from './lib/read-model-consumer';
 import { startTranscriptWorker } from './workers/transcript.worker';
 import { initCache, closeCache } from '@lms/cache';
 
@@ -227,6 +228,21 @@ if (process.env.KAFKA_BROKER) {
   });
 } else {
   logger.warn('KAFKA_BROKER chua set — bo qua consumer (enrollmentCount se khong cap nhat)');
+}
+
+if (process.env.KAFKA_BROKER && process.env.CACHE_REDIS_URL) {
+  setTimeout(() => {
+    startReadModelConsumer().catch((err) => {
+      logger.error({ err }, '[COURSE-SERVICE] Read model consumer start failed - se thu lai sau 10s');
+      setTimeout(() => {
+        startReadModelConsumer().catch((retryErr) =>
+          logger.error({ err: retryErr }, '[COURSE-SERVICE] Read model consumer retry failed'),
+        );
+      }, 10_000);
+    });
+  }, 2_000);
+} else if (process.env.KAFKA_BROKER) {
+  logger.warn('[COURSE-SERVICE] CACHE_REDIS_URL chua set - bo qua course read model consumer');
 }
 
 // Tat server an toan

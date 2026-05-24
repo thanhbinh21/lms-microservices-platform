@@ -6,6 +6,7 @@ import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
 import { cacheGet, cacheInvalidate, cacheInvalidatePattern } from '@lms/cache';
 import { writeAuditLog } from '../lib/audit';
+import { publishCourseCatalogEvent } from '../lib/course-catalog-events';
 
 const createCategorySchema = z.object({
   name: z.string().min(2, 'Ten danh muc toi thieu 2 ky tu'),
@@ -216,6 +217,15 @@ export async function updateCategory(req: Request, res: Response) {
     });
 
     await invalidateCategoryRelatedCaches();
+    if (category.name !== existing.name || category.slug !== existing.slug) {
+      const affectedCourses = await prisma.course.findMany({
+        where: { categoryId: id, status: 'PUBLISHED' },
+        select: { id: true },
+      });
+      await Promise.all(
+        affectedCourses.map((course) => publishCourseCatalogEvent(course.id, 'updated', traceId)),
+      );
+    }
 
     const response: ApiResponse<typeof category> = {
       success: true,

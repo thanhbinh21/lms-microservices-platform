@@ -1,11 +1,12 @@
 import { Request, Response } from 'express';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { z } from 'zod';
 import type { ApiResponse, CreateOrderResult, OrderDto } from '@lms/types';
 import prisma from '../lib/prisma';
 import { logger } from '@lms/logger';
 import { buildPayUrl, loadVNPayConfig } from '../lib/vnpay';
 import { fetchCourseById } from '../lib/course-client';
+import { appendOrderEvents, ORDER_EVENT_TYPES } from '../lib/order-aggregate';
 
 const createOrderSchema = z.object({
   courseId: z.string().min(1),
@@ -148,31 +149,67 @@ export const createOrder = async (req: Request, res: Response): Promise<Response
       bankCode,
     });
 
-    // 5) Ghi order + audit CREATE_URL trong cung transaction.
-    const order = await prisma.order.create({
-      data: {
-        userId,
-        courseId: course.id,
-        instructorId: course.instructorId,
-        courseTitle: course.title,
-        amount: course.price,
-        currency: config.currency,
-        status: 'PENDING',
-        paymentMethod: 'VNPAY',
-        vnpTxnRef: txnRef,
-        vnpPayUrl: payUrl,
-        expiresAt: expireDate,
-        traceId,
-        audits: {
-          create: {
-            kind: 'CREATE_URL',
-            payload: params,
+    // 5) Dual-write event store + projection de API cu khong doi.
+    const orderId = randomUUID();
+    const now = new Date();
+    const order = await prisma.$transaction(async (tx) => {
+      await appendOrderEvents(tx, orderId, [
+        {
+          eventType: ORDER_EVENT_TYPES.ORDER_CREATED,
+          payload: {
+            orderId,
+            userId,
+            courseId: course.id,
+            instructorId: course.instructorId,
+            courseTitle: course.title,
+            amount: course.price,
+            currency: config.currency,
+            vnpTxnRef: txnRef,
+            traceId,
+          },
+          metadata: { traceId, actorId: userId, source: 'payment-service' },
+          occurredAt: now,
+        },
+        {
+          eventType: ORDER_EVENT_TYPES.PAYMENT_URL_GENERATED,
+          payload: {
+            orderId,
+            payUrl,
+            expiresAt: expireDate.toISOString(),
+            vnpParams: params,
             signature,
-            valid: true,
-            note: 'Create VNPay payment URL',
+          },
+          metadata: { traceId, actorId: userId, source: 'payment-service' },
+          occurredAt: now,
+        },
+      ]);
+
+      return tx.order.create({
+        data: {
+          id: orderId,
+          userId,
+          courseId: course.id,
+          instructorId: course.instructorId,
+          courseTitle: course.title,
+          amount: course.price,
+          currency: config.currency,
+          status: 'PENDING',
+          paymentMethod: 'VNPAY',
+          vnpTxnRef: txnRef,
+          vnpPayUrl: payUrl,
+          expiresAt: expireDate,
+          traceId,
+          audits: {
+            create: {
+              kind: 'CREATE_URL',
+              payload: params,
+              signature,
+              valid: true,
+              note: 'Create VNPay payment URL',
+            },
           },
         },
-      },
+      });
     });
 
     logger.info({ orderId: order.id, courseId, userId, txnRef, traceId }, 'Order created');

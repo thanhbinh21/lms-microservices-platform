@@ -12,6 +12,7 @@
     "start:transcript-worker": "node dist/workers/transcript.worker.js",
     "transcript:backfill": "cross-env NODE_ENV=production tsx src/scripts/backfill-ai-context.ts",
     "ai-context:backfill": "cross-env NODE_ENV=production tsx src/scripts/backfill-ai-context.ts",
+    "read-model:warmup": "tsx src/scripts/warmup-course-read-model.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",

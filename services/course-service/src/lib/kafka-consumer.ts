@@ -11,6 +11,7 @@ import {
 } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
 import prisma from './prisma';
+import { publishCourseCatalogEvent } from './course-catalog-events';
 
 /**
  * Course-service Kafka consumers (Phase 4 cleanup).
@@ -67,6 +68,7 @@ export async function startKafkaConsumers(): Promise<void> {
             data: { enrollmentCount: { increment: 1 } },
           }),
         ]);
+        await publishCourseCatalogEvent(course_id, 'updated', event.trace_id);
       } catch (err: any) {
         if (err?.code === 'P2002') {
           logger.info({ orderId: order_id }, '[course-service] Enrollment signal already applied — skip');

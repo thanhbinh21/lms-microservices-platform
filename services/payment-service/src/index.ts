@@ -13,6 +13,7 @@ import {
   getAdminRevenueAnalytics,
 } from './controllers/order.controller';
 import { handleVNPayReturn, handleVNPayIPN } from './controllers/vnpay.controller';
+import { getOrderEventHistory } from './controllers/event-history.controller';
 import {
   getInstructorEarnings,
   getInstructorEarningsSummary,
@@ -77,6 +78,7 @@ app.post('/api/orders', requireAuth, createOrder);
 app.get('/api/orders/my', requireAuth, getMyOrders);
 app.get('/api/orders/:id', requireAuth, getOrder);
 app.get('/api/admin/revenue-analytics', requireAdmin, getAdminRevenueAnalytics);
+app.get('/api/admin/orders/:orderId/events', requireAdmin, getOrderEventHistory);
 app.get('/api/instructor/earnings/summary', requireAuth, getInstructorEarningsSummary);
 app.get('/api/instructor/earnings', requireAuth, getInstructorEarnings);
 app.get('/api/instructor/payout-profile', requireAuth, getInstructorPayoutProfile);

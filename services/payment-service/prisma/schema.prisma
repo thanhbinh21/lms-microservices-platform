@@ -90,6 +90,25 @@ model Order {
   @@map("orders")
 }
 
+/// Event store bat bien cho lifecycle cua order.
+/// Bang orders van la projection de giu backward compatibility cho API hien co.
+model OrderEvent {
+  id         String   @id @default(uuid())
+  orderId    String   @map("order_id")
+  eventType  String   @map("event_type")
+  version    Int
+  payload    Json     @db.JsonB
+  metadata   Json?    @db.JsonB
+  occurredAt DateTime @map("occurred_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([orderId, version])
+  @@index([orderId])
+  @@index([eventType])
+  @@index([occurredAt])
+  @@map("order_events")
+}
+
 /// Luu toan bo payload VNPay duoi dang JSONB phuc vu audit/compliance.
 model VNPayAudit {
   id        String    @id @default(uuid())
