@@ -343,3 +343,6 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-05-27 - Admin Dashboard Operations UX Refactor
 - [x] Nhom lai sidebar admin theo nghiep vu, them alias `/admin/settings` va `/admin/dlq`, refactor system config thanh setting co label/validation/default, va bo sung confirm/loading/toast cho cac flow admin nhay cam. done 2026-05-27
+
+### 2026-05-27 - Instructor Studio Operations UX Refactor
+- [x] Nhom lai sidebar Instructor theo flow giang vien, refactor overview/courses/course create/Q&A/analytics/profile/payment, sua mojibake instructor scope, them confirm publish/payout va harden validation payout profile. done 2026-05-27

@@ -20,7 +20,7 @@ const updatePayoutSchema = z.object({
 });
 
 const createPayoutSchema = z.object({
-  amount: z.coerce.number().positive('Amount must be greater than 0'),
+  amount: z.coerce.number().positive('Số tiền rút phải lớn hơn 0'),
 });
 
 function toAmount(value: { toNumber: () => number } | number) {
@@ -123,7 +123,7 @@ export async function createPayout(req: Request, res: Response) {
       const response: ApiResponse<null> = {
         success: false,
         code: 400,
-        message: 'Vui long luu thong tin nhan thanh toan truoc khi rut tien',
+        message: 'Vui lòng lưu thông tin nhận thanh toán trước khi rút tiền',
         data: null,
         trace_id: traceId,
       };
@@ -134,7 +134,7 @@ export async function createPayout(req: Request, res: Response) {
       const response: ApiResponse<null> = {
         success: false,
         code: 409,
-        message: 'Ban dang co mot yeu cau rut tien cho xu ly',
+        message: 'Bạn đang có một yêu cầu rút tiền chờ xử lý',
         data: null,
         trace_id: traceId,
       };
@@ -145,7 +145,7 @@ export async function createPayout(req: Request, res: Response) {
       const response: ApiResponse<null> = {
         success: false,
         code: 400,
-        message: 'So tien rut vuot qua so du kha dung',
+        message: 'Số tiền rút vượt quá số dư khả dụng',
         data: null,
         trace_id: traceId,
       };
@@ -157,7 +157,7 @@ export async function createPayout(req: Request, res: Response) {
       const response: ApiResponse<null> = {
         success: false,
         code: 400,
-        message: 'So tien rut hien tai can khop voi cac khoan thu nhap kha dung',
+        message: 'Số tiền rút hiện tại cần khớp với các khoản thu nhập khả dụng',
         data: null,
         trace_id: traceId,
       };
@@ -196,8 +196,8 @@ export async function createPayout(req: Request, res: Response) {
       admins.map((admin) =>
         createInternalNotification({
           userId: admin.id,
-          title: 'Co yeu cau rut tien moi',
-          body: 'Giang vien vua tao yeu cau rut tien can xu ly.',
+          title: 'Có yêu cầu rút tiền mới',
+          body: 'Giảng viên vừa tạo yêu cầu rút tiền cần xử lý.',
           eventId: `payout-request:${payout.id}:${admin.id}`,
           metadata: { payoutId: payout.id, instructorId, amount, route: '/admin/payouts' },
           traceId,
@@ -327,7 +327,7 @@ export async function updatePayout(req: Request, res: Response) {
       const response: ApiResponse<null> = {
         success: false,
         code: 400,
-        message: 'Admin note is required when rejecting a payout',
+        message: 'Cần nhập lý do khi từ chối yêu cầu rút tiền',
         data: null,
         trace_id: traceId,
       };
@@ -376,16 +376,16 @@ export async function updatePayout(req: Request, res: Response) {
       userId: payout.instructorId,
       title:
         nextStatus === 'REJECTED'
-          ? 'Yeu cau rut tien bi tu choi'
+          ? 'Yêu cầu rút tiền bị từ chối'
           : nextStatus === 'PAID'
-            ? 'Yeu cau rut tien da thanh toan'
-            : 'Yeu cau rut tien da duoc duyet',
+            ? 'Yêu cầu rút tiền đã thanh toán'
+            : 'Yêu cầu rút tiền đã được duyệt',
       body:
         nextStatus === 'REJECTED'
-          ? parsed.data.adminNote || 'Admin da tu choi yeu cau rut tien cua ban.'
+          ? parsed.data.adminNote || 'Admin đã từ chối yêu cầu rút tiền của bạn.'
           : nextStatus === 'PAID'
-            ? 'Khoan rut tien cua ban da duoc danh dau la da thanh toan.'
-            : 'Yeu cau rut tien cua ban da duoc duyet va dang cho thanh toan.',
+            ? 'Khoản rút tiền của bạn đã được đánh dấu là đã thanh toán.'
+            : 'Yêu cầu rút tiền của bạn đã được duyệt và đang chờ thanh toán.',
       eventId: `payout-update:${payout.id}:${nextStatus}`,
       metadata: { payoutId: payout.id, status: nextStatus, route: '/instructor/settings' },
       traceId,
