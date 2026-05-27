@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
+import { toast } from '@/components/ui/toast';
 import { getAdminCourses, updateAdminCourseStatus } from '@/app/actions/admin';
 
 export default function AdminCoursesPage() {
@@ -18,6 +19,8 @@ export default function AdminCoursesPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -31,6 +34,7 @@ export default function AdminCoursesPage() {
 
   const fetchCourses = useCallback(async () => {
     setLoading(true);
+    setError('');
     const result = await getAdminCourses({
       page,
       limit: 10,
@@ -40,6 +44,8 @@ export default function AdminCoursesPage() {
     if (result.success && result.data) {
       setCourses(result.data.courses);
       setPagination(result.data.pagination);
+    } else {
+      setError(result.message || 'Không thể tải danh sách khóa học.');
     }
     setLoading(false);
   }, [page, search, statusFilter]);
@@ -90,8 +96,15 @@ export default function AdminCoursesPage() {
       variant: meta.variant,
       confirmLabel: meta.confirmLabel,
       onConfirm: async () => {
+        setActionLoading(true);
         const result = await updateAdminCourseStatus(courseId, nextStatus);
-        if (result.success) void fetchCourses();
+        setActionLoading(false);
+        if (result.success) {
+          toast('success', 'Đã cập nhật khóa học', 'Thao tác kiểm duyệt đã được áp dụng.');
+          void fetchCourses();
+          return;
+        }
+        toast('error', 'Cập nhật khóa học thất bại', result.message || 'Vui lòng thử lại.');
       },
     });
   }
@@ -107,7 +120,13 @@ export default function AdminCoursesPage() {
       onConfirm: async () => {
         setBulkLoading(true);
         try {
-          await Promise.all(selectedCourseIds.map((courseId) => updateAdminCourseStatus(courseId, nextStatus)));
+          const results = await Promise.all(selectedCourseIds.map((courseId) => updateAdminCourseStatus(courseId, nextStatus)));
+          const failed = results.filter((result) => !result.success);
+          if (failed.length > 0) {
+            toast('error', 'Một số khóa học chưa được cập nhật', `${failed.length} thao tác thất bại.`);
+          } else {
+            toast('success', 'Đã cập nhật các khóa học đã chọn');
+          }
           clearSelection();
           await fetchCourses();
         } finally {
@@ -130,6 +149,8 @@ export default function AdminCoursesPage() {
           Duyệt, kiểm duyệt và quản lý trạng thái tất cả khóa học trên hệ thống.
         </p>
       </div>
+
+      {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">{error}</div>}
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
@@ -214,17 +235,17 @@ export default function AdminCoursesPage() {
                       <td className="py-3">
                         <div className="flex items-center gap-2">
                           {course.status === 'DRAFT' && (
-                            <Button size="sm" className="text-xs" onClick={() => handleStatusChange(course.id, 'PUBLISHED', course.title, 'approve')}>
+                            <Button size="sm" className="text-xs" disabled={actionLoading} onClick={() => handleStatusChange(course.id, 'PUBLISHED', course.title, 'approve')}>
                               Duyệt
                             </Button>
                           )}
                           {course.status === 'ARCHIVED' && (
-                            <Button size="sm" className="text-xs" onClick={() => handleStatusChange(course.id, 'PUBLISHED', course.title, 'reopen')}>
+                            <Button size="sm" className="text-xs" disabled={actionLoading} onClick={() => handleStatusChange(course.id, 'PUBLISHED', course.title, 'reopen')}>
                               Mở lại
                             </Button>
                           )}
                           {course.status !== 'ARCHIVED' && (
-                            <Button variant="destructive" size="sm" className="text-xs" onClick={() => handleStatusChange(course.id, 'ARCHIVED', course.title, 'archive')}>
+                            <Button variant="destructive" size="sm" className="text-xs" disabled={actionLoading} onClick={() => handleStatusChange(course.id, 'ARCHIVED', course.title, 'archive')}>
                               Lưu trữ
                             </Button>
                           )}
@@ -265,6 +286,7 @@ export default function AdminCoursesPage() {
         message={confirmDialog.message}
         variant={confirmDialog.variant}
         confirmLabel={confirmDialog.confirmLabel}
+        loading={actionLoading}
       />
     </div>
   );

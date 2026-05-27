@@ -10,6 +10,7 @@ export interface OrderDto {
   id: string;
   userId: string;
   courseId: string;
+  courseTitle?: string | null;
   amount: number;
   currency: string;
   status: OrderStatus;
@@ -24,6 +25,15 @@ export interface OrderDto {
 export interface CreateOrderResult {
   orderId: string;
   payUrl: string;
+  amount: number;
+  currency: string;
+}
+
+export interface ContinuePaymentResult {
+  action: 'PAY' | 'LEARN';
+  orderId: string;
+  courseId: string;
+  payUrl: string | null;
   amount: number;
   currency: string;
 }
@@ -45,6 +55,15 @@ export async function createOrderAction(courseId: string) {
 /** Xem chi tiet mot order. */
 export async function getOrderAction(orderId: string) {
   return callApi<OrderDto>(`/payment/api/orders/${orderId}`, { method: 'GET' }, true);
+}
+
+/** Tiep tuc thanh toan voi URL VNPay con han hoac order moi neu URL cu da het han. */
+export async function continuePaymentAction(orderId: string) {
+  return callApi<ContinuePaymentResult>(
+    `/payment/api/orders/${orderId}/continue`,
+    { method: 'POST', body: JSON.stringify({}) },
+    true,
+  );
 }
 
 /** Lich su order cua user hien tai. */

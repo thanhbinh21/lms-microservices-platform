@@ -173,7 +173,7 @@ export default function InstructorCourseDetailPage() {
     {
       label: 'Có thể xem trước khóa học',
       ok: !!previewLesson?.lesson.videoUrl || !!previewLesson?.lesson.content?.trim(),
-      action: 'Kiểm tra bài học free có video hoặc n�™i dung',
+      action: 'Kiểm tra bài học miễn phí có video hoặc nội dung',
     },
   ];
 

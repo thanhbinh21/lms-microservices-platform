@@ -2,8 +2,9 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { logger } from '@lms/logger';
+import { withRetry } from '@lms/db-prisma';
 import { validateNotificationServiceEnv } from '@lms/env-validator';
-import type { ApiResponse } from '@lms/types';
+import { createRequireAdmin, createRequireInternal, type ApiResponse } from '@lms/types';
 import {
   createConsumer,
   createProducer,
@@ -23,10 +24,10 @@ import {
   listAdminNotifications,
   markAllAsRead,
   markAsRead,
+  createInternalNotification,
 } from './controllers/notification.controller';
 import { sendEmail, getPaymentSuccessTemplate, getEnrollmentCreatedTemplate } from './lib/mailer';
 import { getUserData } from './lib/user';
-import { createRequireAdmin } from '@lms/types';
 
 // Validate env khi khoi dong
 validateNotificationServiceEnv();
@@ -34,6 +35,9 @@ validateNotificationServiceEnv();
 const app = express();
 const PORT = process.env.PORT || 3005;
 const requireAdmin = createRequireAdmin();
+const requireInternal = createRequireInternal({
+  internalSecret: process.env.INTERNAL_SERVICE_SECRET || '',
+});
 
 app.use(helmet());
 app.use(
@@ -60,6 +64,7 @@ app.get('/api/my', requireAuth, listMyNotifications);
 app.post('/api/read-all', requireAuth, markAllAsRead);
 app.post('/api/:id/read', requireAuth, markAsRead);
 app.get('/api/admin/history', requireAdmin, listAdminNotifications);
+app.post('/internal/notifications', requireInternal, createInternalNotification);
 
 const server = app.listen(PORT, () => {
   logger.info(`[NOTIFICATION-SERVICE] Listening on port ${PORT}`);
@@ -80,44 +85,50 @@ async function startConsumers() {
     const { order_id, user_id, course_id, amount, currency } = event.data;
 
     // Event id la idempotency key de Kafka replay khong tao duplicate notification.
-    const notification = await prisma.notification.upsert({
-      where: { eventId: event.event_id },
-      create: {
-        userId: user_id,
-        type: 'PAYMENT_SUCCESS',
-        channel: 'EMAIL',
-        status: 'PENDING',
-        title: 'Thanh toan thanh cong',
-        body: `Ban da thanh toan ${amount.toLocaleString('vi-VN')} ${currency} cho don hang ${order_id}. Cam on da mua khoa hoc!`,
-        metadata: {
-          orderId: order_id,
-          courseId: course_id,
-          amount,
-          currency,
-          vnpTxnRef: event.data.vnp_txn_ref,
+    const notification = await withRetry(() =>
+      prisma.notification.upsert({
+        where: { eventId: event.event_id },
+        create: {
+          userId: user_id,
+          type: 'PAYMENT_SUCCESS',
+          channel: 'EMAIL',
+          status: 'PENDING',
+          title: 'Thanh toan thanh cong',
+          body: `Ban da thanh toan ${amount.toLocaleString('vi-VN')} ${currency} cho don hang ${order_id}. Cam on da mua khoa hoc!`,
+          metadata: {
+            orderId: order_id,
+            courseId: course_id,
+            amount,
+            currency,
+            vnpTxnRef: event.data.vnp_txn_ref,
+          },
+          eventId: event.event_id,
+          traceId: event.trace_id,
         },
-        eventId: event.event_id,
-        traceId: event.trace_id,
-      },
-      update: {},
-    });
+        update: {},
+      }),
+    );
 
     const userData = await getUserData(user_id);
     if (userData) {
       const html = getPaymentSuccessTemplate(userData.name, amount, currency, order_id);
       sendEmail(userData.email, 'Thanh toan thanh cong don hang tren LMS', html)
         .then(async () => {
-          await prisma.notification.update({
-            where: { id: notification.id },
-            data: { status: 'SENT', sentAt: new Date() },
-          });
+          await withRetry(() =>
+            prisma.notification.update({
+              where: { id: notification.id },
+              data: { status: 'SENT', sentAt: new Date() },
+            }),
+          );
           logger.info({ orderId: order_id, userId: user_id }, 'Email Payment Success sent.');
         })
         .catch(async (err) => {
-          await prisma.notification.update({
-            where: { id: notification.id },
-            data: { status: 'FAILED' },
-          });
+          await withRetry(() =>
+            prisma.notification.update({
+              where: { id: notification.id },
+              data: { status: 'FAILED' },
+            }),
+          );
           logger.error({ err, orderId: order_id }, 'Email Payment Success failed.');
         });
     }
@@ -146,41 +157,47 @@ async function startConsumers() {
   const enrollmentHandler = async (event: KafkaEventEnvelope<EnrollmentCreatedEvent>) => {
     const { user_id, course_id, order_id } = event.data;
 
-    const notification = await prisma.notification.upsert({
-      where: { eventId: event.event_id },
-      create: {
-        userId: user_id,
-        type: 'ENROLLMENT_CREATED',
-        channel: 'EMAIL',
-        status: 'PENDING',
-        title: 'Ghi danh thanh cong',
-        body: 'Chuc mung! Ban da duoc ghi danh vao khoa hoc. Vao trang Hoc cua toi de bat dau.',
-        metadata: {
-          courseId: course_id,
-          orderId: order_id ?? null,
+    const notification = await withRetry(() =>
+      prisma.notification.upsert({
+        where: { eventId: event.event_id },
+        create: {
+          userId: user_id,
+          type: 'ENROLLMENT_CREATED',
+          channel: 'EMAIL',
+          status: 'PENDING',
+          title: 'Ghi danh thanh cong',
+          body: 'Chuc mung! Ban da duoc ghi danh vao khoa hoc. Vao trang Hoc cua toi de bat dau.',
+          metadata: {
+            courseId: course_id,
+            orderId: order_id ?? null,
+          },
+          eventId: event.event_id,
+          traceId: event.trace_id,
         },
-        eventId: event.event_id,
-        traceId: event.trace_id,
-      },
-      update: {},
-    });
+        update: {},
+      }),
+    );
 
     const userData = await getUserData(user_id);
     if (userData) {
       const html = getEnrollmentCreatedTemplate(userData.name);
       sendEmail(userData.email, 'Ghi danh thanh cong khoa hoc tren LMS', html)
         .then(async () => {
-          await prisma.notification.update({
-            where: { id: notification.id },
-            data: { status: 'SENT', sentAt: new Date() },
-          });
+          await withRetry(() =>
+            prisma.notification.update({
+              where: { id: notification.id },
+              data: { status: 'SENT', sentAt: new Date() },
+            }),
+          );
           logger.info({ courseId: course_id, userId: user_id }, 'Email Enrollment Created sent.');
         })
         .catch(async (err) => {
-          await prisma.notification.update({
-            where: { id: notification.id },
-            data: { status: 'FAILED' },
-          });
+          await withRetry(() =>
+            prisma.notification.update({
+              where: { id: notification.id },
+              data: { status: 'FAILED' },
+            }),
+          );
           logger.error({ err, courseId: course_id }, 'Email Enrollment Created failed.');
         });
     }

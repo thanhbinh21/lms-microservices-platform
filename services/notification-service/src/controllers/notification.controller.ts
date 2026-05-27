@@ -1,7 +1,16 @@
 import { Request, Response } from 'express';
 import type { ApiResponse } from '@lms/types';
+import { withRetry } from '@lms/db-prisma';
 import prisma from '../lib/prisma';
 import { logger } from '@lms/logger';
+
+const ALLOWED_INTERNAL_TYPES = new Set([
+  'PAYMENT_SUCCESS',
+  'ENROLLMENT_CREATED',
+  'COURSE_COMPLETED',
+  'LESSON_COMPLETED',
+  'SYSTEM',
+]);
 
 /**
  * GET /notification/api/my
@@ -17,18 +26,20 @@ export async function listMyNotifications(req: Request, res: Response): Promise<
   const cursor = req.query.cursor as string | undefined;
 
   try {
-    const [notifications, unreadCount] = await Promise.all([
-      prisma.notification.findMany({
-        where: {
-          userId,
-          ...(unreadOnly ? { readAt: null } : {}),
-        },
-        orderBy: { createdAt: 'desc' },
-        take: limit + 1,
-        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-      }),
-      prisma.notification.count({ where: { userId, readAt: null } }),
-    ]);
+    const [notifications, unreadCount] = await withRetry(() =>
+      Promise.all([
+        prisma.notification.findMany({
+          where: {
+            userId,
+            ...(unreadOnly ? { readAt: null } : {}),
+          },
+          orderBy: { createdAt: 'desc' },
+          take: limit + 1,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        }),
+        prisma.notification.count({ where: { userId, readAt: null } }),
+      ]),
+    );
 
     const hasMore = notifications.length > limit;
     const items = hasMore ? notifications.slice(0, limit) : notifications;
@@ -69,10 +80,12 @@ export async function markAsRead(req: Request, res: Response): Promise<void> {
   const id = req.params.id;
 
   try {
-    const updated = await prisma.notification.updateMany({
-      where: { id, userId, readAt: null },
-      data: { readAt: new Date() },
-    });
+    const updated = await withRetry(() =>
+      prisma.notification.updateMany({
+        where: { id, userId, readAt: null },
+        data: { readAt: new Date() },
+      }),
+    );
 
     const response: ApiResponse<{ updated: number }> = {
       success: true,
@@ -104,10 +117,12 @@ export async function markAllAsRead(req: Request, res: Response): Promise<void> 
   const traceId = (req.headers['x-trace-id'] as string) || '';
 
   try {
-    const updated = await prisma.notification.updateMany({
-      where: { userId, readAt: null },
-      data: { readAt: new Date() },
-    });
+    const updated = await withRetry(() =>
+      prisma.notification.updateMany({
+        where: { userId, readAt: null },
+        data: { readAt: new Date() },
+      }),
+    );
 
     const response: ApiResponse<{ updated: number }> = {
       success: true,
@@ -150,15 +165,17 @@ export async function listAdminNotifications(req: Request, res: Response): Promi
     if (channel) where.channel = channel;
     if (userId) where.userId = userId;
 
-    const [items, total] = await Promise.all([
-      prisma.notification.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.notification.count({ where }),
-    ]);
+    const [items, total] = await withRetry(() =>
+      Promise.all([
+        prisma.notification.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.notification.count({ where }),
+      ]),
+    );
 
     const response: ApiResponse<{
       items: typeof items;
@@ -186,6 +203,91 @@ export async function listAdminNotifications(req: Request, res: Response): Promi
     res.status(200).json(response);
   } catch (err) {
     logger.error({ err, traceId }, 'listAdminNotifications failed');
+    const response: ApiResponse<null> = {
+      success: false,
+      code: 500,
+      message: 'Internal error',
+      data: null,
+      trace_id: traceId,
+    };
+    res.status(500).json(response);
+  }
+}
+
+/**
+ * POST /notification/internal/notifications
+ * Tao notification noi bo tu service khac, dung eventId de chong gui trung.
+ */
+export async function createInternalNotification(req: Request, res: Response): Promise<void> {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const body = req.body as {
+    userId?: string;
+    type?: string;
+    title?: string;
+    body?: string;
+    metadata?: unknown;
+    eventId?: string;
+  };
+
+  const type = body.type || 'SYSTEM';
+  if (!body.userId || !body.title || !body.body || !ALLOWED_INTERNAL_TYPES.has(type)) {
+    const response: ApiResponse<null> = {
+      success: false,
+      code: 400,
+      message: 'Invalid notification payload',
+      data: null,
+      trace_id: traceId,
+    };
+    res.status(400).json(response);
+    return;
+  }
+
+  try {
+    const notification = await withRetry(() => {
+      if (body.eventId) {
+        return prisma.notification.upsert({
+          where: { eventId: body.eventId },
+          create: {
+            userId: body.userId!,
+            type: type as never,
+            channel: 'IN_APP',
+            status: 'SENT',
+            title: body.title!,
+            body: body.body!,
+            metadata: (body.metadata || {}) as never,
+            eventId: body.eventId,
+            traceId,
+            sentAt: new Date(),
+          },
+          update: {},
+        });
+      }
+
+      return prisma.notification.create({
+        data: {
+          userId: body.userId!,
+          type: type as never,
+          channel: 'IN_APP',
+          status: 'SENT',
+          title: body.title!,
+          body: body.body!,
+          metadata: (body.metadata || {}) as never,
+          traceId,
+          sentAt: new Date(),
+        },
+      });
+    });
+
+    const response: ApiResponse<typeof notification> = {
+      success: true,
+      code: 201,
+      message: 'Notification created',
+      data: notification,
+      trace_id: traceId,
+    };
+    res.status(201).json(response);
+  } catch (err) {
+    logger.error({ err, traceId }, 'createInternalNotification failed');
     const response: ApiResponse<null> = {
       success: false,
       code: 500,

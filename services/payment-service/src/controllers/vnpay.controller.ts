@@ -1,11 +1,16 @@
 import { Request, Response } from 'express';
 import type { ApiResponse } from '@lms/types';
+import { Prisma } from '../generated/prisma';
 import prisma from '../lib/prisma';
 import { logger } from '@lms/logger';
 import { loadVNPayConfig, verifyReturn, isSuccessful } from '../lib/vnpay';
 import { enqueuePaymentCompletedOutbox } from '../lib/outbox';
 import { getInstructorRevenueShareRatio } from '../lib/revenue-share';
 import type { PaymentOrderCompletedEvent } from '@lms/kafka-client';
+import { appendOrderEvents, lockOrderForEventAppend, ORDER_EVENT_TYPES } from '../lib/order-aggregate';
+
+type OrderRecord = NonNullable<Awaited<ReturnType<typeof prisma.order.findUnique>>>;
+type VNPayCallbackKind = 'RETURN' | 'IPN';
 
 function buildPaymentCompletedEvent(
   order: Awaited<ReturnType<typeof prisma.order.findUnique>>,
@@ -29,6 +34,56 @@ function buildPaymentCompletedEvent(
     instructor_share_ratio: getInstructorRevenueShareRatio(),
     platform_fee_ratio: Number((1 - getInstructorRevenueShareRatio()).toFixed(4)),
   };
+}
+
+function buildCallbackPayload(
+  order: OrderRecord,
+  kind: VNPayCallbackKind,
+  result: ReturnType<typeof verifyReturn>,
+): Prisma.InputJsonObject {
+  const orderAmount = Math.round(order.amount.toNumber());
+
+  return {
+    orderId: order.id,
+    callbackKind: kind,
+    responseCode: result.responseCode,
+    transactionStatus: result.transactionStatus,
+    transactionNo: result.transactionNo,
+    bankCode: result.bankCode,
+    amount: result.amount,
+    orderAmount,
+    amountVerified: orderAmount === result.amount,
+    rawPayload: result.params,
+    signature: result.signature,
+    checksumValid: result.valid,
+  };
+}
+
+async function appendCallbackAuditAndEvent(
+  tx: Prisma.TransactionClient,
+  order: OrderRecord,
+  kind: VNPayCallbackKind,
+  result: ReturnType<typeof verifyReturn>,
+  traceId: string,
+): Promise<void> {
+  await tx.vNPayAudit.create({
+    data: {
+      orderId: order.id,
+      kind,
+      payload: result.params,
+      signature: result.signature,
+      valid: result.valid,
+      note: `code=${result.responseCode} status=${result.transactionStatus}`,
+    },
+  });
+
+  await appendOrderEvents(tx, order.id, [
+    {
+      eventType: ORDER_EVENT_TYPES.VNPAY_CALLBACK_RECEIVED,
+      payload: buildCallbackPayload(order, kind, result),
+      metadata: { traceId, source: 'vnpay', callbackKind: kind },
+    },
+  ]);
 }
 
 /**
@@ -59,23 +114,62 @@ export const handleVNPayReturn = async (req: Request, res: Response): Promise<Re
     : null;
 
   if (order) {
-    await prisma.vNPayAudit.create({
-      data: {
-        orderId: order.id,
-        kind: 'RETURN',
-        payload: result.params,
-        signature: result.signature,
-        valid: result.valid,
-        note: `code=${result.responseCode} status=${result.transactionStatus}`,
-      },
-    });
+    try {
+      await prisma.$transaction(async (tx) => {
+        await lockOrderForEventAppend(tx, order.id);
+        await appendCallbackAuditAndEvent(tx, order, 'RETURN', result, traceId);
+      });
+    } catch (err) {
+      logger.error({ err, orderId: order.id }, 'VNPay return audit/event append failed');
+    }
 
-    // Dev fallback: neu IPN chua ve va NODE_ENV=development, tu cap nhat order + publish event.
-    // Trong prod, chi trust IPN. Frontend poll order status de biet da COMPLETED hay chua.
+    // Dev fallback chi dung khi sandbox khong goi duoc IPN ve localhost.
     const isDev = process.env.NODE_ENV === 'development';
-    if (isDev && order.status === 'PENDING' && isSuccessful(result)) {
+    if (isDev && isSuccessful(result)) {
       try {
         const updated = await prisma.$transaction(async (tx) => {
+          await lockOrderForEventAppend(tx, order.id);
+
+          const current = await tx.order.findUnique({ where: { id: order.id } });
+          if (!current || current.status !== 'PENDING') {
+            return current;
+          }
+
+          const completedEvent = await tx.orderEvent.findFirst({
+            where: { orderId: order.id, eventType: ORDER_EVENT_TYPES.ORDER_COMPLETED },
+            select: { id: true },
+          });
+          if (completedEvent) {
+            return current;
+          }
+
+          const paidAt = new Date();
+          await appendOrderEvents(tx, order.id, [
+            {
+              eventType: ORDER_EVENT_TYPES.PAYMENT_VERIFIED,
+              payload: {
+                orderId: order.id,
+                vnpTransactionNo: result.transactionNo,
+                vnpBankCode: result.bankCode,
+                vnpResponseCode: result.responseCode,
+                amountVerified: true,
+              },
+              metadata: { traceId, source: 'vnpay-return-dev-fallback' },
+              occurredAt: paidAt,
+            },
+            {
+              eventType: ORDER_EVENT_TYPES.ORDER_COMPLETED,
+              payload: {
+                orderId: order.id,
+                paidAt: paidAt.toISOString(),
+                enrollmentEventPublished: false,
+                outboxEnqueued: true,
+              },
+              metadata: { traceId, source: 'vnpay-return-dev-fallback' },
+              occurredAt: paidAt,
+            },
+          ]);
+
           const completed = await tx.order.update({
             where: { id: order.id },
             data: {
@@ -83,7 +177,7 @@ export const handleVNPayReturn = async (req: Request, res: Response): Promise<Re
               vnpTransactionNo: result.transactionNo,
               vnpBankCode: result.bankCode,
               vnpResponseCode: result.responseCode,
-              paidAt: new Date(),
+              paidAt,
             },
           });
           await enqueuePaymentCompletedOutbox(
@@ -93,7 +187,10 @@ export const handleVNPayReturn = async (req: Request, res: Response): Promise<Re
           );
           return completed;
         });
-        logger.info({ orderId: updated.id }, '[DEV] Marked COMPLETED via Return URL fallback');
+
+        if (updated?.status === 'COMPLETED') {
+          logger.info({ orderId: updated.id }, '[DEV] Marked COMPLETED via Return URL fallback');
+        }
       } catch (err) {
         logger.error({ err, orderId: order.id }, 'Dev fallback update failed');
       }
@@ -148,63 +245,99 @@ export const handleVNPayIPN = async (req: Request, res: Response): Promise<Respo
     'VNPay IPN callback',
   );
 
+  const order = await prisma.order.findUnique({ where: { vnpTxnRef: result.txnRef } });
+
   if (!result.valid) {
+    if (order) {
+      await prisma
+        .$transaction(async (tx) => {
+          await lockOrderForEventAppend(tx, order.id);
+          await appendCallbackAuditAndEvent(tx, order, 'IPN', result, traceId);
+        })
+        .catch((err) => logger.error({ err, orderId: order.id }, 'Invalid IPN audit/event append failed'));
+    }
     return res.status(200).json({ RspCode: '97', Message: 'Checksum failed' });
   }
 
-  const order = await prisma.order.findUnique({ where: { vnpTxnRef: result.txnRef } });
-
   if (!order) {
-    await prisma.vNPayAudit
-      .create({
-        data: {
-          orderId: '00000000-0000-0000-0000-000000000000',
-          kind: 'IPN',
-          payload: result.params,
-          signature: result.signature,
-          valid: false,
-          note: 'Order not found',
-        },
-      })
-      .catch(() => void 0);
     return res.status(200).json({ RspCode: '01', Message: 'Order not found' });
   }
 
-  await prisma.vNPayAudit.create({
-    data: {
-      orderId: order.id,
-      kind: 'IPN',
-      payload: result.params,
-      signature: result.signature,
-      valid: true,
-      note: `code=${result.responseCode} status=${result.transactionStatus}`,
-    },
-  });
+  const outcome = await prisma.$transaction(async (tx) => {
+    await lockOrderForEventAppend(tx, order.id);
+    await appendCallbackAuditAndEvent(tx, order, 'IPN', result, traceId);
 
-  // Check amount
-  if (Math.round(order.amount.toNumber()) !== result.amount) {
-    return res.status(200).json({ RspCode: '04', Message: 'Amount invalid' });
-  }
+    const current = await tx.order.findUnique({ where: { id: order.id } });
+    if (!current) {
+      return 'NOT_FOUND' as const;
+    }
 
-  // Idempotency: neu da xu ly -> khong cap nhat lai, nhung tra OK.
-  if (order.status === 'COMPLETED') {
-    return res.status(200).json({ RspCode: '02', Message: 'Order already confirmed' });
-  }
+    if (Math.round(current.amount.toNumber()) !== result.amount) {
+      return 'AMOUNT_INVALID' as const;
+    }
 
-  if (!isSuccessful(result)) {
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        status: 'FAILED',
-        vnpResponseCode: result.responseCode,
-        failureReason: `code=${result.responseCode} status=${result.transactionStatus}`,
-      },
+    const completedEvent = await tx.orderEvent.findFirst({
+      where: { orderId: order.id, eventType: ORDER_EVENT_TYPES.ORDER_COMPLETED },
+      select: { id: true },
     });
-    return res.status(200).json({ RspCode: '00', Message: 'Confirm Failure' });
-  }
+    if (current.status === 'COMPLETED' || completedEvent) {
+      return 'ALREADY_CONFIRMED' as const;
+    }
 
-  // Order va outbox phai atomic de Kafka down khong lam mat event business-critical.
-  await prisma.$transaction(async (tx) => {
+    if (!isSuccessful(result)) {
+      if (current.status !== 'FAILED') {
+        const reason = `code=${result.responseCode} status=${result.transactionStatus}`;
+        await appendOrderEvents(tx, order.id, [
+          {
+            eventType: ORDER_EVENT_TYPES.ORDER_FAILED,
+            payload: {
+              orderId: order.id,
+              reason,
+              responseCode: result.responseCode,
+            },
+            metadata: { traceId, source: 'vnpay-ipn' },
+          },
+        ]);
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            status: 'FAILED',
+            vnpResponseCode: result.responseCode,
+            failureReason: reason,
+          },
+        });
+      }
+      return 'CONFIRM_FAILURE' as const;
+    }
+
+    // Order va outbox phai atomic de Kafka down khong lam mat event business-critical.
+    const paidAt = new Date();
+    await appendOrderEvents(tx, order.id, [
+      {
+        eventType: ORDER_EVENT_TYPES.PAYMENT_VERIFIED,
+        payload: {
+          orderId: order.id,
+          vnpTransactionNo: result.transactionNo,
+          vnpBankCode: result.bankCode,
+          vnpResponseCode: result.responseCode,
+          amountVerified: true,
+        },
+        metadata: { traceId, source: 'vnpay-ipn' },
+        occurredAt: paidAt,
+      },
+      {
+        eventType: ORDER_EVENT_TYPES.ORDER_COMPLETED,
+        payload: {
+          orderId: order.id,
+          paidAt: paidAt.toISOString(),
+          enrollmentEventPublished: false,
+          outboxEnqueued: true,
+        },
+        metadata: { traceId, source: 'vnpay-ipn' },
+        occurredAt: paidAt,
+      },
+    ]);
+
     const updated = await tx.order.update({
       where: { id: order.id },
       data: {
@@ -212,7 +345,7 @@ export const handleVNPayIPN = async (req: Request, res: Response): Promise<Respo
         vnpTransactionNo: result.transactionNo,
         vnpBankCode: result.bankCode,
         vnpResponseCode: result.responseCode,
-        paidAt: new Date(),
+        paidAt,
       },
     });
     await enqueuePaymentCompletedOutbox(
@@ -220,7 +353,22 @@ export const handleVNPayIPN = async (req: Request, res: Response): Promise<Respo
       buildPaymentCompletedEvent(updated, result.transactionNo),
       traceId,
     );
+
+    return 'CONFIRM_SUCCESS' as const;
   });
+
+  if (outcome === 'NOT_FOUND') {
+    return res.status(200).json({ RspCode: '01', Message: 'Order not found' });
+  }
+  if (outcome === 'AMOUNT_INVALID') {
+    return res.status(200).json({ RspCode: '04', Message: 'Amount invalid' });
+  }
+  if (outcome === 'ALREADY_CONFIRMED') {
+    return res.status(200).json({ RspCode: '02', Message: 'Order already confirmed' });
+  }
+  if (outcome === 'CONFIRM_FAILURE') {
+    return res.status(200).json({ RspCode: '00', Message: 'Confirm Failure' });
+  }
 
   return res.status(200).json({ RspCode: '00', Message: 'Confirm Success' });
 };

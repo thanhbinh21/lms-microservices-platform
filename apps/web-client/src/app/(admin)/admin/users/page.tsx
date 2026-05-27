@@ -1,35 +1,39 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { Search, ChevronLeft, ChevronRight, KeyRound, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, KeyRound, Search, UserCog, X } from 'lucide-react';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { AdminStatCard } from '@/components/admin/AdminStatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 import { toast } from '@/components/ui/toast';
 import {
   getAdminUsers,
+  updateAdminUserPassword,
   updateAdminUserRole,
   updateAdminUserStatus,
-  updateAdminUserPassword,
 } from '@/app/actions/admin';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [pagination, setPagination] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-
+  const [actionLoading, setActionLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
     message: string;
-    onConfirm: () => void;
+    onConfirm: () => void | Promise<void>;
     variant: 'danger' | 'default';
+    confirmLabel?: string;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, variant: 'default' });
 
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
@@ -41,77 +45,102 @@ export default function AdminUsersPage() {
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
-    const res = await getAdminUsers({
+    setError('');
+    const result = await getAdminUsers({
       page,
       limit: 10,
       search: search || undefined,
       role: roleFilter || undefined,
       status: statusFilter || undefined,
     });
-    if (res.success && res.data) {
-      setUsers(res.data.users);
-      setPagination(res.data.pagination);
+    if (result.success && result.data) {
+      setUsers(result.data.users);
+      setPagination(result.data.pagination);
+    } else {
+      setError(result.message || 'Không thể tải danh sách người dùng.');
     }
     setLoading(false);
   }, [page, search, roleFilter, statusFilter]);
 
   useEffect(() => {
-    fetchUsers();
+    void fetchUsers();
   }, [fetchUsers]);
 
   useEffect(() => {
     setPage(1);
   }, [search, roleFilter, statusFilter]);
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
-    const res = await updateAdminUserRole(userId, newRole);
-    if (res.success) {
-      toast('success', 'Đã cập nhật vai trò người dùng');
-      fetchUsers();
-      return;
-    }
-    toast('error', 'Cập nhật vai trò thất bại', res.message || 'Vui lòng thử lại.');
-  };
+  const summary = useMemo(() => {
+    const active = users.filter((user) => user.status === 'ACTIVE').length;
+    const instructors = users.filter((user) => user.role === 'INSTRUCTOR').length;
+    const banned = users.filter((user) => user.status === 'BANNED').length;
+    return { active, instructors, banned };
+  }, [users]);
 
-  const handleStatusToggle = (userId: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'ACTIVE' ? 'BANNED' : 'ACTIVE';
-    const label = newStatus === 'BANNED' ? 'Cấm' : 'Kích hoạt';
+  function showCannotEditAdmin() {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Không thể chỉnh sửa Admin',
+      message: 'Không được chỉnh sửa tài khoản có vai trò Admin từ màn hình này.',
+      variant: 'default',
+      onConfirm: () => undefined,
+    });
+  }
+
+  function handleRoleChange(userId: string, currentRole: string, nextRole: string) {
+    if (currentRole === nextRole) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Cập nhật vai trò người dùng',
+      message: `Bạn có chắc muốn đổi vai trò người dùng này từ ${currentRole} sang ${nextRole}? Thao tác này ảnh hưởng trực tiếp đến quyền truy cập.`,
+      variant: nextRole === 'ADMIN' ? 'danger' : 'default',
+      confirmLabel: 'Đổi vai trò',
+      onConfirm: async () => {
+        setActionLoading(true);
+        const result = await updateAdminUserRole(userId, nextRole);
+        setActionLoading(false);
+        if (result.success) {
+          toast('success', 'Đã cập nhật vai trò người dùng', 'Thao tác đã được ghi audit log.');
+          await fetchUsers();
+          return;
+        }
+        toast('error', 'Cập nhật vai trò thất bại', result.message || 'Vui lòng thử lại.');
+      },
+    });
+  }
+
+  function handleStatusToggle(userId: string, currentStatus: string) {
+    const nextStatus = currentStatus === 'ACTIVE' ? 'BANNED' : 'ACTIVE';
+    const label = nextStatus === 'BANNED' ? 'Cấm' : 'Kích hoạt';
     setConfirmDialog({
       isOpen: true,
       title: `${label} người dùng`,
-      message: `Bạn có chắc muốn ${label.toLowerCase()} người dùng này?`,
-      variant: newStatus === 'BANNED' ? 'danger' : 'default',
+      message: `Bạn có chắc muốn ${label.toLowerCase()} người dùng này? Tài khoản có thể bị thu hồi phiên đăng nhập theo policy backend.`,
+      variant: nextStatus === 'BANNED' ? 'danger' : 'default',
+      confirmLabel: label,
       onConfirm: async () => {
-        const res = await updateAdminUserStatus(userId, newStatus);
-        if (res.success) {
-          toast('success', 'Đã cập nhật trạng thái người dùng');
-          fetchUsers();
+        setActionLoading(true);
+        const result = await updateAdminUserStatus(userId, nextStatus);
+        setActionLoading(false);
+        if (result.success) {
+          toast('success', 'Đã cập nhật trạng thái người dùng', 'Thao tác đã được ghi audit log.');
+          await fetchUsers();
           return;
         }
-        toast('error', 'Cập nhật trạng thái thất bại', res.message || 'Vui lòng thử lại.');
+        toast('error', 'Cập nhật trạng thái thất bại', result.message || 'Vui lòng thử lại.');
       },
     });
-  };
+  }
 
-  const openPasswordDialog = (user: { id: string; email: string }) => {
+  function openPasswordDialog(user: { id: string; email: string }) {
     setPasswordTarget({ id: user.id, email: user.email });
     setNewPassword('');
     setConfirmPassword('');
     setPasswordError(null);
     setPasswordDialogOpen(true);
-  };
+  }
 
-  const showCannotEditAdmin = () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Không thể chỉnh sửa Admin',
-      message: 'Không được chỉnh sửa tài khoản có vai trò Admin.',
-      variant: 'default',
-      onConfirm: () => {},
-    });
-  };
-
-  const submitPasswordChange = async () => {
+  async function submitPasswordChange() {
     if (!passwordTarget) return;
     setPasswordError(null);
 
@@ -125,78 +154,81 @@ export default function AdminUsersPage() {
     }
 
     setPasswordSaving(true);
-    const res = await updateAdminUserPassword(passwordTarget.id, newPassword);
+    const result = await updateAdminUserPassword(passwordTarget.id, newPassword);
     setPasswordSaving(false);
 
-    if (!res.success) {
-      setPasswordError(res.message || 'Đổi mật khẩu thất bại.');
-      toast('error', 'Đổi mật khẩu thất bại', res.message || 'Vui lòng thử lại.');
+    if (!result.success) {
+      setPasswordError(result.message || 'Đổi mật khẩu thất bại.');
+      toast('error', 'Đổi mật khẩu thất bại', result.message || 'Vui lòng thử lại.');
       return;
     }
 
     setPasswordDialogOpen(false);
-    toast('success', 'Đã đổi mật khẩu người dùng');
-  };
+    toast('success', 'Đã đổi mật khẩu người dùng', 'Thao tác đã được ghi audit log.');
+  }
 
   return (
-    <div className="workspace-page">
-      <div className="workspace-page-header">
-        <h1 className="workspace-page-title">Quản lý người dùng</h1>
-        <p className="workspace-page-description">
-          Xem, tìm kiếm, phân quyền và quản lý trạng thái người dùng.
-        </p>
+    <div className="workspace-page space-y-6">
+      <AdminPageHeader
+        eyebrow={
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
+            <UserCog className="size-3.5" />
+            Người dùng
+          </div>
+        }
+        title="Quản lý người dùng"
+        description="Tìm kiếm, phân quyền, khóa hoặc kích hoạt tài khoản. Các thao tác nhạy cảm đều yêu cầu xác nhận."
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminStatCard label="Tổng kết quả" value={pagination?.total ?? users.length} hint="Theo bộ lọc hiện tại" />
+        <AdminStatCard label="Đang hoạt động" value={loading ? '...' : summary.active} hint="Trong trang hiện tại" tone="success" />
+        <AdminStatCard label="Giảng viên" value={loading ? '...' : summary.instructors} hint="Trong trang hiện tại" />
+        <AdminStatCard label="Bị cấm" value={loading ? '...' : summary.banned} hint="Cần theo dõi" tone={summary.banned > 0 ? 'danger' : 'default'} />
       </div>
 
-      <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">{error}</div>}
+
+      <Card className="glass-panel rounded-xl border-white/60">
         <CardHeader>
           <CardTitle className="text-lg">Danh sách người dùng</CardTitle>
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-            <div className="relative flex-1">
+          <CardDescription>Lọc theo tên, email, vai trò hoặc trạng thái tài khoản.</CardDescription>
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Tìm theo tên hoặc email..."
-                className="pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <Input placeholder="Tìm theo tên hoặc email..." className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} />
             </div>
-            <select
-              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-            >
+            <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
               <option value="">Tất cả vai trò</option>
-              <option value="STUDENT">Student</option>
-              <option value="INSTRUCTOR">Instructor</option>
+              <option value="STUDENT">Học viên</option>
+              <option value="INSTRUCTOR">Giảng viên</option>
               <option value="ADMIN">Admin</option>
             </select>
-            <select
-              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
+            <select className="rounded-md border border-input bg-background px-3 py-2 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="">Tất cả trạng thái</option>
-              <option value="ACTIVE">Active</option>
-              <option value="BANNED">Banned</option>
-              <option value="SUSPENDED">Suspended</option>
+              <option value="ACTIVE">Đang hoạt động</option>
+              <option value="BANNED">Bị cấm</option>
+              <option value="SUSPENDED">Tạm khóa</option>
             </select>
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-12 animate-pulse rounded-lg bg-zinc-100" />
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="h-12 animate-pulse rounded-lg bg-zinc-100" />
               ))}
             </div>
           ) : users.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Không tìm thấy người dùng nào.</p>
+            <div className="rounded-xl border border-dashed border-white/60 bg-white/40 p-8 text-center text-sm text-muted-foreground">
+              Không tìm thấy người dùng phù hợp với bộ lọc hiện tại.
+            </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[980px] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <th className="pb-3 pr-4">Tên</th>
+                    <th className="pb-3 pr-4">Người dùng</th>
                     <th className="pb-3 pr-4">Email</th>
                     <th className="pb-3 pr-4">Vai trò</th>
                     <th className="pb-3 pr-4">Trạng thái</th>
@@ -205,65 +237,43 @@ export default function AdminUsersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((u) => (
-                    <tr key={u.id} className="border-b border-zinc-100 transition-colors hover:bg-zinc-50/50">
-                      <td className="py-3 pr-4 font-medium">{u.name}</td>
-                      <td className="py-3 pr-4 text-muted-foreground">{u.email}</td>
-                      <td className="py-3 pr-4">
-                        <StatusBadge status={u.role} />
-                      </td>
-                      <td className="py-3 pr-4">
-                        <StatusBadge status={u.status} />
-                      </td>
-                      <td className="py-3 pr-4 text-muted-foreground">
-                        {new Date(u.createdAt).toLocaleDateString('vi-VN')}
-                      </td>
+                  {users.map((user) => (
+                    <tr key={user.id} className="border-b border-zinc-100 transition-colors hover:bg-zinc-50/50">
+                      <td className="py-3 pr-4 font-medium">{user.name}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">{user.email}</td>
+                      <td className="py-3 pr-4"><StatusBadge status={user.role} /></td>
+                      <td className="py-3 pr-4"><StatusBadge status={user.status} /></td>
+                      <td className="py-3 pr-4 text-muted-foreground">{new Date(user.createdAt).toLocaleDateString('vi-VN')}</td>
                       <td className="py-3">
-                        <div className="flex items-center gap-2">
-                          {u.role === 'ADMIN' ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-xs"
-                              onClick={showCannotEditAdmin}
-                            >
-                              Admin
-                            </Button>
-                          ) : null}
+                        <div className="flex flex-wrap items-center gap-2">
                           <select
                             className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-                            value={u.role}
-                            onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                            disabled={u.role === 'ADMIN'}
+                            value={user.role}
+                            onChange={(event) => (user.role === 'ADMIN' ? showCannotEditAdmin() : handleRoleChange(user.id, user.role, event.target.value))}
+                            disabled={user.role === 'ADMIN' || actionLoading}
                           >
-                            <option value="STUDENT">Student</option>
-                            <option value="INSTRUCTOR">Instructor</option>
+                            <option value="STUDENT">Học viên</option>
+                            <option value="INSTRUCTOR">Giảng viên</option>
                             <option value="ADMIN">Admin</option>
                           </select>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-xs"
-                            onClick={() =>
-                              u.role === 'ADMIN'
-                                ? showCannotEditAdmin()
-                                : openPasswordDialog({ id: u.id, email: u.email })
-                            }
-                            disabled={u.role === 'ADMIN'}
+                            className="gap-1 text-xs"
+                            onClick={() => (user.role === 'ADMIN' ? showCannotEditAdmin() : openPasswordDialog({ id: user.id, email: user.email }))}
+                            disabled={user.role === 'ADMIN' || actionLoading}
                           >
-                            <KeyRound className="mr-1 size-4" />
-                            Đổi MK
+                            <KeyRound className="size-3.5" />
+                            Đổi mật khẩu
                           </Button>
                           <Button
-                            variant={u.status === 'ACTIVE' ? 'destructive' : 'default'}
+                            variant={user.status === 'ACTIVE' ? 'destructive' : 'default'}
                             size="sm"
                             className="text-xs"
-                            onClick={() =>
-                              u.role === 'ADMIN' ? showCannotEditAdmin() : handleStatusToggle(u.id, u.status)
-                            }
-                            disabled={u.role === 'ADMIN'}
+                            onClick={() => (user.role === 'ADMIN' ? showCannotEditAdmin() : handleStatusToggle(user.id, user.status))}
+                            disabled={user.role === 'ADMIN' || actionLoading}
                           >
-                            {u.status === 'ACTIVE' ? 'Cấm' : 'Kích hoạt'}
+                            {user.status === 'ACTIVE' ? 'Cấm' : 'Kích hoạt'}
                           </Button>
                         </div>
                       </td>
@@ -280,20 +290,10 @@ export default function AdminUsersPage() {
                 Trang {pagination.page} / {pagination.totalPages} ({pagination.total} kết quả)
               </p>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
                   <ChevronLeft className="size-4" /> Trước
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= pagination.totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
+                <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((current) => current + 1)}>
                   Sau <ChevronRight className="size-4" />
                 </Button>
               </div>
@@ -304,24 +304,18 @@ export default function AdminUsersPage() {
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
-        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+        onClose={() => setConfirmDialog((previous) => ({ ...previous, isOpen: false }))}
         onConfirm={confirmDialog.onConfirm}
         title={confirmDialog.title}
         message={confirmDialog.message}
         variant={confirmDialog.variant}
+        confirmLabel={confirmDialog.confirmLabel}
+        loading={actionLoading}
       />
 
       {passwordDialogOpen && passwordTarget && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          onClick={() => {
-            if (!passwordSaving) setPasswordDialogOpen(false);
-          }}
-        >
-          <div
-            className="mx-4 w-full max-w-md rounded-2xl border border-white/60 bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={() => (!passwordSaving ? setPasswordDialogOpen(false) : null)}>
+          <div className="w-full max-w-md rounded-xl border border-white/60 bg-white p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex size-10 items-center justify-center rounded-full bg-zinc-100">
@@ -332,49 +326,26 @@ export default function AdminUsersPage() {
                   <p className="text-xs text-muted-foreground">{passwordTarget.email}</p>
                 </div>
               </div>
-              <button
-                onClick={() => (!passwordSaving ? setPasswordDialogOpen(false) : null)}
-                className="rounded-lg p-1 hover:bg-zinc-100"
-              >
+              <button onClick={() => (!passwordSaving ? setPasswordDialogOpen(false) : null)} className="rounded-lg p-1 hover:bg-zinc-100" aria-label="Đóng">
                 <X className="size-4" />
               </button>
             </div>
 
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Mật khẩu mới</label>
-                <Input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Tối thiểu 8 ký tự"
-                />
+                <label htmlFor="admin-new-password" className="mb-1 block text-xs font-semibold text-muted-foreground">Mật khẩu mới</label>
+                <Input id="admin-new-password" type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Tối thiểu 8 ký tự" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Xác nhận mật khẩu</label>
-                <Input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Nhập lại mật khẩu"
-                />
+                <label htmlFor="admin-confirm-password" className="mb-1 block text-xs font-semibold text-muted-foreground">Xác nhận mật khẩu</label>
+                <Input id="admin-confirm-password" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Nhập lại mật khẩu" />
               </div>
-              {passwordError && (
-                <p className="text-sm font-medium text-red-600">{passwordError}</p>
-              )}
+              {passwordError && <p className="text-sm font-medium text-red-600">{passwordError}</p>}
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setPasswordDialogOpen(false)}
-                disabled={passwordSaving}
-              >
-                Hủy
-              </Button>
-              <Button onClick={submitPasswordChange} disabled={passwordSaving}>
-                {passwordSaving ? 'Đang lưu...' : 'Lưu'}
-              </Button>
+              <Button variant="outline" onClick={() => setPasswordDialogOpen(false)} disabled={passwordSaving}>Hủy</Button>
+              <Button onClick={submitPasswordChange} disabled={passwordSaving}>{passwordSaving ? 'Đang lưu...' : 'Lưu'}</Button>
             </div>
           </div>
         </div>
@@ -382,5 +353,3 @@ export default function AdminUsersPage() {
     </div>
   );
 }
-
-

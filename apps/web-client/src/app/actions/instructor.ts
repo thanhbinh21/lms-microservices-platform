@@ -57,6 +57,7 @@ export interface InstructorRequestDto {
   courseDescription: string;
   targetStudents?: string | null;
   status: string;
+  rejectionReason?: string | null;
   createdAt: string;
 }
 
@@ -460,8 +461,8 @@ export async function createInstructorRequestAction(data: BecomeInstructorInput)
     message:
       result.message ||
       (result.success
-        ? 'Da gui ho so thanh cong. Admin se xem xet trong thoi gian som nhat.'
-        : 'Khong the gui ho so ung tuyen giang vien.'),
+        ? 'Đã gửi hồ sơ thành công. Admin sẽ xem xét trong thời gian sớm nhất.'
+        : 'Không thể gửi hồ sơ ứng tuyển giảng viên.'),
   };
 }
 
@@ -506,16 +507,22 @@ export async function listInstructorRequestsAdminAction(): Promise<{
   message: string;
   requests: InstructorRequestDto[];
 }> {
-  const result = await callApi<InstructorRequestDto[]>(
+  const result = await callApi<InstructorRequestDto[] | { requests: InstructorRequestDto[] }>(
     '/auth/admin/instructor/requests',
     { method: 'GET' },
     true,
   );
 
+  const requests = Array.isArray(result.data)
+    ? result.data
+    : Array.isArray(result.data?.requests)
+      ? result.data.requests
+      : [];
+
   return {
     success: result.success,
     message: result.message,
-    requests: result.success && Array.isArray(result.data) ? result.data : [],
+    requests: result.success ? requests : [],
   };
 }
 

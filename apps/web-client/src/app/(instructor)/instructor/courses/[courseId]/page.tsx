@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { StatusMessage } from '@/components/ui/status-message';
 import { toast } from '@/components/ui/toast';
+import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 import {
   confirmLessonUploadAction,
   createCourseCategoryAction,
@@ -269,6 +270,7 @@ export default function CourseWizardPage() {
   // Modal states
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showCertModal, setShowCertModal] = useState(false);
+  const [confirmPublishOpen, setConfirmPublishOpen] = useState(false);
 
   // Step 1 state
   const [title, setTitle] = useState('');
@@ -1383,7 +1385,7 @@ export default function CourseWizardPage() {
                     </Button>
                   </div>
                 ) : (
-                  <Button onClick={() => void handlePublish()} disabled={!canPublish || publishing}
+                  <Button onClick={() => setConfirmPublishOpen(true)} disabled={!canPublish || publishing}
                     className="w-full rounded-xl font-bold text-base h-14 shadow-lg gap-2">
                     {publishing ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}
                     {canPublish ? 'Xuất bản khóa học' : 'Chưa đủ điều kiện xuất bản'}
@@ -1404,6 +1406,16 @@ export default function CourseWizardPage() {
       {/* ── Modals ── */}
       <CreateCategoryModal open={showCategoryModal} onClose={() => setShowCategoryModal(false)} onSuccess={handleCategoryCreated} />
       <CreateCertificateModal open={showCertModal} onClose={() => setShowCertModal(false)} onSuccess={handleCertCreated} />
+      <ConfirmDialog
+        isOpen={confirmPublishOpen}
+        onClose={() => setConfirmPublishOpen(false)}
+        onConfirm={handlePublish}
+        title="Xuất bản khóa học?"
+        message="Khóa học sẽ hiển thị công khai với học viên sau khi xuất bản. Hãy chắc chắn bạn đã preview nội dung, giá, thumbnail và các bài học miễn phí."
+        confirmLabel="Xuất bản"
+        loadingLabel="Đang xuất bản..."
+        loading={publishing}
+      />
     </div>
   );
 }

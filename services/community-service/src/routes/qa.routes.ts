@@ -33,7 +33,11 @@ const updateAnswerSchema = z.object({
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(30).default(10),
+  limit: z.preprocess((value) => {
+    const parsed = Number(value ?? 20);
+    if (!Number.isFinite(parsed)) return 20;
+    return Math.min(30, Math.max(1, Math.trunc(parsed)));
+  }, z.number().int().min(1).max(30)),
   status: z.enum(['all', 'unanswered', 'resolved']).default('all'),
   sortBy: z.enum(['recent', 'popular', 'upvotes']).default('recent'),
   courseId: z.string().uuid().optional(),
@@ -112,7 +116,7 @@ qaRouter.get('/questions', requireAuth, async (req: Request, res: Response) => {
         const enrolled = await checkEnrollment(viewerId, query.courseId);
         if (!enrolled) {
           return res.status(403).json({
-            success: false, code: 403, message: 'Ban can ghi danh khoa hoc truoc khi xem hoi dap.', data: null, trace_id: traceId,
+            success: false, code: 403, message: 'Bạn cần ghi danh khóa học trước khi xem hỏi đáp.', data: null, trace_id: traceId,
           });
         }
         where.authorId = viewerId;
@@ -171,7 +175,7 @@ qaRouter.get('/questions', requireAuth, async (req: Request, res: Response) => {
       const info = nameMap.get(uid);
       return {
         id: uid,
-        displayName: info?.name || info?.username || `NgÆ°á»i dÃ¹ng #${uid.slice(0, 6)}`,
+        displayName: info?.name || info?.username || `Người dùng #${uid.slice(0, 6)}`,
         role: info?.role,
       };
     });
@@ -182,7 +186,7 @@ qaRouter.get('/questions', requireAuth, async (req: Request, res: Response) => {
       data: {
         items: items.map((q) => ({
           ...q,
-          author: authorMap.get(q.authorId) || { id: q.authorId, displayName: `NgÆ°á»i dÃ¹ng #${q.authorId.slice(0, 6)}` },
+          author: authorMap.get(q.authorId) || { id: q.authorId, displayName: `Người dùng #${q.authorId.slice(0, 6)}` },
           answerCount: q._count.answers,
           course: q.courseId ? (courseMap.get(q.courseId) || null) : null,
         })),
@@ -209,7 +213,7 @@ qaRouter.post('/questions', requireAuth, async (req: Request, res: Response) => 
     if (!enrolled) {
       return res.status(403).json({
         success: false, code: 403,
-        message: 'Ban can ghi danh khoa hoc truoc khi dat cau hoi.',
+        message: 'Bạn cần ghi danh khóa học trước khi đặt câu hỏi.',
         data: null, trace_id: traceId,
       });
     }
@@ -287,7 +291,7 @@ qaRouter.get('/questions/:id', requireAuth, async (req: Request, res: Response) 
       const info = nameMap.get(uid);
       enrichedAuthors[uid] = {
         id: uid,
-        displayName: info?.name || info?.username || `NgÆ°á»i dÃ¹ng #${uid.slice(0, 6)}`,
+        displayName: info?.name || info?.username || `Người dùng #${uid.slice(0, 6)}`,
         role: info?.role,
       };
     }
@@ -613,7 +617,7 @@ qaRouter.get('/course/:courseId/questions', requireAuth, async (req: Request, re
     } else if (!isAdmin(viewerRole)) {
       const enrolled = await checkEnrollment(viewerId, courseId);
       if (!enrolled) {
-        return res.status(403).json({ success: false, code: 403, message: 'Ban can ghi danh khoa hoc truoc khi xem hoi dap.', data: null, trace_id: traceId });
+        return res.status(403).json({ success: false, code: 403, message: 'Bạn cần ghi danh khóa học trước khi xem hỏi đáp.', data: null, trace_id: traceId });
       }
       where.authorId = viewerId;
     }

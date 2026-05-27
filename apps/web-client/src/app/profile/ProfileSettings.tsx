@@ -28,7 +28,6 @@ import { logout, setUser } from '@/lib/redux/authSlice';
 import { AdminInstructorRequestsPanel } from '@/components/admin/AdminInstructorRequestsPanel';
 import { SecurityPanel } from './panels/SecurityPanel';
 import { NotificationsPanel } from './panels/NotificationsPanel';
-import { PaymentsPanel } from './panels/PaymentsPanel';
 import { DisplayPanel } from './panels/DisplayPanel';
 
 type TabId = 'personal' | 'security' | 'notifications' | 'payments' | 'display' | 'instructor-requests';
@@ -76,16 +75,14 @@ export function ProfileSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState(user?.avatar || '');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const displayAvatarUrl = avatarUrl ?? user?.avatar ?? '';
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setAvatarUrl(user?.avatar || '');
-  }, [user?.avatar]);
-
-  useEffect(() => {
-    setIsMounted(true);
+    const frame = window.requestAnimationFrame(() => setIsMounted(true));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
@@ -99,6 +96,12 @@ export function ProfileSettings() {
       router.replace('/profile?tab=personal');
     }
   }, [tabParam, isAdmin, router]);
+
+  useEffect(() => {
+    if (tabParam === 'payments') {
+      router.replace('/dashboard/orders');
+    }
+  }, [tabParam, router]);
 
   const handleLogout = async () => {
     await logoutAction();
@@ -215,7 +218,7 @@ export function ProfileSettings() {
       { id: 'personal', label: 'Hồ sơ cá nhân', icon: User },
       { id: 'security', label: 'Bảo mật & Mật khẩu', icon: Shield },
       { id: 'notifications', label: 'Thông báo', icon: Bell },
-      { id: 'payments', label: 'Lịch sử thanh toán', icon: Wallet },
+      { id: 'payments', label: 'Lịch sử đơn hàng', icon: Wallet },
       { id: 'display', label: 'Tùy chọn hiển thị', icon: Settings },
     ];
     if (!isAdmin) return base;
@@ -282,7 +285,13 @@ export function ProfileSettings() {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => goToTab(item.id)}
+                onClick={() => {
+                  if (item.id === 'payments') {
+                    router.push('/dashboard/orders');
+                    return;
+                  }
+                  goToTab(item.id);
+                }}
                 className={`flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-bold transition-all ${
                   activeTab === item.id
                     ? 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90'
@@ -328,8 +337,8 @@ export function ProfileSettings() {
                   <div className="flex items-center gap-6">
                     <div className="group relative cursor-pointer">
                       <div className="relative flex size-28 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-linear-to-br from-primary to-indigo-500 text-4xl font-bold text-white shadow-xl">
-                        {avatarUrl ? (
-                          <Image src={avatarUrl} alt={user.name || 'Ảnh đại diện'} fill className="object-cover" />
+                        {displayAvatarUrl ? (
+                          <Image src={displayAvatarUrl} alt={user.name || 'Ảnh đại diện'} fill className="object-cover" />
                         ) : (
                           user.name?.charAt(0) || 'U'
                         )}
@@ -438,7 +447,7 @@ export function ProfileSettings() {
             ) : activeTab === 'notifications' ? (
               <NotificationsPanel />
             ) : activeTab === 'payments' ? (
-              <PaymentsPanel />
+              null
             ) : activeTab === 'display' ? (
               <DisplayPanel />
             ) : (

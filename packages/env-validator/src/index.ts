@@ -64,6 +64,8 @@ const vnpayEnvSchema = z.object({
 // Service discovery noi bo (payment -> course de verify price)
 const internalServiceEnvSchema = z.object({
   COURSE_SERVICE_URL: z.string().url('COURSE_SERVICE_URL must be valid URL').optional(),
+  AUTH_SERVICE_URL: z.string().url('AUTH_SERVICE_URL must be valid URL').optional(),
+  NOTIFICATION_SERVICE_URL: z.string().url('NOTIFICATION_SERVICE_URL must be valid URL').optional(),
   INTERNAL_SERVICE_SECRET: z.string().min(1, 'INTERNAL_SERVICE_SECRET is required'),
 });
 
@@ -149,5 +151,4 @@ export const validateNotificationServiceEnv = () =>
     kafkaEnvSchema,
     internalServiceEnvSchema,
     smtpEnvSchema,
-    z.object({ AUTH_SERVICE_URL: z.string().url().optional() }),
   );

@@ -13,11 +13,14 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
+import { forceRefreshSessionAction } from '@/app/actions/auth';
 import {
   createInstructorRequestAction,
   getMyPendingInstructorRequestAction,
+  type InstructorRequestDto,
 } from '@/app/actions/instructor';
-import { useAppSelector } from '@/lib/redux/hooks';
+import { setUser } from '@/lib/redux/authSlice';
+import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -63,18 +66,29 @@ function optionalUrl(value: string) {
   return value.trim() || undefined;
 }
 
+function isValidOptionalUrl(value: string) {
+  if (!value.trim()) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function normalizeStatus(status?: string | null) {
+  return (status || '').toUpperCase();
+}
+
 export default function BecomeInstructorForm() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
-  const userEmail = (user as { email?: string } | null)?.email || '';
 
   const [form, setForm] = useState<InstructorRequestForm>(defaultForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
-  const [existingRequest, setExistingRequest] = useState<{
-    status: string;
-    createdAt: string;
-  } | null>(null);
+  const [existingRequest, setExistingRequest] = useState<InstructorRequestDto | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -88,11 +102,10 @@ export default function BecomeInstructorForm() {
     async function checkStatus() {
       setIsCheckingStatus(true);
       const res = await getMyPendingInstructorRequestAction();
-      if (res.success && res.request) {
-        setExistingRequest({
-          status: res.request.status,
-          createdAt: res.request.createdAt,
-        });
+      if (res.success) {
+        setExistingRequest(res.request);
+      } else {
+        setError(res.message || 'Không thể kiểm tra trạng thái hồ sơ.');
       }
       setIsCheckingStatus(false);
     }
@@ -101,7 +114,7 @@ export default function BecomeInstructorForm() {
 
   const canShowForm = useMemo(() => {
     if (!existingRequest) return true;
-    return existingRequest.status === 'REJECTED' || existingRequest.status === 'rejected';
+    return normalizeStatus(existingRequest.status) === 'REJECTED';
   }, [existingRequest]);
 
   const updateField = (field: keyof InstructorRequestForm, value: string) => {
@@ -112,13 +125,14 @@ export default function BecomeInstructorForm() {
     if (form.fullName.trim().length < 2) return 'Họ tên cần ít nhất 2 ký tự.';
     if (form.phone.trim().length < 9) return 'Số điện thoại không hợp lệ.';
     if (form.expertise.trim().length < 2) return 'Vui lòng nhập chuyên môn chính.';
-    if (!Number.isInteger(Number(form.experienceYears)) || Number(form.experienceYears) < 0) {
-      return 'Số năm kinh nghiệm phải là số nguyên không âm.';
-    }
+    if (!Number.isInteger(Number(form.experienceYears)) || Number(form.experienceYears) < 0) return 'Số năm kinh nghiệm phải là số nguyên không âm.';
     if (form.bio.trim().length < 10) return 'Giới thiệu bản thân cần ít nhất 10 ký tự.';
     if (form.courseTitle.trim().length < 2) return 'Tên khóa học mẫu cần ít nhất 2 ký tự.';
     if (form.courseCategory.trim().length < 2) return 'Danh mục khóa học cần ít nhất 2 ký tự.';
     if (form.courseDescription.trim().length < 10) return 'Mô tả khóa học cần ít nhất 10 ký tự.';
+    if (!isValidOptionalUrl(form.website) || !isValidOptionalUrl(form.linkedin) || !isValidOptionalUrl(form.youtube)) {
+      return 'Các liên kết phải bắt đầu bằng http:// hoặc https://.';
+    }
     return '';
   };
 
@@ -147,7 +161,6 @@ export default function BecomeInstructorForm() {
       courseCategory: form.courseCategory.trim(),
       courseDescription: form.courseDescription.trim(),
       targetStudents: form.targetStudents.trim() || undefined,
-      email: userEmail || undefined,
       website: optionalUrl(form.website),
       linkedin: optionalUrl(form.linkedin),
       youtube: optionalUrl(form.youtube),
@@ -155,7 +168,8 @@ export default function BecomeInstructorForm() {
 
     if (result.success) {
       toast('success', 'Đã gửi hồ sơ giảng viên');
-      router.push('/?instructorSubmitted=1');
+      const statusRes = await getMyPendingInstructorRequestAction();
+      setExistingRequest(statusRes.request);
     } else {
       const message = result.message || 'Không thể gửi hồ sơ. Vui lòng thử lại.';
       setError(message);
@@ -165,43 +179,25 @@ export default function BecomeInstructorForm() {
     setIsSubmitting(false);
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status.toUpperCase()) {
-      case 'PENDING':
-        return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
-            <Clock3 className="size-3.5" />
-            Đang chờ duyệt
-          </span>
-        );
-      case 'APPROVED':
-        return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
-            <CheckCircle2 className="size-3.5" />
-            Đã duyệt
-          </span>
-        );
-      case 'REJECTED':
-        return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">
-            <AlertCircle className="size-3.5" />
-            Đã từ chối
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-            {status}
-          </span>
-        );
+  const enterStudio = async () => {
+    const refreshed = await forceRefreshSessionAction();
+    if (refreshed.success && refreshed.user && refreshed.accessToken) {
+      dispatch(setUser({ user: refreshed.user, accessToken: refreshed.accessToken }));
+      router.push('/instructor');
+      return;
     }
+    toast('error', 'Cần đăng nhập lại', refreshed.message || 'Phiên hiện tại chưa nhận role giảng viên mới.');
+    router.push('/login');
   };
+
+  const requestStatus = normalizeStatus(existingRequest?.status);
 
   if (isCheckingStatus) {
     return (
       <Card className="glass-panel relative w-full overflow-hidden rounded-3xl border-white/60 shadow-2xl shadow-primary/10">
         <CardContent className="flex items-center justify-center py-16">
-          <Loader2 className="size-8 animate-spin text-primary" />
+          <Loader2 className="mr-2 size-8 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Đang kiểm tra trạng thái hồ sơ...</span>
         </CardContent>
       </Card>
     );
@@ -212,10 +208,10 @@ export default function BecomeInstructorForm() {
       <CardHeader className="relative space-y-3 px-6 pb-2 pt-8 text-center sm:px-10 sm:text-left">
         <CardTitle className="flex items-center gap-2 text-2xl font-bold tracking-tight md:text-3xl">
           <Sparkles className="size-6 text-primary" />
-          Trở thành Giảng viên
+          Trở thành giảng viên
         </CardTitle>
         <CardDescription className="text-base font-medium text-muted-foreground">
-          Điền hồ sơ ứng tuyển để đội ngũ quản trị có đủ thông tin đánh giá chuyên môn và ý tưởng khóa học của bạn.
+          Điền hồ sơ để đội ngũ quản trị đánh giá chuyên môn, kinh nghiệm và ý tưởng khóa học của bạn.
         </CardDescription>
       </CardHeader>
 
@@ -225,28 +221,48 @@ export default function BecomeInstructorForm() {
             <div className="flex flex-wrap items-center gap-2">
               <FileText className="size-4 text-primary" />
               <span className="font-semibold text-foreground">Hồ sơ gần nhất</span>
-              {getStatusBadge(existingRequest.status)}
+              {requestStatus === 'PENDING' && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+                  <Clock3 className="size-3.5" /> Đang chờ duyệt
+                </span>
+              )}
+              {requestStatus === 'APPROVED' && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
+                  <CheckCircle2 className="size-3.5" /> Đã duyệt
+                </span>
+              )}
+              {requestStatus === 'REJECTED' && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">
+                  <AlertCircle className="size-3.5" /> Đã từ chối
+                </span>
+              )}
             </div>
-            {existingRequest.status.toUpperCase() === 'PENDING' && (
+
+            {requestStatus === 'PENDING' && (
               <p className="text-sm text-muted-foreground">
-                Hồ sơ của bạn đang được xem xét. Bạn sẽ nhận thông báo khi có kết quả.
+                Hồ sơ của bạn đang được xem xét. Admin sẽ thấy đơn trong trang quản lý và bạn sẽ nhận thông báo khi có kết quả.
               </p>
             )}
-            {existingRequest.status.toUpperCase() === 'APPROVED' && (
+            {requestStatus === 'APPROVED' && (
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-medium text-emerald-700">
-                  Hồ sơ đã được duyệt. Bạn đã có thể vào Studio để tạo khóa học.
+                  Hồ sơ đã được duyệt. Hãy vào Studio để tạo khóa học đầu tiên.
                 </p>
-                <Button onClick={() => router.push('/instructor')} className="w-fit gap-2 font-bold shadow-lg shadow-primary/20">
-                  Vào Studio
+                <Button onClick={enterStudio} className="w-fit gap-2 font-bold shadow-lg shadow-primary/20">
+                  Vào Instructor Studio
                   <ArrowRight className="size-4" />
                 </Button>
               </div>
             )}
-            {existingRequest.status.toUpperCase() === 'REJECTED' && (
-              <p className="text-sm text-red-600">
-                Hồ sơ trước đó chưa được duyệt. Bạn có thể chỉnh thông tin và gửi lại.
-              </p>
+            {requestStatus === 'REJECTED' && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-red-700">Hồ sơ trước đó chưa được duyệt. Bạn có thể chỉnh thông tin và gửi lại.</p>
+                {existingRequest.rejectionReason && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    Lý do từ chối: {existingRequest.rejectionReason}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -256,14 +272,14 @@ export default function BecomeInstructorForm() {
             <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
               <p className="mb-3 flex items-center gap-2 font-semibold text-foreground">
                 <ShieldCheck className="size-4 text-primary" />
-                Quy trình
+                Quy trình xét duyệt
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {[
                   'Gửi hồ sơ ứng tuyển giảng viên.',
                   'Admin xem xét chuyên môn và ý tưởng khóa học.',
-                  'Khi được duyệt, bạn sẽ nhận thông báo và vào Studio.',
-                  'Tạo và xuất bản khóa học đầu tiên của bạn.',
+                  'Khi được duyệt, bạn nhận thông báo và vào Studio.',
+                  'Tạo, hoàn thiện và xuất bản khóa học đầu tiên.',
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2">
                     <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-600" />
@@ -276,70 +292,24 @@ export default function BecomeInstructorForm() {
             {error && <StatusMessage type="error" message={error} />}
 
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="instructor-full-name" className="text-sm font-semibold">Họ và tên</label>
-                <Input id="instructor-full-name" value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="instructor-phone" className="text-sm font-semibold">Số điện thoại</label>
-                <Input id="instructor-phone" value={form.phone} onChange={(event) => updateField('phone', event.target.value)} placeholder="VD: 0901234567" />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="instructor-expertise" className="text-sm font-semibold">Chuyên môn chính</label>
-                <Input id="instructor-expertise" value={form.expertise} onChange={(event) => updateField('expertise', event.target.value)} placeholder="VD: Lập trình Frontend" />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="instructor-experience" className="text-sm font-semibold">Số năm kinh nghiệm</label>
-                <Input id="instructor-experience" type="number" min={0} value={form.experienceYears} onChange={(event) => updateField('experienceYears', event.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="instructor-specialization" className="text-sm font-semibold">Lĩnh vực chuyên sâu</label>
-                <Input id="instructor-specialization" value={form.specialization} onChange={(event) => updateField('specialization', event.target.value)} placeholder="VD: React, Next.js, UI Architecture" />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="instructor-current-job" className="text-sm font-semibold">Công việc hiện tại</label>
-                <Input id="instructor-current-job" value={form.currentJob} onChange={(event) => updateField('currentJob', event.target.value)} placeholder="VD: Senior Frontend Engineer" />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label htmlFor="instructor-bio" className="text-sm font-semibold">Giới thiệu bản thân</label>
-                <Textarea id="instructor-bio" value={form.bio} onChange={(event) => updateField('bio', event.target.value)} placeholder="Nêu kinh nghiệm giảng dạy, dự án đã làm, thế mạnh chuyên môn..." />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="instructor-course-title" className="text-sm font-semibold">Tên khóa học dự kiến</label>
-                <Input id="instructor-course-title" value={form.courseTitle} onChange={(event) => updateField('courseTitle', event.target.value)} placeholder="VD: Next.js thực chiến" />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="instructor-course-category" className="text-sm font-semibold">Danh mục khóa học</label>
-                <Input id="instructor-course-category" value={form.courseCategory} onChange={(event) => updateField('courseCategory', event.target.value)} placeholder="VD: Lập trình Web" />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label htmlFor="instructor-course-description" className="text-sm font-semibold">Mô tả khóa học</label>
-                <Textarea id="instructor-course-description" value={form.courseDescription} onChange={(event) => updateField('courseDescription', event.target.value)} placeholder="Mô tả mục tiêu, nội dung chính và kết quả học viên đạt được..." />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label htmlFor="instructor-target-students" className="text-sm font-semibold">Đối tượng học viên</label>
-                <Input id="instructor-target-students" value={form.targetStudents} onChange={(event) => updateField('targetStudents', event.target.value)} placeholder="VD: Người mới học lập trình, sinh viên CNTT..." />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="instructor-website" className="text-sm font-semibold">Website cá nhân</label>
-                <Input id="instructor-website" value={form.website} onChange={(event) => updateField('website', event.target.value)} placeholder="https://..." />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="instructor-linkedin" className="text-sm font-semibold">LinkedIn</label>
-                <Input id="instructor-linkedin" value={form.linkedin} onChange={(event) => updateField('linkedin', event.target.value)} placeholder="https://linkedin.com/in/..." />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label htmlFor="instructor-youtube" className="text-sm font-semibold">YouTube hoặc kênh demo</label>
-                <Input id="instructor-youtube" value={form.youtube} onChange={(event) => updateField('youtube', event.target.value)} placeholder="https://..." />
-              </div>
+              <Field id="instructor-full-name" label="Họ và tên" value={form.fullName} onChange={(value) => updateField('fullName', value)} />
+              <Field id="instructor-phone" label="Số điện thoại" value={form.phone} onChange={(value) => updateField('phone', value)} placeholder="VD: 0901234567" />
+              <Field id="instructor-expertise" label="Chuyên môn chính" value={form.expertise} onChange={(value) => updateField('expertise', value)} placeholder="VD: Lập trình Frontend" />
+              <Field id="instructor-experience" label="Số năm kinh nghiệm" type="number" value={form.experienceYears} onChange={(value) => updateField('experienceYears', value)} />
+              <Field id="instructor-specialization" label="Lĩnh vực chuyên sâu" value={form.specialization} onChange={(value) => updateField('specialization', value)} placeholder="VD: React, Next.js, UI Architecture" />
+              <Field id="instructor-current-job" label="Công việc hiện tại" value={form.currentJob} onChange={(value) => updateField('currentJob', value)} placeholder="VD: Senior Frontend Engineer" />
+
+              <TextareaField id="instructor-bio" label="Giới thiệu bản thân" value={form.bio} onChange={(value) => updateField('bio', value)} placeholder="Nêu kinh nghiệm giảng dạy, dự án đã làm và thế mạnh chuyên môn." />
+              <Field id="instructor-course-title" label="Tên khóa học dự kiến" value={form.courseTitle} onChange={(value) => updateField('courseTitle', value)} placeholder="VD: Next.js thực chiến" />
+              <Field id="instructor-course-category" label="Danh mục khóa học" value={form.courseCategory} onChange={(value) => updateField('courseCategory', value)} placeholder="VD: Lập trình Web" />
+              <TextareaField id="instructor-course-description" label="Mô tả khóa học" value={form.courseDescription} onChange={(value) => updateField('courseDescription', value)} placeholder="Mô tả mục tiêu, nội dung chính và kết quả học viên đạt được." />
+              <Field id="instructor-target-students" label="Đối tượng học viên" value={form.targetStudents} onChange={(value) => updateField('targetStudents', value)} placeholder="VD: Người mới học lập trình, sinh viên CNTT" className="md:col-span-2" />
+              <Field id="instructor-website" label="Website cá nhân" value={form.website} onChange={(value) => updateField('website', value)} placeholder="https://..." />
+              <Field id="instructor-linkedin" label="LinkedIn" value={form.linkedin} onChange={(value) => updateField('linkedin', value)} placeholder="https://linkedin.com/in/..." />
+              <Field id="instructor-youtube" label="YouTube hoặc kênh demo" value={form.youtube} onChange={(value) => updateField('youtube', value)} placeholder="https://..." className="md:col-span-2" />
             </div>
 
-            <Button
-              type="button"
-              onClick={onSubmit}
-              disabled={isSubmitting}
-              className="h-12 w-full rounded-xl text-base font-bold shadow-lg shadow-primary/20 md:max-w-xs"
-            >
+            <Button type="button" onClick={onSubmit} disabled={isSubmitting} className="h-12 w-full rounded-xl text-base font-bold shadow-lg shadow-primary/20 md:max-w-xs">
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -362,5 +332,51 @@ export default function BecomeInstructorForm() {
         </p>
       </CardFooter>
     </Card>
+  );
+}
+
+function Field({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+  className = '',
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+  className?: string;
+}) {
+  return (
+    <div className={`space-y-2 ${className}`}>
+      <label htmlFor={id} className="text-sm font-semibold">{label}</label>
+      <Input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+    </div>
+  );
+}
+
+function TextareaField({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div className="space-y-2 md:col-span-2">
+      <label htmlFor={id} className="text-sm font-semibold">{label}</label>
+      <Textarea id={id} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+    </div>
   );
 }

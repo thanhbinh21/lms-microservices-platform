@@ -378,6 +378,54 @@ export async function restoreSessionAction(): Promise<AuthResponse> {
   }
 }
 
+export async function forceRefreshSessionAction(): Promise<AuthResponse> {
+  try {
+    const cookieStore = await cookies();
+    const currentRefreshToken = cookieStore.get('refreshToken')?.value;
+    const savedUserName = cookieStore.get('userName')?.value;
+    const savedUserUsername = cookieStore.get('userUsername')?.value;
+    const savedUserAvatar = cookieStore.get('userAvatar')?.value;
+
+    if (!currentRefreshToken) {
+      return { success: false, code: 401, message: 'Không tìm thấy refresh token' };
+    }
+
+    const refreshed = await refreshWithToken(currentRefreshToken);
+    if (!refreshed) {
+      await clearAuthCookies();
+      return { success: false, code: 401, message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' };
+    }
+
+    await writeAuthCookies({ accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken });
+    const payload = decodeTokenPayload(refreshed.accessToken);
+    if (!payload) {
+      await clearAuthCookies();
+      return { success: false, code: 401, message: 'Token không hợp lệ' };
+    }
+
+    return {
+      success: true,
+      code: 200,
+      accessToken: refreshed.accessToken,
+      user: {
+        id: payload.userId,
+        email: payload.email,
+        name: savedUserName?.trim() || payload.email.split('@')[0] || 'User',
+        username: savedUserUsername || null,
+        avatar: savedUserAvatar || null,
+        role: normalizeRole(payload.role),
+      },
+    };
+  } catch (error) {
+    console.error('Force refresh session error:', error);
+    return {
+      success: false,
+      code: 500,
+      message: 'Không thể làm mới phiên đăng nhập',
+    };
+  }
+}
+
 export async function updateProfileAvatarAction(avatarUrl: string | null) {
   try {
     await writeAuthCookies({ userAvatar: avatarUrl || null });

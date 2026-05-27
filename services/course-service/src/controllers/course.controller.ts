@@ -9,6 +9,8 @@ import { handlePrismaError } from '../lib/prisma-errors';
 import { withRetry } from '@lms/db-prisma';
 import { cacheGet, cacheInvalidate, cacheInvalidatePattern } from '@lms/cache';
 import { fetchWithTimeout } from '../lib/http';
+import { queryCourseReadStore } from '../lib/read-store';
+import { publishCourseCatalogEvent } from '../lib/course-catalog-events';
 
 // Schema tao khoa hoc
 const createCourseSchema = z.object({
@@ -330,6 +332,10 @@ export async function listCourses(req: Request, res: Response) {
     const where: Prisma.CourseWhereInput = { status: 'PUBLISHED' };
     const keyword = q || search;
     const ratingFloor = minRating ?? rating;
+    const effectiveMinPrice = minPrice !== undefined && !isNaN(minPrice) ? minPrice : undefined;
+    const effectiveMaxPrice = maxPrice !== undefined && !isNaN(maxPrice) ? maxPrice : undefined;
+    const effectiveMinRating = ratingFloor !== undefined && !isNaN(ratingFloor) ? ratingFloor : undefined;
+    const effectiveLevel = level && ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].includes(level) ? level : '';
 
     if (keyword) {
       where.OR = [
@@ -340,17 +346,17 @@ export async function listCourses(req: Request, res: Response) {
     if (categorySlug) {
       where.category = { slug: categorySlug };
     }
-    if (minPrice !== undefined && !isNaN(minPrice)) {
-      where.price = { ...(where.price as object), gte: minPrice };
+    if (effectiveMinPrice !== undefined) {
+      where.price = { ...(where.price as object), gte: effectiveMinPrice };
     }
-    if (maxPrice !== undefined && !isNaN(maxPrice)) {
-      where.price = { ...(where.price as object), lte: maxPrice };
+    if (effectiveMaxPrice !== undefined) {
+      where.price = { ...(where.price as object), lte: effectiveMaxPrice };
     }
-    if (ratingFloor !== undefined && !isNaN(ratingFloor)) {
-      where.averageRating = { gte: ratingFloor };
+    if (effectiveMinRating !== undefined) {
+      where.averageRating = { gte: effectiveMinRating };
     }
-    if (level && ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].includes(level)) {
-      where.level = level as any;
+    if (effectiveLevel) {
+      where.level = effectiveLevel as any;
     }
 
     const orderBy = SORT_MAP[sortBy] || SORT_MAP.newest;
@@ -376,12 +382,25 @@ export async function listCourses(req: Request, res: Response) {
       ),
     ]);
 
-    // Dynamic data: cache 3 phut theo query hash
-    const listCacheKey = buildCacheKey('cache:courses:list', {
-      q, categorySlug, sortBy, minPrice, maxPrice, minRating, level, page, limit,
+    const readStoreResult = await queryCourseReadStore({
+      keyword,
+      categorySlug,
+      sortBy,
+      minPrice: effectiveMinPrice,
+      maxPrice: effectiveMaxPrice,
+      minRating: effectiveMinRating,
+      level: effectiveLevel,
+      page,
+      limit,
     });
 
-    const { courses, total } = await cacheGet(
+    // Dynamic data: uu tien read model Redis, fallback cache-aside Prisma khi chua warm hoac query can text search.
+    const listCacheKey = buildCacheKey('cache:courses:list', {
+      keyword, categorySlug, sortBy, minPrice: effectiveMinPrice, maxPrice: effectiveMaxPrice,
+      minRating: effectiveMinRating, level: effectiveLevel, page, limit,
+    });
+
+    const listResult = readStoreResult ?? await cacheGet(
       listCacheKey,
       async () => {
         const [c, t] = await withRetry(() =>
@@ -406,6 +425,8 @@ export async function listCourses(req: Request, res: Response) {
       },
       180,
     );
+
+    const { courses, total } = listResult;
 
     const response: ApiResponse<unknown> = {
       success: true, code: 200, message: 'Courses fetched successfully',
@@ -748,6 +769,7 @@ export async function upsertCourseReview(req: Request, res: Response) {
     };
 
     await invalidateCourseDiscoveryCaches();
+    await publishCourseCatalogEvent(courseId, 'review_changed', traceId);
 
     return res.status(200).json(response);
   } catch (err) {
@@ -1452,6 +1474,12 @@ export async function updateCourse(req: Request, res: Response) {
       includeCategories: statusChanged || categoryChanged,
     });
 
+    if (updated.status === 'PUBLISHED') {
+      await publishCourseCatalogEvent(updated.id, course.status === 'PUBLISHED' ? 'updated' : 'published', traceId);
+    } else if (course.status === 'PUBLISHED') {
+      await publishCourseCatalogEvent(updated.id, 'archived', traceId);
+    }
+
     const response: ApiResponse<unknown> = {
       success: true, code: 200, message: 'Course updated successfully',
       data: serializeCourse(updated), trace_id: traceId,
@@ -1542,6 +1570,7 @@ export async function publishCourse(req: Request, res: Response) {
       includePriceRange: true,
       includeCategories: true,
     });
+    await publishCourseCatalogEvent(publishedCourse.id, 'published', traceId);
 
     const response: ApiResponse<unknown> = {
       success: true,
@@ -1597,6 +1626,7 @@ export async function deleteCourse(req: Request, res: Response) {
     await prisma.course.delete({ where: { id: req.params.id } });
 
     await invalidateCourseDiscoveryCaches();
+    await publishCourseCatalogEvent(req.params.id, 'deleted', traceId);
 
     const response: ApiResponse<null> = {
       success: true, code: 200, message: 'Course deleted successfully', data: null, trace_id: traceId,

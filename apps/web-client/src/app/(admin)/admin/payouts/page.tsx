@@ -1,34 +1,38 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { CheckCircle2, Loader2, Search, XCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Loader2, Search, Wallet, XCircle } from 'lucide-react';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { AdminStatCard } from '@/components/admin/AdminStatCard';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 import { StatusBadge } from '@/components/admin/StatusBadge';
+import { toast } from '@/components/ui/toast';
 import { getAdminPayoutsAction, updateAdminPayoutAction, type AdminPayoutDto } from '@/app/actions/admin';
+
+type PayoutAction = 'APPROVED' | 'REJECTED' | 'PAID';
 
 export default function AdminPayoutsPage() {
   const [items, setItems] = useState<AdminPayoutDto[]>([]);
   const [pagination, setPagination] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [instructorFilter, setInstructorFilter] = useState('');
-  const [note, setNote] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-    variant: 'danger' | 'default';
-    confirmLabel?: string;
-  }>({ isOpen: false, title: '', message: '', onConfirm: () => {}, variant: 'default' });
+    payout: AdminPayoutDto | null;
+    nextStatus: PayoutAction | null;
+  }>({ isOpen: false, payout: null, nextStatus: null });
 
   async function fetchPayouts() {
     setLoading(true);
+    setError('');
     const result = await getAdminPayoutsAction({
       page,
       limit: 10,
@@ -38,6 +42,8 @@ export default function AdminPayoutsPage() {
     if (result.success && result.data) {
       setItems(result.data.items);
       setPagination(result.data.pagination);
+    } else {
+      setError(result.message || 'Không thể tải danh sách yêu cầu rút tiền.');
     }
     setLoading(false);
   }
@@ -50,52 +56,84 @@ export default function AdminPayoutsPage() {
     setPage(1);
   }, [statusFilter, instructorFilter]);
 
-  function handleUpdate(payout: AdminPayoutDto, nextStatus: 'APPROVED' | 'REJECTED' | 'PAID') {
-    if (nextStatus === 'REJECTED' && !note.trim()) {
-      setConfirmDialog({
-        isOpen: true,
-        title: 'Thiếu ghi chú từ chối',
-        message: 'Vui lòng nhập ghi chú admin trước khi từ chối yêu cầu rút tiền.',
-        variant: 'danger',
-        confirmLabel: 'Đã hiểu',
-        onConfirm: () => undefined,
-      });
+  const summary = useMemo(() => {
+    const pending = items.filter((item) => item.status === 'PENDING').length;
+    const approved = items.filter((item) => item.status === 'APPROVED').length;
+    const amount = items.reduce((sum, item) => (item.status === 'PENDING' ? sum + item.amount : sum), 0);
+    return { pending, approved, amount };
+  }, [items]);
+
+  function openUpdateConfirm(payout: AdminPayoutDto, nextStatus: PayoutAction) {
+    if (nextStatus === 'REJECTED' && rejectReason.trim().length < 10) {
+      toast('error', 'Thiếu lý do từ chối', 'Lý do từ chối cần ít nhất 10 ký tự để giảng viên hiểu cách xử lý tiếp.');
+      return;
+    }
+    setConfirmDialog({ isOpen: true, payout, nextStatus });
+  }
+
+  async function submitUpdate() {
+    if (!confirmDialog.payout || !confirmDialog.nextStatus) return;
+    setActionLoading(true);
+    const result = await updateAdminPayoutAction(
+      confirmDialog.payout.id,
+      confirmDialog.nextStatus,
+      confirmDialog.nextStatus === 'REJECTED' ? rejectReason.trim() : undefined,
+    );
+    setActionLoading(false);
+
+    if (!result.success) {
+      toast('error', 'Cập nhật payout thất bại', result.message || 'Vui lòng thử lại.');
       return;
     }
 
-    setConfirmDialog({
-      isOpen: true,
-      title: nextStatus === 'REJECTED' ? 'Từ chối yêu cầu rút tiền' : nextStatus === 'PAID' ? 'Đánh dấu đã chi trả' : 'Duyệt yêu cầu rút tiền',
-      message: `Bạn có chắc muốn chuyển yêu cầu này sang trạng thái ${nextStatus}?`,
-      variant: nextStatus === 'REJECTED' ? 'danger' : 'default',
-      confirmLabel: nextStatus === 'REJECTED' ? 'Từ chối' : 'Xác nhận',
-      onConfirm: async () => {
-        setActionLoading(true);
-        const result = await updateAdminPayoutAction(payout.id, nextStatus, note.trim() || undefined);
-        setActionLoading(false);
-        if (result.success) {
-          setNote('');
-          await fetchPayouts();
-        }
-      },
-    });
+    const successTitle =
+      confirmDialog.nextStatus === 'REJECTED'
+        ? 'Đã từ chối yêu cầu rút tiền'
+        : confirmDialog.nextStatus === 'PAID'
+          ? 'Đã đánh dấu chi trả'
+          : 'Đã duyệt yêu cầu rút tiền';
+    toast('success', successTitle, 'Thao tác đã được ghi audit log.');
+    setRejectReason('');
+    await fetchPayouts();
   }
 
   const formatMoney = (value: number) => `${value.toLocaleString('vi-VN')} đ`;
+  const dialogTitle =
+    confirmDialog.nextStatus === 'REJECTED'
+      ? 'Từ chối yêu cầu rút tiền'
+      : confirmDialog.nextStatus === 'PAID'
+        ? 'Xác nhận đã chi trả'
+        : 'Duyệt yêu cầu rút tiền';
 
   return (
-    <div className="workspace-page">
-      <div className="workspace-page-header">
-        <h1 className="workspace-page-title">Quản lý rút tiền</h1>
-        <p className="workspace-page-description">
-          Duyệt, từ chối hoặc xác nhận đã chi trả các yêu cầu rút tiền của giảng viên.
-        </p>
+    <div className="workspace-page space-y-6">
+      <AdminPageHeader
+        eyebrow={
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
+            <Wallet className="size-3.5" />
+            Payout
+          </div>
+        }
+        title="Quản lý rút tiền"
+        description="Duyệt, từ chối hoặc xác nhận đã chi trả các yêu cầu rút tiền của giảng viên. Từ chối phải có lý do rõ ràng."
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminStatCard label="Đang chờ duyệt" value={loading ? '...' : summary.pending} hint="Trong trang hiện tại" tone={summary.pending > 0 ? 'warning' : 'default'} />
+        <AdminStatCard label="Đã duyệt chờ chi" value={loading ? '...' : summary.approved} hint="Cần đối soát ngân hàng" />
+        <AdminStatCard label="Số tiền chờ duyệt" value={loading ? '...' : formatMoney(summary.amount)} hint="Tổng PENDING đang hiển thị" />
+        <AdminStatCard label="Tổng kết quả" value={pagination?.total ?? items.length} hint="Theo bộ lọc hiện tại" />
       </div>
 
-      <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">{error}</div>}
+
+      <Card className="glass-panel rounded-xl border-white/60">
         <CardHeader>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <CardTitle className="text-lg">Danh sách yêu cầu rút tiền</CardTitle>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <CardTitle className="text-lg">Danh sách yêu cầu rút tiền</CardTitle>
+              <CardDescription>Ưu tiên xử lý PENDING, sau đó đối soát các yêu cầu đã duyệt.</CardDescription>
+            </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -108,7 +146,7 @@ export default function AdminPayoutsPage() {
                 <option value="REJECTED">Từ chối</option>
                 <option value="PAID">Đã chi trả</option>
               </select>
-              <Input placeholder="Ghi chú admin khi từ chối" value={note} onChange={(event) => setNote(event.target.value)} />
+              <Input placeholder="Lý do từ chối payout" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} />
             </div>
           </div>
         </CardHeader>
@@ -119,7 +157,9 @@ export default function AdminPayoutsPage() {
               Đang tải yêu cầu rút tiền...
             </div>
           ) : items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Chưa có yêu cầu rút tiền nào.</p>
+            <div className="rounded-xl border border-dashed border-white/60 bg-white/40 p-8 text-center text-sm text-muted-foreground">
+              Không có yêu cầu rút tiền phù hợp với bộ lọc hiện tại.
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[980px] text-sm">
@@ -149,20 +189,23 @@ export default function AdminPayoutsPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           {payout.status === 'PENDING' && (
                             <>
-                              <Button size="sm" className="gap-2 text-xs" disabled={actionLoading} onClick={() => handleUpdate(payout, 'APPROVED')}>
+                              <Button size="sm" className="gap-2 text-xs" disabled={actionLoading} onClick={() => openUpdateConfirm(payout, 'APPROVED')}>
                                 <CheckCircle2 className="size-3" />
                                 Duyệt
                               </Button>
-                              <Button size="sm" variant="destructive" className="gap-2 text-xs" disabled={actionLoading} onClick={() => handleUpdate(payout, 'REJECTED')}>
+                              <Button size="sm" variant="destructive" className="gap-2 text-xs" disabled={actionLoading} onClick={() => openUpdateConfirm(payout, 'REJECTED')}>
                                 <XCircle className="size-3" />
                                 Từ chối
                               </Button>
                             </>
                           )}
                           {payout.status === 'APPROVED' && (
-                            <Button size="sm" variant="outline" className="text-xs" disabled={actionLoading} onClick={() => handleUpdate(payout, 'PAID')}>
-                              Đánh dấu đã chi trả
+                            <Button size="sm" variant="outline" className="text-xs" disabled={actionLoading} onClick={() => openUpdateConfirm(payout, 'PAID')}>
+                              Đã chi trả
                             </Button>
+                          )}
+                          {!['PENDING', 'APPROVED'].includes(payout.status) && (
+                            <span className="text-xs text-muted-foreground">Không còn thao tác</span>
                           )}
                         </div>
                       </td>
@@ -195,14 +238,13 @@ export default function AdminPayoutsPage() {
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
-        onConfirm={confirmDialog.onConfirm}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        variant={confirmDialog.variant}
-        confirmLabel={confirmDialog.confirmLabel}
+        onConfirm={submitUpdate}
+        title={dialogTitle}
+        message={`Bạn có chắc muốn chuyển yêu cầu này sang trạng thái ${confirmDialog.nextStatus ?? ''}? Thao tác sẽ được ghi audit log và gửi thông báo liên quan nếu backend cấu hình.`}
+        variant={confirmDialog.nextStatus === 'REJECTED' ? 'danger' : 'default'}
+        confirmLabel={confirmDialog.nextStatus === 'REJECTED' ? 'Từ chối' : 'Xác nhận'}
+        loading={actionLoading}
       />
     </div>
   );
 }
-
-

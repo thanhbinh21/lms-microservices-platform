@@ -13,9 +13,9 @@ function apiError(res: Response, code: number, message: string, traceId: string)
 }
 
 const payoutProfileSchema = z.object({
-  bankAccount: z.string().min(8, 'Bank account must be at least 8 characters'),
-  bankName: z.string().min(2, 'Bank name is required'),
-  accountHolder: z.string().min(2, 'Account holder is required'),
+  bankAccount: z.string().trim().regex(/^[0-9]{8,20}$/, 'Số tài khoản chỉ gồm 8-20 chữ số'),
+  bankName: z.string().trim().min(2, 'Tên ngân hàng là bắt buộc'),
+  accountHolder: z.string().trim().min(2, 'Tên chủ tài khoản là bắt buộc'),
 });
 
 function maskBankAccount(value: string): string {

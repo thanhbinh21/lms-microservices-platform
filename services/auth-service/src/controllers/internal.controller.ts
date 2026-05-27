@@ -62,15 +62,16 @@ export const getInternalUsersBatch = async (req: Request, res: Response): Promis
       select: {
         id: true,
         name: true,
+        email: true,
         username: true,
         role: true,
       },
     });
 
     // Map thanh object { [userId]: { name, username } } de consumer tra cuu nhanh
-    const usersMap: Record<string, { name: string; username: string | null; role: string }> = {};
+    const usersMap: Record<string, { name: string; email: string; username: string | null; role: string }> = {};
     for (const user of users) {
-      usersMap[user.id] = { name: user.name, username: user.username, role: user.role };
+      usersMap[user.id] = { name: user.name, email: user.email, username: user.username, role: user.role };
     }
 
     const response: ApiResponse<{ users: typeof usersMap }> = {
@@ -81,6 +82,44 @@ export const getInternalUsersBatch = async (req: Request, res: Response): Promis
     logger.error({ error }, 'getInternalUsersBatch error');
     const response: ApiResponse<null> = {
       success: false, code: 500, message: 'Internal server error while fetching users batch', data: null, trace_id: traceId,
+    };
+    return res.status(500).json(response);
+  }
+};
+
+export const getInternalAdmins = async (req: Request, res: Response): Promise<Response | void> => {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+
+  try {
+    const admins = await prisma.user.findMany({
+      where: { role: 'ADMIN', status: 'ACTIVE' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        username: true,
+        role: true,
+      },
+      orderBy: { name: 'asc' },
+      take: 100,
+    });
+
+    const response: ApiResponse<{ users: typeof admins }> = {
+      success: true,
+      code: 200,
+      message: 'OK',
+      data: { users: admins },
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (error) {
+    logger.error({ error }, 'getInternalAdmins error');
+    const response: ApiResponse<null> = {
+      success: false,
+      code: 500,
+      message: 'Internal server error while fetching admins',
+      data: null,
+      trace_id: traceId,
     };
     return res.status(500).json(response);
   }

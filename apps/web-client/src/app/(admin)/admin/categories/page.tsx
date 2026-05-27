@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
+import { toast } from '@/components/ui/toast';
 import {
   createAdminCategoryAction,
   deleteAdminCategoryAction,
@@ -29,6 +30,7 @@ export default function AdminCategoriesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [error, setError] = useState('');
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -40,9 +42,12 @@ export default function AdminCategoriesPage() {
 
   const fetchCategories = async () => {
     setLoading(true);
+    setError('');
     const res = await getAdminCategoriesAction();
     if (res.success && res.data) {
       setCategories(res.data);
+    } else {
+      setError(res.message || 'Không thể tải danh mục.');
     }
     setLoading(false);
   };
@@ -87,9 +92,12 @@ export default function AdminCategoriesPage() {
 
     setSaving(false);
     if (res.success) {
+      toast('success', editingId ? 'Đã cập nhật danh mục' : 'Đã tạo danh mục');
       await fetchCategories();
       resetForm();
+      return;
     }
+    toast('error', 'Không thể lưu danh mục', res.message || 'Vui lòng thử lại.');
   };
 
   const handleDelete = (category: AdminCategoryDto) => {
@@ -101,9 +109,12 @@ export default function AdminCategoriesPage() {
       onConfirm: async () => {
         const res = await deleteAdminCategoryAction(category.id);
         if (res.success) {
+          toast('success', 'Đã xóa danh mục');
           await fetchCategories();
           if (editingId === category.id) resetForm();
+          return;
         }
+        toast('error', 'Không thể xóa danh mục', res.message || 'Danh mục có thể đang được khóa học sử dụng.');
       },
     });
   };
@@ -127,6 +138,8 @@ export default function AdminCategoriesPage() {
           />
         </div>
       </div>
+
+      {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">{error}</div>}
 
       <div className="grid gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
         <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">

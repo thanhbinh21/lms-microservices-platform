@@ -1,22 +1,30 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Loader2, BookOpen, PlayCircle, Clock, CheckCircle2 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { BookOpen, CheckCircle2, Clock, Loader2, PlayCircle, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAppSelector } from '@/lib/redux/hooks';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { toast } from '@/components/ui/toast';
 import { getMyEnrollmentsAction } from '@/app/actions/student';
 import type { MyCourseSummary } from '@/app/actions/learning';
+import { useAppSelector } from '@/lib/redux/hooks';
 
 type Filter = 'all' | 'in-progress' | 'completed';
+
+function formatDate(value?: string | null) {
+  if (!value) return 'Chưa học';
+  return new Date(value).toLocaleDateString('vi-VN');
+}
 
 export default function MyCoursesPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
   const [items, setItems] = useState<MyCourseSummary[] | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
+  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,158 +33,181 @@ export default function MyCoursesPage() {
       router.push('/login');
       return;
     }
-    (async () => {
+    async function loadCourses() {
       const res = await getMyEnrollmentsAction();
       if (res.success && res.data) {
         setItems(res.data as MyCourseSummary[]);
+        setError(null);
       } else {
-        setError(res.message || 'Không thể tải danh sách khóa học.');
+        const message = res.message || 'Không thể tải danh sách khóa học.';
+        setError(message);
         setItems([]);
+        toast('error', 'Tải khóa học thất bại', message);
       }
-    })();
+    }
+    void loadCourses();
   }, [isAuthenticated, isLoading, router]);
 
-  const filtered = (items ?? []).filter((item) => {
-    const progress = item.progressPercent ?? 0;
-    if (filter === 'in-progress') return progress < 100;
-    if (filter === 'completed') return progress >= 100;
-    return true;
-  });
+  const stats = useMemo(() => {
+    const list = items ?? [];
+    return {
+      total: list.length,
+      completed: list.filter((item) => (item.progressPercent ?? 0) >= 100).length,
+      inProgress: list.filter((item) => (item.progressPercent ?? 0) < 100).length,
+    };
+  }, [items]);
 
-  const stats = {
-    total: items?.length ?? 0,
-    completed: items?.filter((i) => (i.progressPercent ?? 0) >= 100).length ?? 0,
-    inProgress: items?.filter((i) => (i.progressPercent ?? 0) < 100).length ?? 0,
-  };
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return (items ?? []).filter((item) => {
+      const progress = item.progressPercent ?? 0;
+      const matchesFilter =
+        filter === 'all' || (filter === 'in-progress' && progress < 100) || (filter === 'completed' && progress >= 100);
+      const matchesSearch = !query || item.title.toLowerCase().includes(query);
+      return matchesFilter && matchesSearch;
+    });
+  }, [filter, items, search]);
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-800">Khóa học của tôi</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Tất cả khóa học bạn đã đăng ký.
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
+            <BookOpen className="size-3.5" />
+            Học tập
+          </div>
+          <h1 className="workspace-page-title">Khóa học của tôi</h1>
+          <p className="workspace-page-description">
+            Theo dõi trạng thái đang học, đã hoàn thành, tiến độ và lần học gần nhất của từng khóa.
+          </p>
+        </div>
+        <Button asChild className="w-full rounded-xl font-bold md:w-auto">
+          <Link href="/courses">Khám phá khóa học</Link>
+        </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="rounded-2xl border-transparent bg-white/70 p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Tổng</p>
-          <p className="mt-1 text-2xl font-bold">{stats.total}</p>
-        </Card>
-        <Card className="rounded-2xl border-transparent bg-white/70 p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Đang học</p>
-          <p className="mt-1 text-2xl font-bold text-primary">{stats.inProgress}</p>
-        </Card>
-        <Card className="rounded-2xl border-transparent bg-white/70 p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Hoàn thành</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-600">{stats.completed}</p>
-        </Card>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {(['all', 'in-progress', 'completed'] as const).map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFilter(f)}
-            className={`rounded-full px-4 py-1.5 text-sm font-bold transition-all ${
-              filter === f
-                ? 'bg-primary text-white shadow-md'
-                : 'bg-white/60 text-muted-foreground hover:bg-white/90'
-            }`}
-          >
-            {f === 'all' ? 'Tất cả' : f === 'in-progress' ? 'Đang học' : 'Đã hoàn thành'}
-          </button>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[
+          { label: 'Tổng khóa học', value: stats.total, hint: 'Đã ghi danh' },
+          { label: 'Đang học', value: stats.inProgress, hint: 'Chưa hoàn thành 100%' },
+          { label: 'Hoàn thành', value: stats.completed, hint: 'Đủ điều kiện chứng chỉ' },
+        ].map((stat) => (
+          <Card key={stat.label} className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-[11px] font-bold uppercase tracking-[0.15em]">{stat.label}</CardDescription>
+              <CardTitle className="text-2xl font-bold">{items === null ? '...' : stat.value.toLocaleString('vi-VN')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">{stat.hint}</p>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {items === null ? (
-        <div className="flex flex-col items-center justify-center py-20 opacity-60">
-          <Loader2 className="size-10 animate-spin text-primary mb-4" />
-          <p className="font-medium text-muted-foreground">Đang tải khóa học...</p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <Card className="rounded-2xl border-dashed border-2 py-12 flex flex-col items-center justify-center text-center">
-          <BookOpen className="size-16 text-muted-foreground/30 mb-4" />
-          <h3 className="text-xl font-bold mb-2">
-            {filter === 'all'
-              ? 'Bạn chưa có khóa học nào'
-              : filter === 'completed'
-                ? 'Chưa có khóa học hoàn thành'
-                : 'Chưa có khóa học đang học'}
-          </h3>
-          <p className="text-muted-foreground text-sm font-medium max-w-sm mb-6">
-            Khám phá thư viện khóa học để bắt đầu hành trình học tập của bạn.
-          </p>
-          <Link href="/courses">
-            <Button className="px-8 font-bold shadow-md rounded-full">Khám phá khóa học</Button>
-          </Link>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {filtered.map((item) => {
-            const progress = item.progressPercent ?? 0;
-            const isDone = progress >= 100;
-            const href = `/learn/${item.id}`;
-            return (
-              <Card key={item.id} className="rounded-2xl border-transparent bg-white/70 p-5 shadow-sm hover:shadow-md transition-all overflow-hidden">
-                <CardContent className="p-0 space-y-4">
-                  {item.thumbnail && (
-                    <div className="relative w-full h-32 -mx-5 -mt-5 rounded-t-2xl overflow-hidden bg-muted">
-                      <img
-                        src={item.thumbnail}
-                        alt={item.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-bold leading-tight line-clamp-2">
-                        {item.title || 'Khóa học'}
-                      </h3>
-                      <p className="mt-1 text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                        <Clock className="size-3.5" />
-                        {item.lastAccessedAt
-                          ? `Lần cuối: ${new Date(item.lastAccessedAt).toLocaleDateString('vi-VN')}`
-                          : `Đăng ký: ${new Date(item.enrolledAt).toLocaleDateString('vi-VN')}`}
-                      </p>
-                    </div>
-                    {isDone && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
-                        <CheckCircle2 className="size-3.5" />
-                        Hoàn thành
-                      </span>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-semibold text-muted-foreground">
-                      <span>Tiến độ</span>
-                      <span>{progress}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-secondary/50 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-1000 ${
-                          isDone ? 'bg-emerald-500' : 'bg-primary'
-                        }`}
-                        style={{ width: `${Math.min(100, progress)}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2 pt-1">
-                    <Link href={href} className="flex-1">
-                      <Button className="w-full gap-2 rounded-xl font-bold shadow-md">
-                        <PlayCircle className="size-4" />
-                        {isDone ? 'Xem lại' : 'Tiếp tục học'}
+      <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
+        <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <CardTitle className="text-base">Danh sách khóa học</CardTitle>
+            <CardDescription className="text-xs">Lọc theo trạng thái hoặc tìm nhanh theo tên khóa học.</CardDescription>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[1fr_180px] md:w-[520px]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm khóa học" className="rounded-xl pl-9" />
+            </div>
+            <select
+              value={filter}
+              onChange={(event) => setFilter(event.target.value as Filter)}
+              className="h-10 rounded-xl border border-input bg-white px-3 text-sm font-medium"
+              aria-label="Lọc khóa học theo tiến độ"
+            >
+              <option value="all">Tất cả</option>
+              <option value="in-progress">Đang học</option>
+              <option value="completed">Đã hoàn thành</option>
+            </select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {error}
+            </div>
+          )}
+
+          {items === null ? (
+            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+              <Loader2 className="mb-4 size-10 animate-spin text-primary" />
+              <p className="font-medium">Đang tải khóa học...</p>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-white/40 py-14 text-center">
+              <BookOpen className="mx-auto mb-4 size-12 text-muted-foreground/40" />
+              <h3 className="text-lg font-bold">Bạn chưa có khóa học nào</h3>
+              <p className="mx-auto mb-6 mt-1 max-w-md text-sm text-muted-foreground">
+                Khám phá thư viện khóa học để bắt đầu lộ trình học tập của bạn.
+              </p>
+              <Button asChild className="rounded-xl font-bold">
+                <Link href="/courses">Khám phá khóa học</Link>
+              </Button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-white/40 py-12 text-center">
+              <p className="text-sm font-semibold">Không tìm thấy khóa học phù hợp</p>
+              <p className="mt-1 text-xs text-muted-foreground">Thử đổi từ khóa tìm kiếm hoặc bộ lọc tiến độ.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {filtered.map((item) => {
+                const progress = item.progressPercent ?? 0;
+                const isDone = progress >= 100;
+                const href = `/learn/${item.id}`;
+                return (
+                  <Card key={item.id} className="overflow-hidden rounded-2xl border-white/60 bg-white/60 shadow-sm backdrop-blur-md transition-colors hover:bg-white/80">
+                    <CardContent className="space-y-4 p-5">
+                      {item.thumbnail && (
+                        <div className="-mx-5 -mt-5 h-36 overflow-hidden bg-muted">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={item.thumbnail} alt={item.title} className="size-full object-cover" />
+                        </div>
+                      )}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="line-clamp-2 font-bold leading-tight">{item.title || 'Khóa học'}</h3>
+                          <p className="mt-1 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                            <Clock className="size-3.5" />
+                            {item.lastAccessedAt ? `Lần học gần nhất: ${formatDate(item.lastAccessedAt)}` : `Ghi danh: ${formatDate(item.enrolledAt)}`}
+                          </p>
+                        </div>
+                        <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                          isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-primary/10 text-primary'
+                        }`}>
+                          {isDone ? <CheckCircle2 className="size-3.5" /> : <PlayCircle className="size-3.5" />}
+                          {isDone ? 'Đã hoàn thành' : 'Đang học'}
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-semibold text-muted-foreground">
+                          <span>Tiến độ</span>
+                          <span>{progress}% · {item.completedLessons}/{item.totalLessons} bài</span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/50">
+                          <div className={`h-full rounded-full transition-all duration-700 ${isDone ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${Math.min(100, progress)}%` }} />
+                        </div>
+                      </div>
+                      <Button asChild className="w-full gap-2 rounded-xl font-bold shadow-md">
+                        <Link href={href}>
+                          <PlayCircle className="size-4" />
+                          {isDone ? 'Xem lại khóa học' : 'Tiếp tục học'}
+                        </Link>
                       </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -124,6 +124,17 @@ export async function cachePing(): Promise<boolean> {
   }
 }
 
+/** Tra ve Redis client cho cac read model can thao tac set/sorted-set rieng. */
+export function getCacheClient(): RedisClientType | null {
+  if (!cacheClient || !isConnected) return null;
+  return cacheClient;
+}
+
+/** Kiem tra cache da san sang de tranh read model lam crash service khi Redis loi. */
+export function isCacheReady(): boolean {
+  return Boolean(cacheClient && isConnected);
+}
+
 /** Dong ket noi Redis khi shutdown service */
 export async function closeCache(): Promise<void> {
   if (cacheClient) {
