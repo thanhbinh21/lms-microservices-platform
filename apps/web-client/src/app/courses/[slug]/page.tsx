@@ -1,15 +1,13 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Clock3, PlayCircle, Lock, Award, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Award, BookOpen, Clock3, Lock, MessageSquare, PlayCircle, UserCircle } from 'lucide-react';
 import { getPublicCourseDetailAction } from '@/app/actions/instructor';
 import { getCourseProgressAction } from '@/app/actions/student';
-
+import { PublicCourseCard } from '@/components/shared/public-course-card';
+import { PublicPageHeader, PublicPageShell, PublicState } from '@/components/shared/public-page';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { SharedNavbar } from '@/components/shared/shared-navbar';
-import { SharedFooter } from '@/components/shared/shared-footer';
-
 import { EnrollButton, CourseReviewPanel } from './enroll-button';
-
 
 interface CourseDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -17,31 +15,38 @@ interface CourseDetailPageProps {
 
 function formatDuration(seconds?: number) {
   const total = Number(seconds || 0);
-  if (!total) return '0 phút';
-  const mins = Math.max(1, Math.ceil(total / 60));
-  return `${mins} phút`;
+  if (!total) return 'Cập nhật';
+  const minutes = Math.max(1, Math.ceil(total / 60));
+  if (minutes < 60) return `${minutes} phút`;
+  const hours = Math.floor(minutes / 60);
+  const remain = minutes % 60;
+  return remain > 0 ? `${hours}h ${remain}p` : `${hours}h`;
+}
+
+function levelLabel(level?: string | null) {
+  if (level === 'BEGINNER') return 'Cơ bản';
+  if (level === 'INTERMEDIATE') return 'Trung cấp';
+  if (level === 'ADVANCED') return 'Nâng cao';
+  return level || 'Cập nhật';
 }
 
 export default async function CourseDetailPage({ params }: CourseDetailPageProps) {
   const { slug } = await params;
   const result = await getPublicCourseDetailAction(slug);
 
-  if (!result.success || !result.data) {
-    notFound();
-  }
+  if (!result.success || !result.data) notFound();
 
   const course = result.data;
   const totalLessons = course.chapters.reduce((acc, chapter) => acc + chapter.lessons.length, 0);
   const totalChapters = course.chapters.length;
   const instructorDisplayName = course.instructor?.displayName || `Giảng viên #${(course.instructorId || '').slice(0, 8)}`;
-  const formattedPrice = `${Number(course.price || 0).toLocaleString('vi-VN')}đ`;
-  const updatedLabel = course.updatedAt || course.createdAt
-    ? new Date(course.updatedAt || course.createdAt || Date.now()).toLocaleDateString('vi-VN')
-    : '-';
+  const price = Number(course.price || 0);
+  const formattedPrice = price > 0 ? `${price.toLocaleString('vi-VN')}đ` : 'Miễn phí';
+  const dateSource = course.updatedAt || course.createdAt;
+  const updatedLabel = dateSource
+    ? new Date(dateSource).toLocaleDateString('vi-VN')
+    : 'Cập nhật';
 
-  const isFree = Number(course.price) === 0;
-
-  // Kiem tra enrollment bang cach get progress
   const progressRes = await getCourseProgressAction(course.id);
   const isEnrolled = progressRes.success && progressRes.code === 200;
   const completedLessons =
@@ -51,153 +56,130 @@ export default async function CourseDetailPage({ params }: CourseDetailPageProps
   const isCourseCompleted = isEnrolled && totalLessons > 0 && completedLessons >= totalLessons;
 
   return (
-    <div className="glass-page min-h-screen text-foreground relative overflow-hidden">
-      <div className="absolute top-[-10%] right-[-5%] w-[35%] h-[40%] rounded-full bg-primary/10 blur-[140px] pointer-events-none" />
-      <div className="absolute top-[25%] left-[-10%] w-[30%] h-[35%] rounded-full bg-blue-300/15 blur-[120px] pointer-events-none" />
+    <PublicPageShell mainClassName="max-w-6xl space-y-8 py-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Link href="/courses" className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-primary">
+          <ArrowLeft className="size-4" />
+          Quay lại danh sách khóa học
+        </Link>
+        <EnrollButton courseId={course.id} isEnrolled={isEnrolled} isFree={price === 0} price={price} />
+      </div>
 
-      <SharedNavbar />
-
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 space-y-8 relative z-10">
-        <div className="flex items-center justify-between">
-          <Link href="/courses" className="text-sm font-semibold text-muted-foreground hover:text-foreground">
-            ← Quay lại danh sách khóa học
-          </Link>
-          <EnrollButton
-            courseId={course.id}
-            isEnrolled={isEnrolled}
-            isFree={isFree}
-            price={Number(course.price || 0)}
-          />
-        </div>
-
-        <Card className="rounded-3xl border-white/60 bg-white/70 backdrop-blur-xl shadow-sm">
-          <CardHeader className="space-y-4">
-            <div className="inline-flex w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">Chi tiết khóa học</div>
-            <CardTitle className="text-3xl font-bold tracking-tight">{course.title}</CardTitle>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {course.description || 'Khóa học đang được cập nhật nội dung chi tiết. Bạn có thể xem trước các bài học miễn phí bên dưới.'}
-            </p>
-            <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-muted-foreground">
-              <span className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1">
-                <Clock3 className="size-3.5" /> {totalLessons} bài học
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1">
-                Trạng thái: {course.status}
-              </span>
+      <section className="glass-panel rounded-2xl border-white/70 p-6 md:p-8">
+        <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
+          <div>
+            <PublicPageHeader
+              eyebrow="Chi tiết khóa học"
+              title={course.title}
+              description={course.description || 'Khóa học đang được giảng viên cập nhật nội dung chi tiết.'}
+              className="py-0"
+            />
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Badge className="bg-primary/10 text-primary hover:bg-primary/10">{levelLabel(course.level)}</Badge>
+              <Badge variant="secondary">{totalChapters} chương</Badge>
+              <Badge variant="secondary">{totalLessons} bài học</Badge>
+              {isEnrolled ? <Badge className="bg-emerald-600 hover:bg-emerald-600">Đã ghi danh</Badge> : null}
             </div>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 text-sm">
-            <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Giảng viên</p>
-              <div className="mt-1">
-                {course.instructor?.slug ? (
-                  <Link href={`/instructors/${course.instructor.slug}`} className="font-bold text-primary hover:underline">
-                    {instructorDisplayName}
-                  </Link>
-                ) : (
-                  <p className="font-bold text-slate-800">{instructorDisplayName}</p>
-                )}
-                {course.instructor?.bio && (
-                  <p className="line-clamp-1 text-xs text-muted-foreground">{course.instructor.bio}</p>
-                )}
+          </div>
+
+          <Card className="rounded-2xl border-white/70 bg-white/60">
+            <CardContent className="space-y-4 p-5">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Giá khóa học</p>
+                <p className="mt-1 text-3xl font-extrabold text-primary">{formattedPrice}</p>
               </div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cấp độ</p>
-              <p className="mt-1 font-bold text-slate-800">{course.level}</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Giá khóa học</p>
-              <p className="mt-1 font-bold text-primary">{formattedPrice}</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Số chương</p>
-              <p className="mt-1 font-bold text-slate-800">{totalChapters}</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tổng bài học</p>
-              <p className="mt-1 font-bold text-slate-800">{totalLessons}</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white/70 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cập nhật</p>
-              <p className="mt-1 font-bold text-slate-800">{updatedLabel}</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-emerald-50/50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Chứng chỉ</p>
-              <p className="mt-1 font-bold text-emerald-700 flex items-center gap-1.5">
-                <Award className="size-4" /> Cấp chứng chỉ sau khi học xong
-              </p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-blue-50/50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Cộng đồng</p>
-              <p className="mt-1 font-bold text-blue-700 flex items-center gap-1.5">
-                <MessageSquare className="size-4" /> Nhóm thảo luận kín cho học viên
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="grid gap-3 text-sm">
+                <div className="flex items-center gap-2 font-semibold">
+                  <UserCircle className="size-4 text-primary" />
+                  {course.instructor?.slug ? (
+                    <Link href={`/instructors/${course.instructor.slug}`} className="text-primary hover:underline">
+                      {instructorDisplayName}
+                    </Link>
+                  ) : (
+                    instructorDisplayName
+                  )}
+                </div>
+                <div className="flex items-center gap-2 font-semibold text-muted-foreground">
+                  <Clock3 className="size-4" />
+                  Cập nhật {updatedLabel}
+                </div>
+                <div className="flex items-center gap-2 font-semibold text-muted-foreground">
+                  <Award className="size-4" />
+                  Cấp chứng chỉ sau khi hoàn thành
+                </div>
+                <div className="flex items-center gap-2 font-semibold text-muted-foreground">
+                  <MessageSquare className="size-4" />
+                  Có Q&A theo khóa học
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
-        <section className="space-y-4">
-          <h2 className="text-xl font-bold">Giáo trình khóa học</h2>
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold">Giáo trình khóa học</h2>
+        {course.chapters.length === 0 ? (
+          <PublicState
+            icon={BookOpen}
+            title="Khóa học chưa có chương công khai"
+            description="Nội dung sẽ xuất hiện sau khi giảng viên xuất bản chương và bài học."
+          />
+        ) : (
           <div className="space-y-4">
-            {course.chapters.length === 0 && (
-              <Card className="rounded-2xl border-white/60 bg-white/70">
-                <CardContent className="py-8 text-sm text-muted-foreground">
-                  Khóa học chưa có chương nào được xuất bản.
-                </CardContent>
-              </Card>
-            )}
-
-            {course.chapters.map((chapter) => (
-              <Card key={chapter.id} className="rounded-2xl border-white/60 bg-white/70 backdrop-blur-xl">
+            {course.chapters.map((chapter, chapterIndex) => (
+              <Card key={chapter.id} className="glass-panel rounded-2xl border-white/70">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-bold">{chapter.title}</CardTitle>
+                  <CardTitle className="text-base font-bold">
+                    Chương {chapterIndex + 1}: {chapter.title}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {chapter.lessons.map((lesson) => (
-                    <div key={lesson.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2">
-                      <div>
-                        <p className="text-sm font-semibold">{lesson.title}</p>
-                        <p className="text-xs text-muted-foreground">{formatDuration(lesson.duration)}</p>
+                  {chapter.lessons.length === 0 ? (
+                    <p className="rounded-xl bg-white/60 px-3 py-3 text-sm font-medium text-muted-foreground">Chương này chưa có bài học công khai.</p>
+                  ) : (
+                    chapter.lessons.map((lesson) => (
+                      <div key={lesson.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/70 bg-white/70 px-3 py-3">
+                        <div className="min-w-0">
+                          <p className="line-clamp-1 text-sm font-semibold">{lesson.title}</p>
+                          <p className="text-xs font-medium text-muted-foreground">{formatDuration(lesson.duration)}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {lesson.isFree ? (
+                            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Học thử</Badge>
+                          ) : null}
+                          {isEnrolled ? <PlayCircle className="size-4 text-primary" /> : <Lock className="size-4 text-muted-foreground" />}
+                        </div>
                       </div>
-                      <div className="inline-flex items-center gap-2">
-                        {!isEnrolled && (
-                          <span className="text-[10px] font-bold rounded-full px-2 py-0.5 inline-flex items-center gap-1 bg-slate-100 text-slate-500">
-                            <Lock className="size-3" /> Yêu cầu đăng ký
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </CardContent>
               </Card>
             ))}
           </div>
-        </section>
-
-        {Array.isArray(course.relatedCourses) && course.relatedCourses.length > 0 && (
-          <section className="space-y-4">
-            <h2 className="text-xl font-bold">Khóa học liên quan</h2>
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {course.relatedCourses.map((item) => (
-                <Link key={item.id} href={`/courses/${item.slug}`} className="min-w-[240px] rounded-2xl border border-white/60 bg-white/70 p-4 hover:border-primary/50">
-                  <p className="font-bold line-clamp-2">{item.title}</p>
-                  <p className="mt-2 text-sm text-primary">{Number(item.price || 0).toLocaleString('vi-VN')}đ</p>
-                </Link>
-              ))}
-            </div>
-          </section>
         )}
+      </section>
 
-        <CourseReviewPanel
-          courseId={course.id}
-          isEnrolled={isEnrolled}
-          isCourseCompleted={isCourseCompleted}
-          heading="Đánh giá và nhận xét"
-        />
-      </main>
+      {Array.isArray(course.relatedCourses) && course.relatedCourses.length > 0 ? (
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-xl font-bold">Khóa học liên quan</h2>
+            <p className="text-sm font-medium text-muted-foreground">Gợi ý thêm theo cùng chủ đề hoặc giảng viên.</p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {course.relatedCourses.map((item) => (
+              <PublicCourseCard key={item.id} course={item} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
-      <SharedFooter />
-    </div>
+      <CourseReviewPanel
+        courseId={course.id}
+        isEnrolled={isEnrolled}
+        isCourseCompleted={isCourseCompleted}
+        heading="Đánh giá và nhận xét"
+      />
+    </PublicPageShell>
   );
 }

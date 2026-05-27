@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
-  type AiConversationDto,
-  type AiMessageDto,
-  listAiConversationsAction,
-  getAiConversationAction,
   deleteAiConversationAction,
   getAiMessagesAction,
+  listAiConversationsAction,
+  type AiConversationDto,
+  type AiMessageDto,
 } from '@/app/actions/ai';
 
 interface UseConversationsOptions {
@@ -22,22 +21,22 @@ export function useConversations(options: UseConversationsOptions = {}) {
   const fetchConversations = useCallback(async () => {
     setLoading(true);
     setError('');
-    const res = await listAiConversationsAction(options.courseId);
+    const result = await listAiConversationsAction(options.courseId);
     setLoading(false);
 
-    if (res.success && res.data) {
-      setConversations(res.data.conversations);
+    if (result.success && result.data) {
+      setConversations(result.data.conversations);
     } else {
-      setError(res.message || 'Không tải được cuộc trò chuyện');
+      setError(result.message || 'Không tải được danh sách trò chuyện.');
     }
   }, [options.courseId]);
 
   const deleteConversation = useCallback(async (id: string) => {
-    const res = await deleteAiConversationAction(id);
-    if (res.success) {
-      setConversations((prev) => prev.filter((c) => c.id !== id));
+    const result = await deleteAiConversationAction(id);
+    if (result.success) {
+      setConversations((prev) => prev.filter((conversation) => conversation.id !== id));
     }
-    return res;
+    return result;
   }, []);
 
   return { conversations, loading, error, fetchConversations, deleteConversation };
@@ -51,28 +50,27 @@ export function useConversation(conversationId: string) {
   const [nextCursor, setNextCursor] = useState<string | undefined>();
 
   const fetchMessages = useCallback(async (cursor?: string) => {
+    if (!conversationId) return;
     setLoading(true);
     setError('');
-    const res = await getAiMessagesAction(conversationId, cursor);
+    const result = await getAiMessagesAction(conversationId, cursor);
     setLoading(false);
 
-    if (res.success && res.data) {
-      if (cursor) {
-        setMessages((prev) => [...res.data!.messages, ...prev]);
-      } else {
-        setMessages(res.data.messages);
-      }
-      setHasMore(res.data.hasMore);
-      setNextCursor(res.data.nextCursor);
+    if (result.success && result.data) {
+      if (cursor) setMessages((prev) => [...result.data!.messages, ...prev]);
+      else setMessages(result.data.messages);
+      setHasMore(result.data.hasMore);
+      setNextCursor(result.data.nextCursor);
     } else {
-      setError(res.message || 'Không tải được tin nhắn');
+      setMessages([]);
+      setError(result.message || 'Không tải được tin nhắn.');
     }
   }, [conversationId]);
 
   const loadMore = useCallback(async () => {
     if (!hasMore || !nextCursor || loading) return;
     await fetchMessages(nextCursor);
-  }, [hasMore, nextCursor, loading, fetchMessages]);
+  }, [fetchMessages, hasMore, loading, nextCursor]);
 
   return { messages, loading, error, hasMore, nextCursor, fetchMessages, loadMore };
 }

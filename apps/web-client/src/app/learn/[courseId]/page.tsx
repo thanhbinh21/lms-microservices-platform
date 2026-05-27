@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { BookOpen, Loader2 } from 'lucide-react';
 import { getLearnDataAction } from '@/app/actions/learning';
 import { Button } from '@/components/ui/button';
 
@@ -15,21 +15,19 @@ export default function LearnCoursePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      const res = await getLearnDataAction(courseId);
-      if (!res.success || !res.data) {
-        setError(res.message || 'Không thể tải dữ liệu khóa học');
+    let active = true;
+    void (async () => {
+      const result = await getLearnDataAction(courseId);
+      if (!active) return;
+      if (!result.success || !result.data) {
+        setError(result.message || 'Không thể tải dữ liệu khóa học.');
         setLoading(false);
         return;
       }
 
-      const { chapters } = res.data;
-      const allLessons = chapters.flatMap((ch) => ch.lessons);
-
-      const lastInProgress = allLessons.find(
-        (l) => l.progress && !l.progress.isCompleted && l.progress.lastWatched > 0,
-      );
-      const firstIncomplete = allLessons.find((l) => !l.progress?.isCompleted);
+      const allLessons = result.data.chapters.flatMap((chapter) => chapter.lessons);
+      const lastInProgress = allLessons.find((lesson) => lesson.progress && !lesson.progress.isCompleted && lesson.progress.lastWatched > 0);
+      const firstIncomplete = allLessons.find((lesson) => !lesson.progress?.isCompleted);
       const target = lastInProgress || firstIncomplete || allLessons[0];
 
       if (target) {
@@ -37,9 +35,12 @@ export default function LearnCoursePage() {
         return;
       }
 
-      setError('Khóa học chưa có bài học để bắt đầu');
+      setError('Khóa học chưa có bài học để bắt đầu.');
       setLoading(false);
     })();
+    return () => {
+      active = false;
+    };
   }, [courseId, router]);
 
   if (loading) {
@@ -47,7 +48,7 @@ export default function LearnCoursePage() {
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-8 animate-spin text-primary" />
-          <p className="text-sm font-medium text-muted-foreground">Đang chuyển đến bài học...</p>
+          <p className="text-sm font-medium text-muted-foreground">Đang chuyển đến bài học phù hợp...</p>
         </div>
       </div>
     );
@@ -55,26 +56,18 @@ export default function LearnCoursePage() {
 
   if (error) {
     return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+        <BookOpen className="size-12 text-slate-300" />
         <p className="text-sm font-semibold text-slate-700">{error}</p>
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button variant="outline" onClick={() => router.refresh()}>
-            Thu lai
+          <Button variant="outline" onClick={() => router.refresh()}>Thử lại</Button>
+          <Button asChild variant="ghost">
+            <Link href="/dashboard/courses">Về khóa học của tôi</Link>
           </Button>
-          <Link href="/dashboard/courses">
-            <Button variant="ghost">Ve khoa hoc cua toi</Button>
-          </Link>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="flex min-h-[50vh] items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <Loader2 className="size-8 animate-spin text-primary" />
-        <p className="text-sm font-medium text-muted-foreground">Đang chuyển đến bài học...</p>
-      </div>
-    </div>
-  );
+  return null;
 }

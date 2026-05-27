@@ -14,25 +14,25 @@ const REASONS: Record<string, { icon: ReactNode; title: string; description: str
   TRANSCRIPT_NOT_READY: {
     icon: <Loader2 className="size-4 animate-spin" />,
     title: 'AI đang chuẩn bị ngữ cảnh',
-    description: 'Hệ thống sẽ dùng title, mô tả, nội dung bài học và từ khóa khóa học để tạo quiz.',
+    description: 'Hệ thống sẽ ưu tiên metadata, nội dung bài học và từ khóa khóa học để tạo quiz.',
     severity: 'info',
   },
   VIDEO_TOO_LARGE: {
     icon: <AlertCircle className="size-4" />,
-    title: 'Video cần được chia nhỏ',
-    description: 'Quiz vẫn có thể tạo từ metadata, nhưng video quá dài có thể làm giảm chất lượng ngữ cảnh.',
+    title: 'Video quá dài để phân tích đầy đủ',
+    description: 'Quiz vẫn có thể tạo từ metadata, nhưng chất lượng ngữ cảnh có thể giảm. Vui lòng thử lại.',
     severity: 'warning',
   },
   INSUFFICIENT_CONTENT: {
     icon: <AlertCircle className="size-4" />,
     title: 'Chưa tạo được quiz từ ngữ cảnh hiện có',
-    description: 'AI đã thử dùng title, mô tả và nội dung giảng viên cung cấp. Vui lòng thử lại sau hoặc bổ sung mô tả bài học.',
+    description: 'AI đã thử dùng tiêu đề, mô tả và nội dung bài học. Vui lòng thử lại hoặc bổ sung nội dung bài học.',
     severity: 'warning',
   },
   INSUFFICIENT_COURSE_COVERAGE: {
     icon: <AlertCircle className="size-4" />,
-    title: 'Ngữ cảnh khóa học chưa sẵn sàng',
-    description: 'Hệ thống đang dùng cơ chế best-effort từ metadata khóa học, không còn yêu cầu transcript.',
+    title: 'Ngữ cảnh khóa học chưa đủ rộng',
+    description: 'Hệ thống không còn bắt buộc transcript, nhưng khóa học cần thêm nội dung để tạo câu hỏi tốt hơn.',
     severity: 'warning',
   },
   EMPTY_COURSE: {
@@ -49,8 +49,8 @@ const REASONS: Record<string, { icon: ReactNode; title: string; description: str
   },
   COURSE_SERVICE_UNAVAILABLE: {
     icon: <AlertCircle className="size-4" />,
-    title: 'Hệ thống tạm thời không khả dụng',
-    description: 'Vui lòng thử lại sau.',
+    title: 'Hệ thống kiểm tra tạm thời không khả dụng',
+    description: 'Vui lòng thử lại sau ít phút. Tiến độ học tập của bạn không bị ảnh hưởng.',
     severity: 'error',
   },
 };
@@ -71,19 +71,17 @@ export function QuizUnavailable({ reason, className }: QuizUnavailableProps) {
   const config = REASONS[reason] ?? {
     icon: <AlertCircle className="size-4" />,
     title: 'Quiz chưa khả dụng',
-    description: reason,
+    description: 'Vui lòng thử lại sau hoặc chuyển sang bài học khác.',
     severity: 'warning' as const,
   };
 
   return (
     <Card className={cn('border', severityStyles[config.severity], className)}>
-      <CardContent className="flex items-center gap-3 p-3">
-        <div className={cn('rounded-full p-1.5', iconStyles[config.severity])}>
-          {config.icon}
-        </div>
+      <CardContent className="flex items-start gap-3 p-4">
+        <div className={cn('rounded-full p-1.5', iconStyles[config.severity])}>{config.icon}</div>
         <div className="flex-1">
-          <p className="text-sm font-medium">{config.title}</p>
-          <p className="text-xs opacity-80">{config.description}</p>
+          <p className="text-sm font-semibold">{config.title}</p>
+          <p className="mt-1 text-xs leading-relaxed opacity-85">{config.description}</p>
         </div>
       </CardContent>
     </Card>

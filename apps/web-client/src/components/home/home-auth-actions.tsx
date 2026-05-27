@@ -1,10 +1,10 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Clapperboard, LayoutDashboard, PlayCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppSelector } from '@/lib/redux/hooks';
-import { useEffect, useState } from 'react';
 
 interface HomeAuthActionsProps {
   context: 'hero' | 'cta';
@@ -14,63 +14,31 @@ export function HomeAuthActions({ context }: HomeAuthActionsProps) {
   const { isAuthenticated, isLoading, user } = useAppSelector((state) => state.auth);
   const [mounted, setMounted] = useState(false);
 
+  // Tránh hydration mismatch bằng cách chỉ render role-aware actions sau khi đã mount trên client.
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Tranh hydration mismatch: server va client render giong nhau (null) cho den khi mount
-  if (!mounted || isLoading) {
-    return null;
-  }
+  const showRoleAware = mounted && !isLoading && isAuthenticated && user;
 
   const normalizedRole = (user?.role || '').toUpperCase();
-  const canAccessInstructorStudio = normalizedRole === 'INSTRUCTOR' || normalizedRole === 'ADMIN';
+  const workspaceHref = normalizedRole === 'ADMIN' ? '/admin' : normalizedRole === 'INSTRUCTOR' ? '/instructor' : '/dashboard';
+  const workspaceLabel = normalizedRole === 'INSTRUCTOR' ? 'Vào Studio' : normalizedRole === 'ADMIN' ? 'Vào Admin' : 'Vào Dashboard';
+  const WorkspaceIcon = normalizedRole === 'INSTRUCTOR' ? Clapperboard : LayoutDashboard;
 
-  if (!isAuthenticated || !user) {
-    if (context === 'hero') {
-      return (
-        <>
-          <Button asChild size="lg" className="gap-2 shadow-lg shadow-primary/20">
-            <Link href="/register">
-              Bắt đầu ngay
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="outline" className="gap-2 bg-white/60">
-            <Link href="/login">
-              <PlayCircle className="size-4" />
-              Xem demo
-            </Link>
-          </Button>
-        </>
-      );
-    }
-
+  if (!showRoleAware) {
     return (
       <>
-        <Button asChild variant="secondary" size="lg" className="bg-white text-primary hover:bg-white/90 rounded-full px-8 shadow-xl">
-          <Link href="/register">Đăng ký miễn phí</Link>
-        </Button>
-        <Button asChild variant="outline" size="lg" className="rounded-full px-8 border-white/40 bg-white/10 backdrop-blur-md text-white hover:bg-white/20 hover:text-white">
-          <Link href="/login">Liên hệ tư vấn</Link>
-        </Button>
-      </>
-    );
-  }
-
-  if (context === 'hero') {
-    return (
-      <>
-        <Button asChild size="lg" className="gap-2 shadow-lg shadow-primary/20">
-          <Link href={canAccessInstructorStudio ? '/instructor' : '/dashboard'}>
-            {canAccessInstructorStudio ? 'Vào Studio' : 'Vào Dashboard'}
-            {canAccessInstructorStudio ? <Clapperboard className="size-4" /> : <LayoutDashboard className="size-4" />}
+        <Button asChild size="lg" className="gap-2 rounded-xl font-semibold shadow-lg shadow-primary/20">
+          <Link href="/register">
+            Bắt đầu miễn phí
+            <ArrowRight className="size-4" />
           </Link>
         </Button>
-        <Button asChild size="lg" variant="outline" className="gap-2 bg-white/60">
-          <Link href="/courses">
+        <Button asChild size="lg" variant="outline" className="gap-2 rounded-xl bg-white/70 font-semibold">
+          <Link href={context === 'hero' ? '/courses' : '/support'}>
             <PlayCircle className="size-4" />
-            Khám phá khóa học
+            {context === 'hero' ? 'Khám phá khóa học' : 'Nhận tư vấn'}
           </Link>
         </Button>
       </>
@@ -79,13 +47,17 @@ export function HomeAuthActions({ context }: HomeAuthActionsProps) {
 
   return (
     <>
-      <Button asChild variant="secondary" size="lg" className="bg-white text-primary hover:bg-white/90 rounded-full px-8 shadow-xl">
-        <Link href={canAccessInstructorStudio ? '/instructor' : '/dashboard'}>
-          {canAccessInstructorStudio ? 'Vào Studio giảng viên' : 'Mở Dashboard'}
+      <Button asChild size="lg" className="gap-2 rounded-xl font-semibold shadow-lg shadow-primary/20">
+        <Link href={workspaceHref}>
+          {workspaceLabel}
+          <WorkspaceIcon className="size-4" />
         </Link>
       </Button>
-      <Button asChild variant="outline" size="lg" className="rounded-full px-8 border-white/40 bg-white/10 backdrop-blur-md text-white hover:bg-white/20 hover:text-white">
-        <Link href="/courses">Xem khóa học đã xuất bản</Link>
+      <Button asChild size="lg" variant="outline" className="gap-2 rounded-xl bg-white/70 font-semibold">
+        <Link href="/courses">
+          <PlayCircle className="size-4" />
+          Xem khóa học
+        </Link>
       </Button>
     </>
   );

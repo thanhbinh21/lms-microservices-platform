@@ -3,14 +3,14 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ChevronDown, CheckCircle2, PlayCircle, Lock, Clock3 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { CheckCircle2, ChevronDown, Clock3, Lock, PlayCircle } from 'lucide-react';
 import type { LearnChapterDto } from '@/app/actions/learning';
+import { cn } from '@/lib/utils';
 
 function formatDuration(seconds: number) {
   if (!seconds) return '';
-  const mins = Math.ceil(seconds / 60);
-  return `${mins} ph`;
+  const minutes = Math.ceil(seconds / 60);
+  return `${minutes} phút`;
 }
 
 interface CurriculumSidebarProps {
@@ -32,20 +32,14 @@ export function CurriculumSidebar({
 }: CurriculumSidebarProps) {
   const params = useParams();
   const currentLessonId = params.lessonId as string | undefined;
-  const [expandedChapters, setExpandedChapters] = useState<Set<string>>(
-    () => {
-      const set = new Set<string>();
-      for (const ch of chapters) {
-        if (ch.lessons.some((l) => l.id === currentLessonId)) {
-          set.add(ch.id);
-        }
-      }
-      if (set.size === 0 && chapters.length > 0) {
-        set.add(chapters[0].id);
-      }
-      return set;
-    },
-  );
+  const [expandedChapters, setExpandedChapters] = useState<Set<string>>(() => {
+    const current = new Set<string>();
+    for (const chapter of chapters) {
+      if (chapter.lessons.some((lesson) => lesson.id === currentLessonId)) current.add(chapter.id);
+    }
+    if (current.size === 0 && chapters.length > 0) current.add(chapters[0].id);
+    return current;
+  });
 
   const toggleChapter = (chapterId: string) => {
     setExpandedChapters((prev) => {
@@ -58,57 +52,38 @@ export function CurriculumSidebar({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Progress summary */}
-      <div className="border-b border-white/20 p-4">
+      <div className="border-b border-white/10 p-4">
         <div className="mb-2 flex items-center justify-between text-xs font-bold text-slate-300">
           <span>{completedLessons}/{totalLessons} bài hoàn thành</span>
           <span className="text-emerald-400">{progressPercent}%</span>
         </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-700/60">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700 ease-out"
-            style={{ width: `${progressPercent}%` }}
-          />
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-700/70">
+          <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700" style={{ width: `${progressPercent}%` }} />
         </div>
       </div>
 
-      {/* Chapter list */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin">
+      <div className="flex-1 overflow-y-auto">
         {chapters.map((chapter) => {
           const isExpanded = expandedChapters.has(chapter.id);
-          const chapterCompleted = chapter.lessons.every((l) => l.progress?.isCompleted);
-          const chapterLessonsDone = chapter.lessons.filter((l) => l.progress?.isCompleted).length;
+          const chapterCompleted = chapter.lessons.length > 0 && chapter.lessons.every((lesson) => lesson.progress?.isCompleted);
+          const chapterLessonsDone = chapter.lessons.filter((lesson) => lesson.progress?.isCompleted).length;
 
           return (
             <div key={chapter.id} className="border-b border-white/[0.06]">
-              <button
-                onClick={() => toggleChapter(chapter.id)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.04]"
-              >
-                <ChevronDown
-                  className={cn(
-                    'size-4 shrink-0 text-slate-400 transition-transform duration-200',
-                    isExpanded && 'rotate-180',
-                  )}
-                />
+              <button type="button" onClick={() => toggleChapter(chapter.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.05]">
+                <ChevronDown className={cn('size-4 shrink-0 text-slate-400 transition-transform duration-200', isExpanded && 'rotate-180')} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-semibold text-slate-200">
-                    {chapter.title}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">
-                    {chapterLessonsDone}/{chapter.lessons.length} bài
-                  </p>
+                  <p className="truncate text-[13px] font-semibold text-slate-200">{chapter.title}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">{chapterLessonsDone}/{chapter.lessons.length} bài</p>
                 </div>
-                {chapterCompleted && chapter.lessons.length > 0 && (
-                  <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
-                )}
+                {chapterCompleted ? <CheckCircle2 className="size-4 shrink-0 text-emerald-400" /> : null}
               </button>
 
-              {isExpanded && (
+              {isExpanded ? (
                 <div className="pb-1">
                   {chapter.lessons.map((lesson) => {
                     const isCurrent = lesson.id === currentLessonId;
-                    const isCompleted = lesson.progress?.isCompleted;
+                    const isCompleted = Boolean(lesson.progress?.isCompleted);
                     const isAccessible = enrolled || lesson.isFree;
 
                     return (
@@ -116,13 +91,13 @@ export function CurriculumSidebar({
                         key={lesson.id}
                         href={isAccessible ? `/learn/${courseId}/lesson/${lesson.id}` : '#'}
                         className={cn(
-                          'group flex items-center gap-3 px-4 py-2.5 pl-10 transition-all',
-                          isCurrent
-                            ? 'bg-primary/15 border-l-2 border-primary'
-                            : 'hover:bg-white/[0.04] border-l-2 border-transparent',
+                          'group flex items-center gap-3 border-l-2 px-4 py-2.5 pl-10 transition-all',
+                          isCurrent ? 'border-primary bg-primary/15' : 'border-transparent hover:bg-white/[0.05]',
                           !isAccessible && 'cursor-not-allowed opacity-50',
                         )}
-                        onClick={(e) => !isAccessible && e.preventDefault()}
+                        onClick={(event) => {
+                          if (!isAccessible) event.preventDefault();
+                        }}
                       >
                         <div className="shrink-0">
                           {isCompleted ? (
@@ -135,28 +110,20 @@ export function CurriculumSidebar({
                             <div className="size-4 rounded-full border-2 border-slate-600" />
                           )}
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p
-                            className={cn(
-                              'truncate text-[13px] font-medium',
-                              isCurrent ? 'text-primary' : 'text-slate-300',
-                              isCompleted && !isCurrent && 'text-slate-400',
-                            )}
-                          >
-                            {lesson.title}
-                          </p>
-                        </div>
-                        {lesson.duration > 0 && (
+                        <p className={cn('min-w-0 flex-1 truncate text-[13px] font-medium', isCurrent ? 'text-primary' : 'text-slate-300', isCompleted && !isCurrent && 'text-slate-400')}>
+                          {lesson.title}
+                        </p>
+                        {lesson.duration > 0 ? (
                           <span className="flex shrink-0 items-center gap-1 text-[11px] text-slate-500">
                             <Clock3 className="size-3" />
                             {formatDuration(lesson.duration)}
                           </span>
-                        )}
+                        ) : null}
                       </Link>
                     );
                   })}
                 </div>
-              )}
+              ) : null}
             </div>
           );
         })}

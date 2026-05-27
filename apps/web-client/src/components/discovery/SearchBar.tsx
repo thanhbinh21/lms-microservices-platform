@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export function SearchBar() {
   const router = useRouter();
@@ -11,62 +13,61 @@ export function SearchBar() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setValue(searchParams.get('q') || '');
+    const timer = window.setTimeout(() => setValue(searchParams.get('q') || ''), 0);
+    return () => window.clearTimeout(timer);
   }, [searchParams]);
 
   const pushSearch = useCallback(
-    (q: string) => {
+    (query: string) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (q.trim()) {
-        params.set('q', q.trim());
-      } else {
-        params.delete('q');
-      }
+      const normalized = query.trim();
+      if (normalized) params.set('q', normalized);
+      else params.delete('q');
       params.delete('page');
       router.push(`/courses?${params.toString()}`);
     },
     [router, searchParams],
   );
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const next = e.target.value;
-    setValue(next);
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const nextValue = event.target.value;
+    setValue(nextValue);
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => pushSearch(next), 400);
-  };
-
-  const handleClear = () => {
-    setValue('');
-    pushSearch('');
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      pushSearch(value);
-    }
+    timerRef.current = setTimeout(() => pushSearch(nextValue), 450);
   };
 
   return (
-    <div className="w-full max-w-2xl flex items-center bg-white/60 backdrop-blur-md border border-white/80 rounded-full p-2 shadow-xl shadow-primary/5 focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-primary transition-all">
-      <Search className="w-5 h-5 text-muted-foreground ml-3 shrink-0" />
+    <div className="flex w-full max-w-2xl items-center rounded-2xl border border-white/80 bg-white/70 p-2 shadow-xl shadow-primary/5 backdrop-blur-md focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30">
+      <Search className="ml-2 size-5 shrink-0 text-muted-foreground" />
       <input
-        type="text"
+        type="search"
         value={value}
         onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        placeholder="Tìm kiếm khoá học (VD: React, Node.js, Kubernetes...)"
-        className="flex-1 bg-transparent border-none outline-none px-4 text-base font-medium placeholder:text-muted-foreground"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            if (timerRef.current) clearTimeout(timerRef.current);
+            pushSearch(value);
+          }
+        }}
+        placeholder="Tìm khóa học, kỹ năng hoặc công nghệ..."
+        className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm font-medium outline-none placeholder:text-muted-foreground"
+        aria-label="Tìm kiếm khóa học"
       />
-      {value && (
-        <button
+      {value ? (
+        <Button
           type="button"
-          onClick={handleClear}
-          className="p-2 hover:bg-muted rounded-full transition-colors mr-1"
+          variant="ghost"
+          size="icon"
+          className="size-9 rounded-xl"
+          aria-label="Xóa từ khóa"
+          onClick={() => {
+            setValue('');
+            pushSearch('');
+          }}
         >
-          <X className="w-4 h-4 text-muted-foreground" />
-        </button>
-      )}
+          <X className="size-4" />
+        </Button>
+      ) : null}
     </div>
   );
 }

@@ -352,3 +352,4 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 - [x] Hotfix seed Neon pool timeout: ep Prisma seed URL dung `connection_limit=1&pool_timeout=30` de tranh P2024 khi seed nhieu service DB cung luc. done 2026-05-27
 - [x] AI final quiz/chat context hardening: rut gon context ve metadata course/chapter/lesson, parse JSON an toan, retry prompt ngan hon, UTF-8 headers, demo fallback quiz co dieu kien, va redirect lesson URL cu sau reseed. done 2026-05-27
 - [x] AI chat conversation scoping fix: list conversation theo courseId va reset selected conversation khi doi course/lesson de tranh gui lesson sai khoa hoc. done 2026-05-27
+- [x] Public/shared UI refactor: chuan hoa shell/header/state/course-card, polish public pages, `/settings`, community, support, learn, AI Chat va Final Quiz. done 2026-05-27

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 interface UseChatOptions {
   conversationId: string;
@@ -11,6 +11,27 @@ interface UseChatOptions {
 }
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || 'http://localhost:8000';
+
+function friendlyChatError(message?: string) {
+  const raw = message || '';
+  const lower = raw.toLowerCase();
+  if (lower.includes('lesson does not belong to this course')) {
+    return 'Ngữ cảnh bài học không còn khớp với khóa học hiện tại. Hãy tạo cuộc trò chuyện mới rồi thử lại.';
+  }
+  if (lower.includes('conversation') && lower.includes('course')) {
+    return 'Cuộc trò chuyện đang dùng ngữ cảnh cũ. Hãy tạo cuộc trò chuyện mới để đồng bộ với bài học hiện tại.';
+  }
+  if (lower.includes('unauthorized') || lower.includes('forbidden')) {
+    return 'Phiên đăng nhập đã hết hạn hoặc bạn chưa có quyền dùng trợ lý AI cho khóa học này.';
+  }
+  if (lower.includes('quota') || lower.includes('rate limit')) {
+    return 'AI đang bị giới hạn lượt dùng tạm thời. Vui lòng thử lại sau ít phút.';
+  }
+  if (lower.includes('failed to fetch')) {
+    return 'Không kết nối được AI Service. Kiểm tra Kong Gateway và AI Service rồi thử lại.';
+  }
+  return raw || 'AI chưa thể trả lời lúc này. Vui lòng thử lại.';
+}
 
 export function useChat(options: UseChatOptions) {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -25,20 +46,16 @@ export function useChat(options: UseChatOptions) {
     lessonId?: string,
     currentTimeSec?: number,
   ) => {
-    // Cancel any ongoing stream
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    if (abortControllerRef.current) abortControllerRef.current.abort();
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
-
     setIsStreaming(true);
     setStreamingContent('');
     setError('');
 
     try {
-      const res = await fetch(
+      const response = await fetch(
         `${GATEWAY_URL}/ai/api/chat/conversations/${options.conversationId}/messages`,
         {
           method: 'POST',
@@ -53,26 +70,27 @@ export function useChat(options: UseChatOptions) {
         },
       );
 
-      // Read rate limit headers
-      const remaining = res.headers.get('X-RateLimit-Remaining');
-      const reset = res.headers.get('X-RateLimit-Reset');
-      if (remaining) setRateLimitRemaining(parseInt(remaining, 10));
-      if (reset) setRateLimitReset(parseInt(reset, 10));
+      const remaining = response.headers.get('X-RateLimit-Remaining');
+      const reset = response.headers.get('X-RateLimit-Reset');
+      if (remaining) setRateLimitRemaining(Number.parseInt(remaining, 10));
+      if (reset) setRateLimitReset(Number.parseInt(reset, 10));
 
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        setError(json.message || 'Lỗi gửi tin nhắn');
-        setIsStreaming(false);
+      if (!response.ok) {
+        const json = await response.json().catch(() => ({}));
+        const errMsg = friendlyChatError(json.message);
+        setError(errMsg);
+        options.onError?.(errMsg);
         return;
       }
 
-      if (!res.body) {
-        setError('Không có phản hồi từ server');
-        setIsStreaming(false);
+      if (!response.body) {
+        const errMsg = 'AI Service không trả về nội dung. Vui lòng thử lại.';
+        setError(errMsg);
+        options.onError?.(errMsg);
         return;
       }
 
-      const reader = res.body.getReader();
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
 
@@ -96,7 +114,6 @@ export function useChat(options: UseChatOptions) {
 
           try {
             const data = JSON.parse(dataStr);
-
             if (eventName === 'message_id' && data.messageId) {
               options.onMessageId?.(data.messageId);
             } else if (eventName === 'chunk' && data.text) {
@@ -105,23 +122,18 @@ export function useChat(options: UseChatOptions) {
             } else if (eventName === 'done') {
               options.onDone?.(data.sources);
             } else if (eventName === 'error') {
-              setError(data.message || 'Đã xảy ra lỗi');
-              options.onError?.(data.message);
+              const errMsg = friendlyChatError(data.message);
+              setError(errMsg);
+              options.onError?.(errMsg);
             }
           } catch {
-            // skip malformed SSE data
+            // SSE co the bi cat nho theo chunk; bo qua block loi de tiep tuc stream.
           }
         }
       }
     } catch (err) {
-      if ((err as Error).name === 'AbortError') {
-        // Stream was cancelled
-        return;
-      }
-      // CORS hoac network error deu roi vao day — hien thi chi tiet hon de debug.
-      const errMsg = (err as Error).message?.includes('Failed to fetch')
-        ? 'Không kết nối được AI server. Kiểm tra Kong Gateway và AI Service.'
-        : 'Lỗi kết nối. Vui lòng thử lại.';
+      if ((err as Error).name === 'AbortError') return;
+      const errMsg = friendlyChatError((err as Error).message);
       setError(errMsg);
       options.onError?.(errMsg);
     } finally {

@@ -9,7 +9,7 @@ import { fetchInternalInstructors, fetchInternalUsersBatch } from '../lib/auth-c
 
 const listInstructorsQuerySchema = z.object({
   q: z.string().trim().optional(),
-  sortBy: z.enum(['name', 'courses', 'rating']).default('name'),
+  sortBy: z.enum(['name', 'courses', 'rating', 'newest']).default('newest'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(12),
 });
@@ -263,6 +263,9 @@ export async function listInstructors(req: Request, res: Response): Promise<Resp
       }
       if (sortBy === 'rating') {
         return b.averageRating - a.averageRating;
+      }
+      if (sortBy === 'newest') {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
       return a.displayName.localeCompare(b.displayName);
     });
