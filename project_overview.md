@@ -328,3 +328,15 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-05-23 - Payment Event Sourcing
 - [x] Payment Order Event Sourcing dual-write, admin event history API, order event backfill, and fold/projection verification. done 2026-05-23
+
+### 2026-05-27 - Order History UX Unification
+- [x] Chuan hoa lich su don hang ve route `/dashboard/orders`, dung chung component dashboard va redirect VNPay return ve man hinh nay. done 2026-05-27
+
+### 2026-05-27 - VNPay Continue Payment Expiry Fix
+- [x] Khong tai su dung VNPay URL het han; them continue payment API expire order cu, verify lai gia va tao order/URL moi co khoa chong double click. done 2026-05-27
+
+### 2026-05-27 - Notification Neon Connection Retry
+- [x] Them retry cho notification-service khi Prisma gap P1017/connection drop tren Neon serverless. done 2026-05-27
+
+### 2026-05-27 - Payment And Revenue Flow Audit
+- [x] Audit va harden flow VNPay/enrollment/earning/payout: instructor role guard, idempotent earning notification, payout audit log, admin/instructor payout notification, va internal admins/notification endpoints. done 2026-05-27

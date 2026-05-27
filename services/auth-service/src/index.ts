@@ -14,7 +14,7 @@ import { updateUserRole } from './controllers/update-role.controller.js';
 import { becomeEducator } from './controllers/become-educator.controller.js';
 import { requireAdmin } from './middleware/require-admin.js';
 import { requireAuth } from './middleware/require-auth.js';
-import { getInternalUser, getInternalUsersBatch, getInternalInstructors } from './controllers/internal.controller.js';
+import { getInternalUser, getInternalUsersBatch, getInternalInstructors, getInternalAdmins } from './controllers/internal.controller.js';
 import { createAuditLog } from './controllers/audit.controller.js';
 import adminRouter from './routes/admin.routes.js';
 import { startCleanupJobs } from './jobs/cleanup.js';
@@ -104,6 +104,7 @@ app.post('/support/tickets/:id/replies', requireAuth, replySupportTicket);
 app.get('/internal/users/:id', requireInternal, getInternalUser);
 app.post('/internal/users/batch', requireInternal, getInternalUsersBatch);
 app.get('/internal/instructors', requireInternal, getInternalInstructors);
+app.get('/internal/admins', requireInternal, getInternalAdmins);
 app.post('/internal/audit-logs', requireInternal, createAuditLog);
 
 // Admin routes

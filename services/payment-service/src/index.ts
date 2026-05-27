@@ -7,6 +7,7 @@ import type { ApiResponse } from '@lms/types';
 import { requireAuth } from './middleware/require-auth';
 import {
   createOrder,
+  continuePayment,
   getOrder,
   getMyOrders,
   getRevenueAnalytics,
@@ -32,6 +33,20 @@ validatePaymentServiceEnv();
 const app = express();
 const PORT = process.env.PORT || 3003;
 const requireAdmin = createRequireAdmin();
+const requireInstructor = (req: Request, res: Response, next: NextFunction) => {
+  const userRole = String(res.locals.userRole || '').toUpperCase();
+  if (userRole !== 'INSTRUCTOR') {
+    const response: ApiResponse<null> = {
+      success: false,
+      code: 403,
+      message: 'Forbidden - instructor access required',
+      data: null,
+      trace_id: (req.headers['x-trace-id'] as string) || '',
+    };
+    return res.status(403).json(response);
+  }
+  return next();
+};
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(helmet());
@@ -75,16 +90,17 @@ app.post('/api/vnpay-ipn', handleVNPayIPN);
 // ─── Authenticated endpoints ──────────────────────────────────────────────────
 app.post('/api/orders/analytics/revenue', requireAuth, getRevenueAnalytics);
 app.post('/api/orders', requireAuth, createOrder);
+app.post('/api/orders/:id/continue', requireAuth, continuePayment);
 app.get('/api/orders/my', requireAuth, getMyOrders);
 app.get('/api/orders/:id', requireAuth, getOrder);
 app.get('/api/admin/revenue-analytics', requireAdmin, getAdminRevenueAnalytics);
 app.get('/api/admin/orders/:orderId/events', requireAdmin, getOrderEventHistory);
-app.get('/api/instructor/earnings/summary', requireAuth, getInstructorEarningsSummary);
-app.get('/api/instructor/earnings', requireAuth, getInstructorEarnings);
-app.get('/api/instructor/payout-profile', requireAuth, getInstructorPayoutProfile);
-app.put('/api/instructor/payout-profile', requireAuth, upsertInstructorPayoutProfile);
-app.get('/api/instructor/payouts/my', requireAuth, listMyPayouts);
-app.post('/api/instructor/payouts', requireAuth, createPayout);
+app.get('/api/instructor/earnings/summary', requireAuth, requireInstructor, getInstructorEarningsSummary);
+app.get('/api/instructor/earnings', requireAuth, requireInstructor, getInstructorEarnings);
+app.get('/api/instructor/payout-profile', requireAuth, requireInstructor, getInstructorPayoutProfile);
+app.put('/api/instructor/payout-profile', requireAuth, requireInstructor, upsertInstructorPayoutProfile);
+app.get('/api/instructor/payouts/my', requireAuth, requireInstructor, listMyPayouts);
+app.post('/api/instructor/payouts', requireAuth, requireInstructor, createPayout);
 app.get('/api/admin/payouts', requireAdmin, listPayouts);
 app.patch('/api/admin/payouts/:id', requireAdmin, updatePayout);
 

@@ -3,15 +3,16 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { ArrowLeft, Award, BookOpen, Headphones, LayoutDashboard, Menu, MessageSquare, X } from 'lucide-react';
+import { ArrowLeft, Award, BookOpen, Headphones, LayoutDashboard, Menu, MessageSquare, Wallet, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-type TabId = 'overview' | 'my-courses' | 'certificates' | 'qa' | 'support';
+type TabId = 'overview' | 'my-courses' | 'certificates' | 'orders' | 'qa' | 'support';
 
 const TABS: { id: TabId; label: string; href: string }[] = [
   { id: 'overview', label: 'Tổng quan', href: '/dashboard/overview' },
   { id: 'my-courses', label: 'Khóa học của tôi', href: '/dashboard/courses' },
   { id: 'certificates', label: 'Chứng chỉ', href: '/dashboard/certificates' },
+  { id: 'orders', label: 'Lịch sử đơn hàng', href: '/dashboard/orders' },
   { id: 'qa', label: 'Hỏi đáp', href: '/dashboard/qa' },
   { id: 'support', label: 'Hỗ trợ', href: '/dashboard/support' },
 ];
@@ -20,6 +21,7 @@ const TAB_ICONS: Record<TabId, React.ComponentType<{ className?: string }>> = {
   overview: LayoutDashboard,
   'my-courses': BookOpen,
   certificates: Award,
+  orders: Wallet,
   qa: MessageSquare,
   support: Headphones,
 };

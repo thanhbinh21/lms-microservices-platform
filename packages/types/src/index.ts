@@ -46,6 +46,7 @@ export interface OrderDto {
   id: string;
   userId: string;
   courseId: string;
+  courseTitle?: string | null;
   amount: number;
   currency: string;
   status: OrderStatus;
@@ -64,6 +65,15 @@ export interface CreateOrderInput {
 export interface CreateOrderResult {
   orderId: string;
   payUrl: string;
+  amount: number;
+  currency: string;
+}
+
+export interface ContinuePaymentResult {
+  action: 'PAY' | 'LEARN';
+  orderId: string;
+  courseId: string;
+  payUrl: string | null;
   amount: number;
   currency: string;
 }

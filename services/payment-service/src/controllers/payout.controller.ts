@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { ApiResponse } from '@lms/types';
 import prisma from '../lib/prisma';
 import { handlePrismaError } from '../lib/prisma-errors';
-import { fetchUsersByIds } from '../lib/auth-client';
+import { createInternalNotification, fetchAdminUsers, fetchUsersByIds } from '../lib/auth-client';
 import { writeAuditLog } from '../lib/audit';
 
 const listPayoutsQuerySchema = z.object({
@@ -180,6 +180,31 @@ export async function createPayout(req: Request, res: Response) {
       });
     });
 
+    await writeAuditLog({
+      actorId: instructorId,
+      actorRole: 'INSTRUCTOR',
+      action: 'PAYOUT_REQUEST_CREATED',
+      resourceType: 'PAYOUT',
+      resourceId: payout.id,
+      targetLabel: instructorId,
+      payload: { amount, selectedEarningIds: selected.selected },
+      traceId,
+    });
+
+    const admins = await fetchAdminUsers(traceId);
+    await Promise.all(
+      admins.map((admin) =>
+        createInternalNotification({
+          userId: admin.id,
+          title: 'Co yeu cau rut tien moi',
+          body: 'Giang vien vua tao yeu cau rut tien can xu ly.',
+          eventId: `payout-request:${payout.id}:${admin.id}`,
+          metadata: { payoutId: payout.id, instructorId, amount, route: '/admin/payouts' },
+          traceId,
+        }),
+      ),
+    );
+
     const response: ApiResponse<ReturnType<typeof mapPayout>> = {
       success: true,
       code: 201,
@@ -344,6 +369,25 @@ export async function updatePayout(req: Request, res: Response) {
       resourceId: payout.id,
       targetLabel: payout.instructorId,
       payload: { before: existing, after: payout },
+      traceId,
+    });
+
+    await createInternalNotification({
+      userId: payout.instructorId,
+      title:
+        nextStatus === 'REJECTED'
+          ? 'Yeu cau rut tien bi tu choi'
+          : nextStatus === 'PAID'
+            ? 'Yeu cau rut tien da thanh toan'
+            : 'Yeu cau rut tien da duoc duyet',
+      body:
+        nextStatus === 'REJECTED'
+          ? parsed.data.adminNote || 'Admin da tu choi yeu cau rut tien cua ban.'
+          : nextStatus === 'PAID'
+            ? 'Khoan rut tien cua ban da duoc danh dau la da thanh toan.'
+            : 'Yeu cau rut tien cua ban da duoc duyet va dang cho thanh toan.',
+      eventId: `payout-update:${payout.id}:${nextStatus}`,
+      metadata: { payoutId: payout.id, status: nextStatus, route: '/instructor/settings' },
       traceId,
     });
 
