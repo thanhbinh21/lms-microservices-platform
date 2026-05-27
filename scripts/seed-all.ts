@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Seed Script Tổng Hợp: Mô phỏng dữ liệu hệ thống hoạt động 1 tháng
  *
  * Chạy: pnpm seed
@@ -1048,20 +1048,42 @@ async function createPaymentOrder(params: {
     });
   }
   if (params.status === 'COMPLETED') {
-    events.push({
-      eventType: 'PAYMENT_COMPLETED',
-      payload: { orderId: order.id, vnpTxnRef: txnRef, transactionNo: params.transactionNo, paidAt: params.paidAt?.toISOString() },
-      traceId: params.traceId,
-      occurredAt: params.paidAt ?? params.createdAt,
-    });
+    events.push(
+      {
+        eventType: 'VNPAY_CALLBACK_RECEIVED',
+        payload: { orderId: order.id, vnpTxnRef: txnRef, responseCode: params.responseCode ?? '00', transactionNo: params.transactionNo, callbackType: 'RETURN' },
+        traceId: params.traceId,
+        occurredAt: new Date((params.paidAt ?? params.createdAt).getTime() - 2000),
+      },
+      {
+        eventType: 'PAYMENT_VERIFIED',
+        payload: { orderId: order.id, vnpTxnRef: txnRef, transactionNo: params.transactionNo, verified: true },
+        traceId: params.traceId,
+        occurredAt: new Date((params.paidAt ?? params.createdAt).getTime() - 1000),
+      },
+      {
+        eventType: 'ORDER_COMPLETED',
+        payload: { orderId: order.id, vnpTxnRef: txnRef, transactionNo: params.transactionNo, paidAt: params.paidAt?.toISOString() },
+        traceId: params.traceId,
+        occurredAt: params.paidAt ?? params.createdAt,
+      },
+    );
   }
   if (params.status === 'FAILED' || params.status === 'EXPIRED') {
-    events.push({
-      eventType: params.status === 'FAILED' ? 'PAYMENT_FAILED' : 'ORDER_EXPIRED',
-      payload: { orderId: order.id, reason: params.failureReason, responseCode: params.responseCode },
-      traceId: params.traceId,
-      occurredAt: params.expiresAt ?? params.createdAt,
-    });
+    events.push(
+      {
+        eventType: 'VNPAY_CALLBACK_RECEIVED',
+        payload: { orderId: order.id, vnpTxnRef: txnRef, responseCode: params.responseCode ?? '24', transactionNo: null, callbackType: 'RETURN' },
+        traceId: params.traceId,
+        occurredAt: new Date((params.expiresAt ?? params.createdAt).getTime() - 500),
+      },
+      {
+        eventType: params.status === 'FAILED' ? 'ORDER_FAILED' : 'ORDER_EXPIRED',
+        payload: { orderId: order.id, reason: params.failureReason, responseCode: params.responseCode },
+        traceId: params.traceId,
+        occurredAt: params.expiresAt ?? params.createdAt,
+      },
+    );
   }
   await createOrderHistory(order.id, events);
 

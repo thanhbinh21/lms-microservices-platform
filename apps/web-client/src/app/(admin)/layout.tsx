@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   Menu,
   MessageSquare,
+  Receipt,
   Settings2,
   Shapes,
   Star,
@@ -23,6 +24,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { useAppSelector } from '@/lib/redux/hooks';
 
@@ -78,8 +80,15 @@ const navGroups: NavGroup[] = [
     links: [
       { label: 'Rút tiền', description: 'Duyệt hoặc từ chối payout', href: '/admin/payouts', icon: Wallet },
       { label: 'Doanh thu', description: 'GMV, phí nền tảng, top khóa học', href: '/admin/revenue', icon: BarChart3 },
+      {
+        label: 'Đơn hàng',
+        description: 'Event sourcing lifecycle từng payment order',
+        href: '/admin/orders',
+        icon: Receipt,
+      },
     ],
   },
+
   {
     label: 'Vận hành hệ thống',
     links: [
