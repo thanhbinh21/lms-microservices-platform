@@ -37,6 +37,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const BCRYPT_SALT_ROUNDS = 10;
+const DEMO_PASSWORD = '12345678';
+const INSTRUCTOR_SHARE_RATIO = 0.7;
+const PLATFORM_FEE_RATIO = 0.3;
 
 const CATEGORY_SEEDS = [
   { name: 'Web Frontend', slug: 'web-frontend', order: 1 },
@@ -58,6 +61,15 @@ type CourseSeed = {
   project: string;
   chapters: string[];
 };
+
+type SeedAccount = {
+  id: string;
+  email: string;
+  name: string;
+  username: string;
+  role: 'ADMIN' | 'INSTRUCTOR' | 'STUDENT';
+};
+
 
 function readEnvVarFromFile(filePath: string, variableName: string): string | undefined {
   if (!fs.existsSync(filePath)) return undefined;
@@ -82,13 +94,28 @@ function readEnvVarFromFile(filePath: string, variableName: string): string | un
 
 const projectRoot = path.resolve(__dirname, '..');
 
+function withSeedConnectionParams(rawUrl: string | undefined): string | undefined {
+  if (!rawUrl) return undefined;
+
+  try {
+    const url = new URL(rawUrl);
+    // Seed chay nhieu PrismaClient cho nhieu database; gioi han pool de tranh Neon het connection.
+    url.searchParams.set('connection_limit', '1');
+    url.searchParams.set('pool_timeout', '30');
+    return url.toString();
+  } catch {
+    const separator = rawUrl.includes('?') ? '&' : '?';
+    return `${rawUrl}${separator}connection_limit=1&pool_timeout=30`;
+  }
+}
+
 const getDbUrl = (service: string) => {
   const envName = `DATABASE_URL_${service.toUpperCase()}`;
   const envFile = path.join(projectRoot, 'services', `${service}-service`, '.env');
   // Try DIRECT_URL first (pooler endpoints often blocked), fall back to DATABASE_URL
-  return process.env[envName] ||
+  return withSeedConnectionParams(process.env[envName] ||
     readEnvVarFromFile(envFile, 'DIRECT_URL') ||
-    readEnvVarFromFile(envFile, 'DATABASE_URL');
+    readEnvVarFromFile(envFile, 'DATABASE_URL'));
 };
 
 const authDbUrl = getDbUrl('auth');
@@ -126,6 +153,48 @@ function randomDate(start: Date, end: Date) {
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
 }
 
+function daysAgo(days: number) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+}
+
+function minutesFromNow(minutes: number) {
+  return new Date(Date.now() + minutes * 60 * 1000);
+}
+
+function roundVnd(amount: number) {
+  return Math.round(amount);
+}
+
+function amountToNumber(value: unknown) {
+  if (typeof value === 'number') return value;
+  if (value && typeof (value as { toNumber?: () => number }).toNumber === 'function') {
+    return (value as { toNumber: () => number }).toNumber();
+  }
+  return Number(value);
+}
+
+function revenueSplit(amount: number) {
+  const netAmount = roundVnd(amount * INSTRUCTOR_SHARE_RATIO);
+  return {
+    grossAmount: amount,
+    netAmount,
+    platformFee: roundVnd(amount - netAmount),
+    revenueSharePct: INSTRUCTOR_SHARE_RATIO,
+    platformFeePct: PLATFORM_FEE_RATIO,
+  };
+}
+
+function getOptionalModel(client: any, ...names: string[]) {
+  for (const name of names) {
+    if (client[name]) return client[name];
+  }
+  return null;
+}
+
+function buildDemoPayUrl(txnRef: string) {
+  return `https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_TxnRef=${txnRef}&vnp_Amount=demo`;
+}
+
 // ─── Step 1: Clear Data ───────────────────────────────────────────────────────
 
 async function clearOldData() {
@@ -133,16 +202,20 @@ async function clearOldData() {
 
   try {
     // 1. Notification (notification-service)
-    const notifModel = (notificationPrisma as any).notification || (notificationPrisma as any).Notification;
+    const notifModel = getOptionalModel(notificationPrisma, 'notification', 'Notification');
     if (notifModel) await notifModel.deleteMany();
 
     // 2. Payment (payment-service)
+    const paymentOutboxModel = getOptionalModel(paymentPrisma, 'outboxEvent', 'OutboxEvent');
+    if (paymentOutboxModel) await paymentOutboxModel.deleteMany();
+    const orderEventModel = getOptionalModel(paymentPrisma, 'orderEvent', 'OrderEvent');
+    if (orderEventModel) await orderEventModel.deleteMany();
     await paymentPrisma.payout.deleteMany();
     await paymentPrisma.instructorEarning.deleteMany();
-    const vnpAuditModel = (paymentPrisma as any).vNPayAudit || (paymentPrisma as any).VNPayAudit;
+    const vnpAuditModel = getOptionalModel(paymentPrisma, 'vNPayAudit', 'VNPayAudit');
     if (vnpAuditModel) await vnpAuditModel.deleteMany();
     await paymentPrisma.order.deleteMany();
-    const payoutProfileModel = (paymentPrisma as any).instructorPayoutProfile || (paymentPrisma as any).InstructorPayoutProfile;
+    const payoutProfileModel = getOptionalModel(paymentPrisma, 'instructorPayoutProfile', 'InstructorPayoutProfile');
     if (payoutProfileModel) await payoutProfileModel.deleteMany();
 
     // 3. Community (community-service)
@@ -153,6 +226,8 @@ async function clearOldData() {
     await communityPrisma.communityPost.deleteMany();
 
     // 4. Learning (learning-service)
+    const learningOutboxModel = getOptionalModel(learningPrisma, 'outboxEvent', 'OutboxEvent');
+    if (learningOutboxModel) await learningOutboxModel.deleteMany();
     await learningPrisma.lessonProgress.deleteMany();
     await learningPrisma.certificate.deleteMany();
     await learningPrisma.enrollment.deleteMany();
@@ -174,8 +249,14 @@ async function clearOldData() {
 
     // 6. Auth (auth-service)
     await authPrisma.refreshToken.deleteMany();
+    const supportReplyModel = getOptionalModel(authPrisma, 'supportTicketReply', 'SupportTicketReply');
+    if (supportReplyModel) await supportReplyModel.deleteMany();
+    const supportTicketModel = getOptionalModel(authPrisma, 'supportTicket', 'SupportTicket');
+    if (supportTicketModel) await supportTicketModel.deleteMany();
     await authPrisma.auditLog.deleteMany();
     await authPrisma.instructorRequest.deleteMany();
+    const systemConfigModel = getOptionalModel(authPrisma, 'systemConfig', 'SystemConfig');
+    if (systemConfigModel) await systemConfigModel.deleteMany();
     await authPrisma.user.deleteMany();
 
     // 7. Redis
@@ -198,24 +279,24 @@ async function clearOldData() {
 async function seedAccounts() {
   console.log('\n👥 BƯỚC 2: TẠO TÀI KHOẢN (ADMIN, 3 INSTRUCTORS, 20 STUDENTS)...');
 
-  const accounts = [
+  const accounts: SeedAccount[] = [
     { id: 'admin-001', email: 'admin@nexedu.vn', name: 'Lê Quản Trị', username: 'admin', role: 'ADMIN' },
-    { id: 'inst-001', email: 'tran.giangvien@nexedu.vn', name: 'Trần Thị Giảng Viên', username: 'gv_tran', role: 'INSTRUCTOR' },
-    { id: 'inst-002', email: 'nguyen.hung@nexedu.vn', name: 'Nguyễn Văn Hùng', username: 'gv_hung', role: 'INSTRUCTOR' },
-    { id: 'inst-003', email: 'pham.duc@nexedu.vn', name: 'Phạm Minh Đức', username: 'gv_duc', role: 'INSTRUCTOR' },
+    { id: 'inst-001', email: 'instructor@nexedu.vn', name: 'Trần Thị Giảng Viên', username: 'instructor', role: 'INSTRUCTOR' },
+    { id: 'inst-002', email: 'instructor2@nexedu.vn', name: 'Nguyễn Văn Hùng', username: 'instructor2', role: 'INSTRUCTOR' },
+    { id: 'inst-003', email: 'instructor3@nexedu.vn', name: 'Phạm Minh Đức', username: 'instructor3', role: 'INSTRUCTOR' },
   ];
 
   for (let i = 1; i <= 20; i++) {
     accounts.push({
       id: `std-${i.toString().padStart(3, '0')}`,
-      email: `student${i}@gmail.com`,
+      email: i === 1 ? 'student@nexedu.vn' : i === 2 ? 'student2@nexedu.vn' : `student${i}@gmail.com`,
       name: `Học Viên Số ${i}`,
       username: `student_${i}`,
       role: 'STUDENT'
     });
   }
 
-  const hashedPassword = await bcrypt.hash('12345678', BCRYPT_SALT_ROUNDS);
+  const hashedPassword = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_SALT_ROUNDS);
 
   const userIds: string[] = [];
   for (const acc of accounts) {
@@ -233,7 +314,7 @@ async function seedAccounts() {
     userIds.push(user.id);
   }
 
-  console.log(`✅ Đã tạo ${accounts.length} tài khoản thành công. (Mật khẩu mặc định: 12345678)`);
+  console.log(`✅ Đã tạo ${accounts.length} tài khoản thành công. (Mật khẩu mặc định: ${DEMO_PASSWORD})`);
   return accounts;
 }
 
@@ -248,7 +329,7 @@ async function seedInstructorProfiles(instructors: any[]) {
         instructorId: inst.id,
         slug: inst.username,
         displayName: inst.name,
-        headline: `Chuyên gia hàng đầu trong lĩnh vực ${inst.username.includes('tran') ? 'Frontend' : inst.username.includes('hung') ? 'Backend' : 'Mobile'}`,
+        headline: `Chuyên gia hàng đầu trong lĩnh vực ${inst.id === 'inst-001' ? 'Frontend' : inst.id === 'inst-002' ? 'Backend' : 'Mobile'}`,
         bio: `Với hơn 10 năm kinh nghiệm làm việc tại các tập đoàn công nghệ lớn, tôi mong muốn chia sẻ kiến thức thực chiến đến cộng đồng.`,
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${inst.username}`,
         socialLinks: { website: 'https://nexedu.vn', youtube: 'https://youtube.com/@nexedu' }
@@ -293,8 +374,8 @@ const COURSE_SEEDS: CourseSeed[] = [
     level: 'INTERMEDIATE',
     audience: 'lap trinh vien muon lam san pham fullstack bang App Router, Server Actions va API routes.',
     outcomes: ['phan biet server component va client component', 'xu ly form voi server action', 'cache va revalidate du lieu', 'bao ve route can dang nhap'],
-    keywords: ['next.js', 'app router', 'server actions', 'server component', 'client component', 'cache', 'revalidate', 'fullstack'],
-    project: 'xay dung trang hoc truc tuyen co danh sach khoa hoc, trang chi tiet, dang nhap va dashboard hoc vien.',
+    keywords: ['next.js', 'app router', 'Next.js Server Actions', 'server component', 'client component', 'cache', 'redis', 'revalidate', 'fullstack'],
+    project: 'xay dung trang hoc truc tuyen co danh sach khoa hoc, trang chi tiet, dang nhap, dashboard hoc vien va Server Actions goi BFF.',
     chapters: ['Nen tang App Router', 'Data fetching va Server Actions', 'Auth, cache va deploy'],
   },
   {
@@ -303,9 +384,9 @@ const COURSE_SEEDS: CourseSeed[] = [
     price: 1200000,
     level: 'ADVANCED',
     audience: 'backend developer muon tach he thong thanh service doc lap va giao tiep bang API/Kafka.',
-    outcomes: ['thiet ke service boundary', 'dung message broker cho async flow', 'xu ly retry va DLQ', 'quan sat log, trace va health check'],
-    keywords: ['nodejs', 'microservices', 'express', 'kafka', 'event-driven', 'retry', 'dlq', 'service boundary', 'observability'],
-    project: 'xay dung flow order -> payment -> enrollment voi idempotency, retry topic va dead letter queue.',
+    outcomes: ['thiet ke service boundary', 'dung message broker cho async flow', 'xu ly retry va DLQ', 'ap dung CQRS/read model cho truy van nhanh'],
+    keywords: ['nodejs', 'microservices', 'express', 'kafka', 'event-driven', 'retry', 'dlq', 'cqrs', 'redis', 'vnpay', 'service boundary', 'observability'],
+    project: 'xay dung flow order -> VNPay payment -> Kafka -> enrollment voi idempotency, retry topic, dead letter queue va Redis read model.',
     chapters: ['Tu monolith den microservices', 'Giao tiep dong bo va bat dong bo', 'Reliability, retry va observability'],
   },
   {
@@ -675,6 +756,7 @@ async function seedLearningData(students: any[], courses: any[]) {
 
   for (const student of students) {
     if (student.role !== 'STUDENT') continue;
+    if (student.id === 'std-001' || student.id === 'std-002') continue;
 
     const myCourses = courses.sort(() => 0.5 - Math.random()).slice(0, randomInt(4, 8));
 
@@ -691,12 +773,21 @@ async function seedLearningData(students: any[], courses: any[]) {
           enrolledAt,
         }
       });
+      await coursePrisma.enrollmentSignal.create({
+        data: {
+          userId: student.id,
+          courseId: course.id,
+          orderId,
+        },
+      });
       enrollmentCount++;
 
       // 2. Payment (if not free)
       if (Number(course.price) > 0) {
+        const split = revenueSplit(Number(course.price));
         const order = await paymentPrisma.order.create({
           data: {
+            id: orderId,
             userId: student.id,
             courseId: course.id,
             instructorId: course.instructorId,
@@ -707,18 +798,21 @@ async function seedLearningData(students: any[], courses: any[]) {
             vnpTxnRef: `VNP${Date.now()}${randomInt(1000, 9999)}`,
             vnpTransactionNo: `TR${randomInt(100000, 999999)}`,
             paidAt: enrolledAt,
+            expiresAt: new Date(enrolledAt.getTime() + 15 * 60 * 1000),
           }
         });
 
         // Earning for instructor
-        const netAmount = Number(course.price) * 0.7;
         await paymentPrisma.instructorEarning.create({
           data: {
             orderId: order.id,
             instructorId: course.instructorId,
             courseId: course.id,
-            grossAmount: course.price,
-            netAmount,
+            grossAmount: split.grossAmount,
+            platformFee: split.platformFee,
+            revenueSharePct: split.revenueSharePct,
+            platformFeePct: split.platformFeePct,
+            netAmount: split.netAmount,
             status: 'AVAILABLE'
           }
         });
@@ -802,6 +896,1081 @@ async function seedLearningData(students: any[], courses: any[]) {
   console.log(`✅ Đã cấp ${certificateCount} chứng chỉ.`);
 }
 
+function findSeedCourse(courses: any[], title: string) {
+  const course = courses.find((item) => item.title === title);
+  if (!course) throw new Error(`Missing seed course: ${title}`);
+  return course;
+}
+
+async function getCourseLessons(courseId: string) {
+  return coursePrisma.lesson.findMany({
+    where: { chapter: { courseId } },
+    orderBy: [{ chapter: { order: 'asc' } }, { order: 'asc' }],
+  });
+}
+
+async function createOrderHistory(orderId: string, events: Array<{ eventType: string; payload: Record<string, unknown>; traceId: string; occurredAt: Date }>) {
+  const orderEventModel = getOptionalModel(paymentPrisma, 'orderEvent', 'OrderEvent');
+  if (!orderEventModel) return;
+
+  await orderEventModel.createMany({
+    data: events.map((event, index) => ({
+      orderId,
+      eventType: event.eventType,
+      version: index + 1,
+      payload: event.payload,
+      metadata: { traceId: event.traceId, source: 'seed-all' },
+      occurredAt: event.occurredAt,
+    })),
+  });
+}
+
+async function createVnpAudits(params: {
+  orderId: string;
+  txnRef: string;
+  amount: number;
+  responseCode: string;
+  transactionNo?: string | null;
+  traceId: string;
+  valid: boolean;
+  includeIpn?: boolean;
+}) {
+  const vnpAuditModel = getOptionalModel(paymentPrisma, 'vNPayAudit', 'VNPayAudit');
+  if (!vnpAuditModel) return;
+
+  const basePayload = {
+    vnp_TxnRef: params.txnRef,
+    vnp_Amount: params.amount * 100,
+    vnp_ResponseCode: params.responseCode,
+    vnp_TransactionNo: params.transactionNo,
+    checksumResult: params.valid,
+    amount: params.amount,
+    responseCode: params.responseCode,
+    transactionNo: params.transactionNo,
+    traceId: params.traceId,
+  };
+
+  await vnpAuditModel.createMany({
+    data: [
+      {
+        orderId: params.orderId,
+        kind: 'RETURN',
+        payload: { ...basePayload, callbackType: 'RETURN' },
+        signature: params.valid ? `seed-signature-${params.txnRef}` : 'invalid-seed-signature',
+        valid: params.valid,
+        note: params.valid ? 'Seed VNPay return accepted' : 'Seed VNPay return failed checksum/response',
+      },
+      ...(params.includeIpn
+        ? [{
+            orderId: params.orderId,
+            kind: 'IPN',
+            payload: { ...basePayload, callbackType: 'IPN' },
+            signature: `seed-ipn-signature-${params.txnRef}`,
+            valid: params.valid,
+            note: 'Seed VNPay IPN payload',
+          }]
+        : []),
+    ],
+  });
+}
+
+async function createPaymentOrder(params: {
+  id: string;
+  userId: string;
+  course: any;
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'EXPIRED' | 'REFUNDED';
+  createdAt: Date;
+  paidAt?: Date | null;
+  expiresAt?: Date | null;
+  failureReason?: string | null;
+  responseCode?: string | null;
+  transactionNo?: string | null;
+  traceId: string;
+}) {
+  const amount = Number(params.course.price);
+  const txnRef = `SEED${params.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 40)}`;
+
+  const order = await paymentPrisma.order.upsert({
+    where: { id: params.id },
+    create: {
+      id: params.id,
+      userId: params.userId,
+      courseId: params.course.id,
+      instructorId: params.course.instructorId,
+      courseTitle: params.course.title,
+      amount,
+      currency: 'VND',
+      status: params.status,
+      paymentMethod: 'VNPAY',
+      vnpTxnRef: txnRef,
+      vnpPayUrl: params.status === 'PENDING' ? buildDemoPayUrl(txnRef) : null,
+      vnpTransactionNo: params.transactionNo ?? null,
+      vnpBankCode: 'NCB',
+      vnpResponseCode: params.responseCode ?? null,
+      failureReason: params.failureReason ?? null,
+      paidAt: params.paidAt ?? null,
+      expiresAt: params.expiresAt ?? null,
+      traceId: params.traceId,
+      createdAt: params.createdAt,
+    },
+    update: {
+      userId: params.userId,
+      courseId: params.course.id,
+      instructorId: params.course.instructorId,
+      courseTitle: params.course.title,
+      amount,
+      status: params.status,
+      vnpPayUrl: params.status === 'PENDING' ? buildDemoPayUrl(txnRef) : null,
+      vnpTransactionNo: params.transactionNo ?? null,
+      vnpBankCode: 'NCB',
+      vnpResponseCode: params.responseCode ?? null,
+      failureReason: params.failureReason ?? null,
+      paidAt: params.paidAt ?? null,
+      expiresAt: params.expiresAt ?? null,
+      traceId: params.traceId,
+    },
+  });
+
+  const events: Array<{ eventType: string; payload: Record<string, unknown>; traceId: string; occurredAt: Date }> = [
+    {
+      eventType: 'ORDER_CREATED',
+      payload: { orderId: order.id, userId: order.userId, courseId: order.courseId, amount, status: 'PENDING' },
+      traceId: params.traceId,
+      occurredAt: params.createdAt,
+    },
+  ];
+  if (params.status === 'PENDING') {
+    events.push({
+      eventType: 'PAYMENT_URL_GENERATED',
+      payload: { orderId: order.id, vnpTxnRef: txnRef, expiresAt: params.expiresAt?.toISOString() ?? null },
+      traceId: params.traceId,
+      occurredAt: params.createdAt,
+    });
+  }
+  if (params.status === 'COMPLETED') {
+    events.push({
+      eventType: 'PAYMENT_COMPLETED',
+      payload: { orderId: order.id, vnpTxnRef: txnRef, transactionNo: params.transactionNo, paidAt: params.paidAt?.toISOString() },
+      traceId: params.traceId,
+      occurredAt: params.paidAt ?? params.createdAt,
+    });
+  }
+  if (params.status === 'FAILED' || params.status === 'EXPIRED') {
+    events.push({
+      eventType: params.status === 'FAILED' ? 'PAYMENT_FAILED' : 'ORDER_EXPIRED',
+      payload: { orderId: order.id, reason: params.failureReason, responseCode: params.responseCode },
+      traceId: params.traceId,
+      occurredAt: params.expiresAt ?? params.createdAt,
+    });
+  }
+  await createOrderHistory(order.id, events);
+
+  await createVnpAudits({
+    orderId: order.id,
+    txnRef,
+    amount,
+    responseCode: params.responseCode ?? (params.status === 'COMPLETED' ? '00' : params.status === 'FAILED' ? '24' : '99'),
+    transactionNo: params.transactionNo ?? null,
+    traceId: params.traceId,
+    valid: params.status !== 'FAILED',
+    includeIpn: params.status === 'COMPLETED',
+  });
+
+  return order;
+}
+
+async function createEarningForOrder(order: any, status: 'PENDING' | 'AVAILABLE' | 'WITHDRAWN' = 'AVAILABLE') {
+  const split = revenueSplit(amountToNumber(order.amount));
+  return paymentPrisma.instructorEarning.upsert({
+    where: { orderId: order.id },
+    create: {
+      orderId: order.id,
+      instructorId: order.instructorId,
+      courseId: order.courseId,
+      grossAmount: split.grossAmount,
+      platformFee: split.platformFee,
+      revenueSharePct: split.revenueSharePct,
+      platformFeePct: split.platformFeePct,
+      netAmount: split.netAmount,
+      status,
+    },
+    update: {
+      grossAmount: split.grossAmount,
+      platformFee: split.platformFee,
+      revenueSharePct: split.revenueSharePct,
+      platformFeePct: split.platformFeePct,
+      netAmount: split.netAmount,
+      status,
+    },
+  });
+}
+
+async function ensureEnrollmentAndProgress(params: {
+  student: any;
+  course: any;
+  orderId: string;
+  completed: boolean;
+  certificate?: boolean;
+}) {
+  const enrollment = await learningPrisma.enrollment.upsert({
+    where: { userId_courseId: { userId: params.student.id, courseId: params.course.id } },
+    create: {
+      userId: params.student.id,
+      courseId: params.course.id,
+      orderId: params.orderId,
+      enrolledAt: daysAgo(12),
+    },
+    update: {
+      orderId: params.orderId,
+      enrolledAt: daysAgo(12),
+    },
+  });
+
+  await coursePrisma.enrollmentSignal.upsert({
+    where: { orderId: params.orderId },
+    create: { userId: params.student.id, courseId: params.course.id, orderId: params.orderId },
+    update: { userId: params.student.id, courseId: params.course.id },
+  });
+
+  const lessons = await getCourseLessons(params.course.id);
+  for (const lesson of lessons) {
+    await learningPrisma.lessonProgress.upsert({
+      where: { userId_lessonId: { userId: params.student.id, lessonId: lesson.id } },
+      create: {
+        userId: params.student.id,
+        lessonId: lesson.id,
+        courseId: params.course.id,
+        enrollmentId: enrollment.id,
+        isCompleted: params.completed,
+        lastWatched: params.completed ? lesson.duration : Math.floor(lesson.duration / 2),
+      },
+      update: {
+        enrollmentId: enrollment.id,
+        isCompleted: params.completed,
+        lastWatched: params.completed ? lesson.duration : Math.floor(lesson.duration / 2),
+      },
+    });
+  }
+
+  if (params.certificate) {
+    await learningPrisma.certificate.upsert({
+      where: { userId_courseId: { userId: params.student.id, courseId: params.course.id } },
+      create: {
+        certificateNumber: `CERT-DEMO-${params.student.id}-${params.course.slug}`.slice(0, 80),
+        userId: params.student.id,
+        courseId: params.course.id,
+        enrollmentId: enrollment.id,
+        completedAt: daysAgo(1),
+      },
+      update: {
+        enrollmentId: enrollment.id,
+        completedAt: daysAgo(1),
+      },
+    });
+  }
+
+  return enrollment;
+}
+
+async function completePaidCourseForDemo(student: any, course: any, orderId: string) {
+  const paidAt = daysAgo(8);
+  const order = await createPaymentOrder({
+    id: orderId,
+    userId: student.id,
+    course,
+    status: 'COMPLETED',
+    createdAt: daysAgo(9),
+    paidAt,
+    expiresAt: new Date(paidAt.getTime() + 15 * 60 * 1000),
+    responseCode: '00',
+    transactionNo: `TRDEMO${orderId.replace(/[^0-9a-zA-Z]/g, '').slice(-10)}`,
+    traceId: `trace-${orderId}`,
+  });
+  await createEarningForOrder(order, 'AVAILABLE');
+  await ensureEnrollmentAndProgress({ student, course, orderId: order.id, completed: true, certificate: true });
+}
+
+async function seedSystemConfigs(admin: any) {
+  console.log('\nBUOC 8: TAO SYSTEM CONFIG DEMO...');
+  const configs = [
+    { key: 'platform_fee_pct', value: 30, description: 'Phan tram phi nen tang tren moi order thanh cong.' },
+    { key: 'instructor_revenue_pct', value: 70, description: 'Phan tram doanh thu giang vien nhan duoc.' },
+    { key: 'instructor_share_pct', value: 70, description: 'Alias demo cho ty le chia se doanh thu giang vien.' },
+    { key: 'payout_min_amount_vnd', value: 100000, description: 'So tien rut toi thieu cho giang vien.' },
+    { key: 'min_payout_amount', value: 100000, description: 'Alias demo cho so tien payout toi thieu.' },
+    { key: 'payment_provider', value: 'VNPAY', description: 'Cong thanh toan mac dinh.' },
+    { key: 'vnpay_enabled', value: true, description: 'Bat/tat thanh toan VNPay.' },
+  ];
+
+  const systemConfigModel = getOptionalModel(authPrisma, 'systemConfig', 'SystemConfig');
+  if (!systemConfigModel) return;
+
+  for (const config of configs) {
+    await systemConfigModel.upsert({
+      where: { key: config.key },
+      create: { ...config, updatedBy: admin.id },
+      update: { value: config.value, description: config.description, updatedBy: admin.id },
+    });
+  }
+}
+
+async function seedDeterministicLearningAndPayments(students: any[], courses: any[]) {
+  console.log('\nBUOC 9: TAO FLOW HOC TAP/THANH TOAN DEMO CO DINH...');
+  const student = students.find((item) => item.email === 'student@nexedu.vn');
+  const student2 = students.find((item) => item.email === 'student2@nexedu.vn');
+  if (!student || !student2) throw new Error('Missing fixed demo students');
+
+  const htmlCourse = findSeedCourse(courses, 'HTML & CSS Co Ban');
+  const reactCourse = findSeedCourse(courses, 'ReactJS Pro Mastery');
+  const nextCourse = findSeedCourse(courses, 'Next.js 15 Fullstack');
+  const nodeCourse = findSeedCourse(courses, 'NodeJS Microservices');
+  const kubernetesCourse = findSeedCourse(courses, 'Kubernetes in Practice');
+  const deepLearningCourse = findSeedCourse(courses, 'Deep Learning with PyTorch');
+  const reactNativeCourse = findSeedCourse(courses, 'React Native Advanced');
+
+  await ensureEnrollmentAndProgress({
+    student,
+    course: htmlCourse,
+    orderId: `FREE-${student.id}-${htmlCourse.id}`,
+    completed: true,
+    certificate: true,
+  });
+  await completePaidCourseForDemo(student, reactCourse, 'demo-order-student-react-completed');
+  await completePaidCourseForDemo(student, nextCourse, 'demo-order-student-next-completed');
+  await completePaidCourseForDemo(student, nodeCourse, 'demo-order-student-node-completed');
+
+  await coursePrisma.review.upsert({
+    where: { userId_courseId: { userId: student.id, courseId: htmlCourse.id } },
+    create: { userId: student.id, courseId: htmlCourse.id, rating: 5, comment: 'Hoan thanh 100% HTML & CSS Co Ban, chung chi hien thi dung tren dashboard.' },
+    update: { rating: 5, comment: 'Hoan thanh 100% HTML & CSS Co Ban, chung chi hien thi dung tren dashboard.' },
+  });
+
+  await createPaymentOrder({
+    id: 'demo-order-pending-valid',
+    userId: student.id,
+    course: kubernetesCourse,
+    status: 'PENDING',
+    createdAt: new Date(),
+    expiresAt: minutesFromNow(20),
+    traceId: 'trace-demo-order-pending-valid',
+  });
+  await createPaymentOrder({
+    id: 'demo-order-pending-expired',
+    userId: student.id,
+    course: deepLearningCourse,
+    status: 'PENDING',
+    createdAt: daysAgo(2),
+    expiresAt: minutesFromNow(-60),
+    traceId: 'trace-demo-order-pending-expired',
+  });
+  await createPaymentOrder({
+    id: 'demo-order-expired',
+    userId: student.id,
+    course: reactNativeCourse,
+    status: 'EXPIRED',
+    createdAt: daysAgo(3),
+    expiresAt: daysAgo(2),
+    failureReason: 'Payment URL expired before payment completion',
+    responseCode: '99',
+    traceId: 'trace-demo-order-expired',
+  });
+  await createPaymentOrder({
+    id: 'demo-order-failed',
+    userId: student.id,
+    course: findSeedCourse(courses, 'Tieng Anh cho Developers'),
+    status: 'FAILED',
+    createdAt: daysAgo(4),
+    failureReason: 'VNPay response code 24 - customer cancelled payment',
+    responseCode: '24',
+    traceId: 'trace-demo-order-failed',
+  });
+
+  await ensureEnrollmentAndProgress({
+    student: student2,
+    course: htmlCourse,
+    orderId: `FREE-${student2.id}-${htmlCourse.id}`,
+    completed: false,
+  });
+
+  console.log('Da tao order COMPLETED/PENDING/EXPIRED/FAILED va progress/chung chi demo.');
+}
+
+async function seedPayoutLifecycle(instructors: any[]) {
+  console.log('\nBUOC 10: TAO EARNING VA PAYOUT LIFECYCLE...');
+  const instructor1 = instructors.find((item) => item.email === 'instructor@nexedu.vn') || instructors[0];
+  const instructor2 = instructors.find((item) => item.email === 'instructor2@nexedu.vn') || instructors[1];
+
+  for (const instructor of instructors) {
+    await paymentPrisma.instructorPayoutProfile.upsert({
+      where: { instructorId: instructor.id },
+      create: {
+        instructorId: instructor.id,
+        bankName: 'VCB',
+        bankAccount: `12345678${instructor.id.replace(/\D/g, '').padStart(4, '0')}`,
+        bankAccountMasked: '********5678',
+        accountHolder: instructor.name.toUpperCase(),
+      },
+      update: {
+        bankName: 'VCB',
+        bankAccount: `12345678${instructor.id.replace(/\D/g, '').padStart(4, '0')}`,
+        bankAccountMasked: '********5678',
+        accountHolder: instructor.name.toUpperCase(),
+      },
+    });
+  }
+
+  const instructor1Earnings = await paymentPrisma.instructorEarning.findMany({
+    where: { instructorId: instructor1.id, status: 'AVAILABLE' },
+    orderBy: { createdAt: 'asc' },
+    take: 3,
+  });
+
+  if (instructor1Earnings[0]) {
+    await paymentPrisma.instructorEarning.update({ where: { id: instructor1Earnings[0].id }, data: { status: 'PENDING' } });
+    await paymentPrisma.payout.create({
+      data: {
+        instructorId: instructor1.id,
+        amount: instructor1Earnings[0].netAmount,
+        bankAccountMasked: '********5678',
+        status: 'PENDING',
+      },
+    });
+  }
+  if (instructor1Earnings[1]) {
+    await paymentPrisma.instructorEarning.update({ where: { id: instructor1Earnings[1].id }, data: { status: 'WITHDRAWN' } });
+    await paymentPrisma.payout.create({
+      data: {
+        instructorId: instructor1.id,
+        amount: instructor1Earnings[1].netAmount,
+        bankAccountMasked: '********5678',
+        status: 'PAID',
+        adminNote: 'Da chuyen khoan trong demo.',
+        processedAt: daysAgo(1),
+      },
+    });
+  }
+
+  await paymentPrisma.payout.create({
+    data: {
+      instructorId: instructor2.id,
+      amount: 100000,
+      bankAccountMasked: '********5678',
+      status: 'REJECTED',
+      adminNote: 'Thong tin ngan hang chua khop voi chu tai khoan.',
+      processedAt: daysAgo(2),
+    },
+  });
+}
+
+function instructorRequestData(user: any, status: 'pending' | 'approved' | 'rejected', adminId?: string, reason?: string) {
+  return {
+    userId: user.id,
+    fullName: user.name,
+    phone: '0901234567',
+    email: user.email,
+    dateOfBirth: new Date('1998-01-15'),
+    address: 'Thanh pho Ho Chi Minh',
+    expertise: 'Lap trinh web va kien truc he thong',
+    specialization: 'Fullstack JavaScript',
+    experienceYears: status === 'pending' ? 2 : 4,
+    currentJob: 'Software Engineer',
+    bio: 'Toi muon chia se kinh nghiem thuc chien thong qua cac khoa hoc ngan gon va co bai tap ro rang.',
+    github: 'https://github.com/nexedu-demo',
+    linkedin: 'https://linkedin.com/in/nexedu-demo',
+    website: 'https://nexedu.vn',
+    courseTitle: 'Khoa hoc demo kien truc LMS',
+    courseCategory: 'Web Backend',
+    courseDescription: 'Khoa hoc mau de demo quy trinh xet duyet giang vien.',
+    targetStudents: 'Sinh vien IT va lap trinh vien moi di lam.',
+    status,
+    rejectionReason: reason ?? null,
+    reviewedBy: status === 'pending' ? null : adminId ?? null,
+    reviewedAt: status === 'pending' ? null : daysAgo(status === 'approved' ? 1 : 2),
+  };
+}
+
+async function seedInstructorRequests(accounts: any[], admin: any) {
+  console.log('\nBUOC 11: TAO DON DANG KY GIANG VIEN...');
+  const pendingUser = accounts.find((item) => item.email === 'student2@nexedu.vn');
+  const rejectedUser = accounts.find((item) => item.id === 'std-003');
+  const approvedUser = accounts.find((item) => item.id === 'inst-003');
+  if (!pendingUser || !rejectedUser || !approvedUser) return [];
+
+  const pending = await authPrisma.instructorRequest.create({ data: instructorRequestData(pendingUser, 'pending') });
+  const rejected = await authPrisma.instructorRequest.create({
+    data: instructorRequestData(rejectedUser, 'rejected', admin.id, 'Can bo sung CV va minh chung kinh nghiem giang day.'),
+  });
+  const approved = await authPrisma.instructorRequest.create({ data: instructorRequestData(approvedUser, 'approved', admin.id) });
+  return [pending, rejected, approved];
+}
+
+async function seedQaDemo(students: any[], instructors: any[], courses: any[]) {
+  console.log('\nBUOC 12: TAO Q&A THEO KHOA HOC...');
+  const student = students.find((item) => item.email === 'student@nexedu.vn') || students[0];
+  const student2 = students.find((item) => item.email === 'student2@nexedu.vn') || students[1];
+  const instructor1 = instructors.find((item) => item.email === 'instructor@nexedu.vn') || instructors[0];
+  const instructor2 = instructors.find((item) => item.email === 'instructor2@nexedu.vn') || instructors[1];
+  const course1 = findSeedCourse(courses, 'ReactJS Pro Mastery');
+  const course2 = findSeedCourse(courses, 'Next.js 15 Fullstack');
+  const [lesson1] = await getCourseLessons(course1.id);
+  const [lesson2] = await getCourseLessons(course2.id);
+
+  const unanswered = await communityPrisma.question.create({
+    data: {
+      courseId: course1.id,
+      lessonId: lesson1?.id,
+      authorId: student.id,
+      title: 'Khi nao nen tach component trong React?',
+      content: 'Em muon biet dau la dau hieu nen tach component va truyen props nhu the nao de tranh phuc tap.',
+      upvoteCount: 2,
+    },
+  });
+  const answered = await communityPrisma.question.create({
+    data: {
+      courseId: course1.id,
+      lessonId: lesson1?.id,
+      authorId: student2.id,
+      title: 'useMemo khac useCallback o diem nao?',
+      content: 'Hai hook nay deu toi uu render, em nen dung trong truong hop nao?',
+      upvoteCount: 4,
+    },
+  });
+  await communityPrisma.answer.create({
+    data: {
+      questionId: answered.id,
+      authorId: instructor1.id,
+      content: 'useMemo ghi nho gia tri tinh toan, useCallback ghi nho function reference. Chi dung khi co do luong render hoac prop reference that su gay re-render.',
+      upvoteCount: 3,
+    },
+  });
+  const resolved = await communityPrisma.question.create({
+    data: {
+      courseId: course1.id,
+      lessonId: lesson1?.id,
+      authorId: student.id,
+      title: 'Lam sao xu ly state form nhieu field?',
+      content: 'Nen dung useState rieng tung field hay gom thanh object?',
+      isResolved: true,
+      upvoteCount: 5,
+    },
+  });
+  await communityPrisma.answer.create({
+    data: {
+      questionId: resolved.id,
+      authorId: instructor1.id,
+      content: 'Voi form nho co the dung useState tung field. Voi form lon nen gom object hoac dung form library de validation va error state ro rang hon.',
+      isAccepted: true,
+      upvoteCount: 6,
+    },
+  });
+  const otherInstructorQuestion = await communityPrisma.question.create({
+    data: {
+      courseId: course2.id,
+      lessonId: lesson2?.id,
+      authorId: student.id,
+      title: 'Server Actions co thay the API route khong?',
+      content: 'Trong Next.js App Router, khi nao dung Server Actions va khi nao van nen giu API route?',
+      upvoteCount: 1,
+    },
+  });
+  await communityPrisma.answer.create({
+    data: {
+      questionId: otherInstructorQuestion.id,
+      authorId: instructor2.id,
+      content: 'Server Actions phu hop form/action noi bo BFF. API route van huu ich khi can public endpoint, webhook hoac client ben ngoai goi truc tiep.',
+    },
+  });
+
+  return { unanswered, answered, resolved, otherInstructorQuestion };
+}
+
+async function seedSupportTickets(admin: any, students: any[]) {
+  console.log('\nBUOC 13: TAO SUPPORT TICKET...');
+  const student = students.find((item) => item.email === 'student@nexedu.vn') || students[0];
+  const student2 = students.find((item) => item.email === 'student2@nexedu.vn') || students[1];
+
+  const open = await authPrisma.supportTicket.create({
+    data: {
+      userId: student.id,
+      subject: 'Toi da thanh toan nhung chua vao hoc duoc',
+      description: 'Toi da thanh toan nhung chua vao hoc duoc. Vui long kiem tra don hang va quyen truy cap khoa hoc.',
+      category: 'PAYMENT',
+      priority: 'HIGH',
+      status: 'OPEN',
+    },
+  });
+  const inProgress = await authPrisma.supportTicket.create({
+    data: {
+      userId: student2.id,
+      subject: 'Can ho tro cap nhat thong tin khoa hoc',
+      description: 'Em can thay doi khoa hoc dang theo hoc va muon duoc tu van lo trinh phu hop.',
+      category: 'COURSE',
+      priority: 'NORMAL',
+      status: 'IN_PROGRESS',
+    },
+  });
+  await authPrisma.supportTicketReply.create({
+    data: {
+      ticketId: inProgress.id,
+      authorId: admin.id,
+      authorRole: 'ADMIN',
+      message: 'Admin da tiep nhan va dang kiem tra thong tin khoa hoc cho ban.',
+    },
+  });
+  const closed = await authPrisma.supportTicket.create({
+    data: {
+      userId: student.id,
+      subject: 'Can cap lai chung chi',
+      description: 'Toi muon tai lai chung chi hoan thanh khoa HTML & CSS Co Ban.',
+      category: 'COURSE',
+      priority: 'LOW',
+      status: 'CLOSED',
+      closedAt: daysAgo(1),
+    },
+  });
+  await authPrisma.supportTicketReply.create({
+    data: {
+      ticketId: closed.id,
+      authorId: admin.id,
+      authorRole: 'ADMIN',
+      message: 'Chung chi da duoc cap lai trong tab Chung chi cua dashboard.',
+    },
+  });
+
+  return { open, inProgress, closed };
+}
+
+async function createDemoNotification(params: {
+  userId: string;
+  type: 'PAYMENT_SUCCESS' | 'ENROLLMENT_CREATED' | 'COURSE_COMPLETED' | 'LESSON_COMPLETED' | 'SYSTEM';
+  title: string;
+  body: string;
+  metadata?: Record<string, unknown>;
+  eventId: string;
+  traceId?: string;
+  read?: boolean;
+}) {
+  const notifModel = getOptionalModel(notificationPrisma, 'notification', 'Notification');
+  if (!notifModel) return;
+
+  await notifModel.create({
+    data: {
+      userId: params.userId,
+      type: params.type,
+      channel: 'IN_APP',
+      status: 'SENT',
+      title: params.title,
+      body: params.body,
+      metadata: params.metadata ?? {},
+      eventId: params.eventId,
+      traceId: params.traceId ?? `trace-${params.eventId}`,
+      readAt: params.read ? daysAgo(1) : null,
+      sentAt: new Date(),
+    },
+  });
+}
+
+async function seedDlqDemo(students: any[], courses: any[]) {
+  console.log('\nBUOC 14: TAO DLQ / FAILED EVENT DEMO...');
+  const student2 = students.find((item) => item.email === 'student2@nexedu.vn') || students[1];
+  const course = findSeedCourse(courses, 'Tieng Anh cho Developers');
+  const orderId = '11111111-1111-4111-8111-111111111111';
+  const paidAt = daysAgo(1);
+  const order = await createPaymentOrder({
+    id: orderId,
+    userId: student2.id,
+    course,
+    status: 'COMPLETED',
+    createdAt: daysAgo(1),
+    paidAt,
+    expiresAt: new Date(paidAt.getTime() + 15 * 60 * 1000),
+    responseCode: '00',
+    transactionNo: 'TRDLQ000001',
+    traceId: 'trace-demo-dlq',
+  });
+  await createEarningForOrder(order, 'AVAILABLE');
+
+  const payload = {
+    event_id: 'demo-dlq-payment-order-completed',
+    event_type: 'payment.order.completed',
+    timestamp: paidAt.toISOString(),
+    trace_id: 'trace-demo-dlq',
+    data: {
+      order_id: order.id,
+      user_id: student2.id,
+      course_id: course.id,
+      instructor_id: course.instructorId,
+      amount: Number(course.price),
+      currency: 'VND',
+      payment_method: 'vnpay',
+      vnp_txn_ref: order.vnpTxnRef,
+      vnp_transaction_no: order.vnpTransactionNo || 'TRDLQ000001',
+      paid_at: paidAt.toISOString(),
+      instructor_share_ratio: INSTRUCTOR_SHARE_RATIO,
+      platform_fee_ratio: PLATFORM_FEE_RATIO,
+    },
+  };
+
+  return learningPrisma.failedEvent.create({
+    data: {
+      topic: 'payment.order.completed',
+      eventId: payload.event_id,
+      traceId: payload.trace_id,
+      originalKey: order.id,
+      payload,
+      errorMessage: 'Learning service temporarily unavailable',
+      retryCount: 2,
+      status: 'PENDING',
+    },
+  });
+}
+
+async function seedAuditLogs(params: {
+  admin: any;
+  instructorRequests: any[];
+  failedEvent: any;
+}) {
+  console.log('\nBUOC 15: TAO AUDIT LOG DEMO...');
+  const [pendingRequest, rejectedRequest, approvedRequest] = params.instructorRequests;
+
+  await authPrisma.auditLog.createMany({
+    data: [
+      {
+        actorId: params.admin.id,
+        actorRole: 'ADMIN',
+        action: 'INSTRUCTOR_REQUEST_APPROVED',
+        resourceType: 'INSTRUCTOR_REQUEST',
+        resourceId: approvedRequest?.id ?? null,
+        targetLabel: approvedRequest?.fullName ?? 'Instructor request',
+        payload: { requestId: approvedRequest?.id, status: 'approved' },
+        traceId: 'trace-seed-approve-instructor',
+      },
+      {
+        actorId: params.admin.id,
+        actorRole: 'ADMIN',
+        action: 'PAYOUT_REJECTED',
+        resourceType: 'PAYOUT',
+        resourceId: 'seed-payout-rejected',
+        targetLabel: 'instructor2@nexedu.vn',
+        payload: { reason: 'Thong tin ngan hang chua khop voi chu tai khoan.' },
+        traceId: 'trace-seed-reject-payout',
+      },
+      {
+        actorId: params.admin.id,
+        actorRole: 'ADMIN',
+        action: 'SYSTEM_CONFIG_UPDATED',
+        resourceType: 'SYSTEM_CONFIG',
+        resourceId: 'platform_fee_pct',
+        targetLabel: 'platform_fee_pct',
+        payload: { previousValue: 25, nextValue: 30 },
+        traceId: 'trace-seed-system-config',
+      },
+      {
+        actorId: params.admin.id,
+        actorRole: 'ADMIN',
+        action: 'DLQ_EVENT_RETRIED',
+        resourceType: 'FAILED_EVENT',
+        resourceId: params.failedEvent.id,
+        targetLabel: 'payment.order.completed',
+        payload: { retryCount: 2, nextAction: 'retry' },
+        traceId: 'trace-seed-dlq-retry',
+      },
+      {
+        actorId: params.admin.id,
+        actorRole: 'ADMIN',
+        action: 'DLQ_EVENT_RESOLVED',
+        resourceType: 'FAILED_EVENT',
+        resourceId: params.failedEvent.id,
+        targetLabel: 'payment.order.completed',
+        payload: { status: 'RESOLVED' },
+        traceId: 'trace-seed-dlq-resolve',
+      },
+      {
+        actorId: 'system',
+        actorRole: 'SYSTEM',
+        action: 'PAYMENT_CALLBACK_PROCESSED',
+        resourceType: 'PAYMENT_ORDER',
+        resourceId: 'demo-order-student-react-completed',
+        targetLabel: 'VNPay RETURN/IPN',
+        payload: { responseCode: '00', checksumResult: true },
+        traceId: 'trace-demo-order-student-react-completed',
+      },
+      {
+        actorId: params.admin.id,
+        actorRole: 'ADMIN',
+        action: 'INSTRUCTOR_REQUEST_PENDING_REVIEW',
+        resourceType: 'INSTRUCTOR_REQUEST',
+        resourceId: pendingRequest?.id ?? null,
+        targetLabel: pendingRequest?.fullName ?? 'Pending instructor request',
+        payload: { status: 'pending' },
+        traceId: 'trace-seed-pending-instructor',
+      },
+      {
+        actorId: params.admin.id,
+        actorRole: 'ADMIN',
+        action: 'INSTRUCTOR_REQUEST_REJECTED',
+        resourceType: 'INSTRUCTOR_REQUEST',
+        resourceId: rejectedRequest?.id ?? null,
+        targetLabel: rejectedRequest?.fullName ?? 'Rejected instructor request',
+        payload: { status: 'rejected', reason: rejectedRequest?.rejectionReason },
+        traceId: 'trace-seed-reject-instructor',
+      },
+    ],
+  });
+}
+
+async function seedNotifications(params: {
+  admin: any;
+  instructors: any[];
+  students: any[];
+  qa: any;
+  failedEvent: any;
+  instructorRequests: any[];
+}) {
+  console.log('\nBUOC 16: TAO NOTIFICATION DEMO...');
+  const student = params.students.find((item) => item.email === 'student@nexedu.vn') || params.students[0];
+  const student2 = params.students.find((item) => item.email === 'student2@nexedu.vn') || params.students[1];
+  const instructor1 = params.instructors.find((item) => item.email === 'instructor@nexedu.vn') || params.instructors[0];
+  const instructor2 = params.instructors.find((item) => item.email === 'instructor2@nexedu.vn') || params.instructors[1];
+  const [pendingRequest] = params.instructorRequests;
+
+  await createDemoNotification({
+    userId: student.id,
+    type: 'PAYMENT_SUCCESS',
+    title: 'Thanh toan thanh cong',
+    body: 'Don hang ReactJS Pro Mastery da thanh toan thanh cong qua VNPay.',
+    metadata: { orderId: 'demo-order-student-react-completed', route: '/dashboard/orders' },
+    eventId: 'seed-student-payment-success',
+  });
+  await createDemoNotification({
+    userId: student.id,
+    type: 'ENROLLMENT_CREATED',
+    title: 'Ban da duoc ghi danh',
+    body: 'Ban da duoc ghi danh vao khoa NodeJS Microservices.',
+    metadata: { courseTitle: 'NodeJS Microservices', route: '/dashboard/courses' },
+    eventId: 'seed-student-enrollment-created',
+    read: true,
+  });
+  await createDemoNotification({
+    userId: student.id,
+    type: 'COURSE_COMPLETED',
+    title: 'Ban da nhan chung chi',
+    body: 'Chung chi HTML & CSS Co Ban da san sang trong dashboard.',
+    metadata: { courseTitle: 'HTML & CSS Co Ban', route: '/dashboard/certificates' },
+    eventId: 'seed-student-certificate',
+  });
+  await createDemoNotification({
+    userId: student2.id,
+    type: 'SYSTEM',
+    title: 'Don giang vien dang cho duyet',
+    body: 'Ho so dang ky giang vien cua ban dang cho admin xem xet.',
+    metadata: { requestId: pendingRequest?.id, route: '/become-instructor' },
+    eventId: 'seed-student-instructor-request-pending',
+  });
+
+  await createDemoNotification({
+    userId: instructor1.id,
+    type: 'SYSTEM',
+    title: 'Co hoc vien mua khoa hoc',
+    body: 'Hoc vien moi da mua ReactJS Pro Mastery.',
+    metadata: { orderId: 'demo-order-student-react-completed', route: '/instructor' },
+    eventId: 'seed-instructor-sale',
+  });
+  await createDemoNotification({
+    userId: instructor1.id,
+    type: 'SYSTEM',
+    title: 'Earning moi da duoc ghi nhan',
+    body: 'Doanh thu chia se 70% da duoc cong vao so du kha dung.',
+    metadata: { route: '/instructor/settings' },
+    eventId: 'seed-instructor-earning',
+    read: true,
+  });
+  await createDemoNotification({
+    userId: instructor1.id,
+    type: 'SYSTEM',
+    title: 'Payout da duoc duyet',
+    body: 'Mot yeu cau payout cua ban da duoc duyet/thanh toan trong demo.',
+    metadata: { route: '/instructor/settings' },
+    eventId: 'seed-instructor-payout-approved',
+  });
+  await createDemoNotification({
+    userId: instructor2.id,
+    type: 'SYSTEM',
+    title: 'Payout bi tu choi',
+    body: 'Thong tin ngan hang chua khop voi chu tai khoan.',
+    metadata: { route: '/instructor/settings' },
+    eventId: 'seed-instructor-payout-rejected',
+  });
+  await createDemoNotification({
+    userId: instructor1.id,
+    type: 'SYSTEM',
+    title: 'Co cau hoi Q&A moi',
+    body: params.qa.unanswered.title,
+    metadata: { questionId: params.qa.unanswered.id, route: '/instructor/qa' },
+    eventId: 'seed-instructor-qa-new',
+  });
+
+  await createDemoNotification({
+    userId: params.admin.id,
+    type: 'SYSTEM',
+    title: 'Co don giang vien moi',
+    body: 'Mot hoc vien vua gui don dang ky tro thanh giang vien.',
+    metadata: { requestId: pendingRequest?.id, route: '/admin/instructor-requests' },
+    eventId: 'seed-admin-instructor-request',
+  });
+  await createDemoNotification({
+    userId: params.admin.id,
+    type: 'SYSTEM',
+    title: 'Co payout request moi',
+    body: 'Giang vien vua tao yeu cau rut tien can xu ly.',
+    metadata: { route: '/admin/payouts' },
+    eventId: 'seed-admin-payout-request',
+    read: true,
+  });
+  await createDemoNotification({
+    userId: params.admin.id,
+    type: 'SYSTEM',
+    title: 'Co DLQ event can xu ly',
+    body: 'payment.order.completed dang loi va can retry/resolve.',
+    metadata: { failedEventId: params.failedEvent.id, route: '/admin/dlq' },
+    eventId: 'seed-admin-dlq',
+  });
+}
+
+async function updateCourseAggregates(courses: any[]) {
+  console.log('\nBUOC 17: CAP NHAT AGGREGATE COURSE DISCOVERY...');
+  for (const course of courses) {
+    const [reviews, enrollmentCount] = await Promise.all([
+      coursePrisma.review.findMany({ where: { courseId: course.id }, select: { rating: true } }),
+      coursePrisma.enrollmentSignal.count({ where: { courseId: course.id } }),
+    ]);
+    const ratingCount = reviews.length;
+    const averageRating = ratingCount > 0
+      ? Number((reviews.reduce((sum, item) => sum + item.rating, 0) / ratingCount).toFixed(2))
+      : 0;
+
+    await coursePrisma.course.update({
+      where: { id: course.id },
+      data: { ratingCount, averageRating, enrollmentCount },
+    });
+  }
+}
+
+async function warmCourseDiscoveryReadModel() {
+  const redisUrl = readEnvVarFromFile(path.join(projectRoot, 'services/course-service/.env'), 'CACHE_REDIS_URL') || process.env.CACHE_REDIS_URL;
+  if (!redisUrl) {
+    console.log('Bo qua warmup Redis course read model vi chua co CACHE_REDIS_URL.');
+    return;
+  }
+
+  try {
+    const redis = new Redis(redisUrl);
+    const keys: string[] = [];
+    let cursor = '0';
+    do {
+      const [nextCursor, batch] = await redis.scan(cursor, 'MATCH', 'course:*', 'COUNT', '250');
+      cursor = nextCursor;
+      keys.push(...batch);
+    } while (cursor !== '0');
+    if (keys.length > 0) await redis.del(keys);
+
+    const publishedCourses = await coursePrisma.course.findMany({
+      where: { status: 'PUBLISHED' },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        description: true,
+        thumbnail: true,
+        price: true,
+        level: true,
+        status: true,
+        categoryId: true,
+        instructorId: true,
+        totalLessons: true,
+        totalDuration: true,
+        averageRating: true,
+        ratingCount: true,
+        enrollmentCount: true,
+        createdAt: true,
+        updatedAt: true,
+        category: { select: { name: true, slug: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    for (const course of publishedCourses) {
+      const model = {
+        id: course.id,
+        title: course.title,
+        slug: course.slug,
+        description: course.description,
+        thumbnail: course.thumbnail,
+        price: Number(course.price),
+        level: course.level,
+        status: course.status,
+        categoryId: course.categoryId,
+        categoryName: course.category?.name ?? null,
+        categorySlug: course.category?.slug ?? null,
+        instructorId: course.instructorId,
+        totalLessons: course.totalLessons,
+        totalDuration: course.totalDuration,
+        averageRating: course.averageRating,
+        ratingCount: course.ratingCount,
+        enrollmentCount: course.enrollmentCount,
+        createdAt: course.createdAt.toISOString(),
+        updatedAt: course.updatedAt.toISOString(),
+      };
+      await Promise.all([
+        redis.set(`course:read:${course.id}`, JSON.stringify(model)),
+        redis.sadd('course:filter:status:published', course.id),
+        model.categorySlug ? redis.sadd(`course:filter:category:${model.categorySlug}`, course.id) : Promise.resolve(0),
+        redis.sadd(`course:filter:level:${model.level}`, course.id),
+        redis.zadd('course:sort:newest', Date.parse(model.createdAt), course.id),
+        redis.zadd('course:sort:popular', model.enrollmentCount, course.id),
+        redis.zadd('course:sort:rating', model.averageRating, course.id),
+        redis.zadd('course:sort:price_asc', model.price, course.id),
+        redis.zadd('course:sort:price_desc', -model.price, course.id),
+      ]);
+    }
+
+    await redis.quit();
+    console.log(`Da warmup Redis course read model cho ${publishedCourses.length} khoa hoc.`);
+  } catch (error) {
+    console.warn('Khong the warmup Redis course read model:', error);
+  }
+}
+
+function printDemoSummary() {
+  console.log('\n' + '='.repeat(60));
+  console.log('TAI KHOAN DEMO');
+  console.table([
+    { email: 'admin@nexedu.vn', password: DEMO_PASSWORD, role: 'ADMIN' },
+    { email: 'instructor@nexedu.vn', password: DEMO_PASSWORD, role: 'INSTRUCTOR' },
+    { email: 'instructor2@nexedu.vn', password: DEMO_PASSWORD, role: 'INSTRUCTOR' },
+    { email: 'student@nexedu.vn', password: DEMO_PASSWORD, role: 'STUDENT' },
+    { email: 'student2@nexedu.vn', password: DEMO_PASSWORD, role: 'STUDENT' },
+  ]);
+  console.log('URL DEMO CHINH');
+  [
+    '/courses',
+    '/dashboard',
+    '/dashboard/courses',
+    '/dashboard/orders',
+    '/become-instructor',
+    '/instructor',
+    '/instructor/settings',
+    '/instructor/qa',
+    '/admin',
+    '/admin/instructor-requests',
+    '/admin/revenue',
+    '/admin/payouts',
+    '/admin/audit-log',
+    '/admin/dlq',
+  ].forEach((url) => console.log(`- ${url}`));
+  console.log('='.repeat(60) + '\n');
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -811,8 +1980,10 @@ async function main() {
     await clearOldData();
 
     const accounts = await seedAccounts();
+    const admin = accounts.find(a => a.role === 'ADMIN');
     const instructors = accounts.filter(a => a.role === 'INSTRUCTOR');
     const students = accounts.filter(a => a.role === 'STUDENT');
+    if (!admin) throw new Error('Missing admin account');
 
     await seedInstructorProfiles(instructors);
 
@@ -823,10 +1994,22 @@ async function main() {
     await seedCommunityFeed(instructors);
 
     await seedLearningData(students, courses);
+    await seedSystemConfigs(admin);
+    await seedDeterministicLearningAndPayments(students, courses);
+    await seedPayoutLifecycle(instructors);
+    const instructorRequests = await seedInstructorRequests(accounts, admin);
+    const qa = await seedQaDemo(students, instructors, courses);
+    await seedSupportTickets(admin, students);
+    const failedEvent = await seedDlqDemo(students, courses);
+    await seedAuditLogs({ admin, instructorRequests, failedEvent });
+    await seedNotifications({ admin, instructors, students, qa, failedEvent, instructorRequests });
+    await updateCourseAggregates(courses);
+    await warmCourseDiscoveryReadModel();
 
     console.log('\n' + '═'.repeat(60));
     console.log('✨ CHÚC MỪNG! HỆ THỐNG ĐÃ CÓ ĐẦY ĐỦ DỮ LIỆU ĐỂ TEST.');
     console.log('═'.repeat(60) + '\n');
+    printDemoSummary();
 
   } catch (error) {
     console.error('\n❌ Seed thất bại:', error);

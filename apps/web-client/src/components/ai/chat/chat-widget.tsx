@@ -31,6 +31,10 @@ export function ChatWidget({
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const isOpen = open ?? internalOpen;
 
+  useEffect(() => {
+    setSelectedConversationId(null);
+  }, [courseId, lessonId]);
+
   const setIsOpen = (nextOpen: boolean) => {
     if (onOpenChange) onOpenChange(nextOpen);
     else setInternalOpen(nextOpen);

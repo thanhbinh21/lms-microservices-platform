@@ -346,3 +346,9 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-05-27 - Instructor Studio Operations UX Refactor
 - [x] Nhom lai sidebar Instructor theo flow giang vien, refactor overview/courses/course create/Q&A/analytics/profile/payment, sua mojibake instructor scope, them confirm publish/payout va harden validation payout profile. done 2026-05-27
+
+### 2026-05-27 - Endgame Demo Seed Expansion
+- [x] Mo rong `scripts/seed-all.ts` cho demo kien truc cuoi ky: payment lifecycle, retry payment, VNPay audit, earning/payout, instructor request, Q&A, support ticket, notification, audit log, DLQ, certificate deterministic, course discovery Redis warmup va AI context keywords. done 2026-05-27
+- [x] Hotfix seed Neon pool timeout: ep Prisma seed URL dung `connection_limit=1&pool_timeout=30` de tranh P2024 khi seed nhieu service DB cung luc. done 2026-05-27
+- [x] AI final quiz/chat context hardening: rut gon context ve metadata course/chapter/lesson, parse JSON an toan, retry prompt ngan hon, UTF-8 headers, demo fallback quiz co dieu kien, va redirect lesson URL cu sau reseed. done 2026-05-27
+- [x] AI chat conversation scoping fix: list conversation theo courseId va reset selected conversation khi doi course/lesson de tranh gui lesson sai khoa hoc. done 2026-05-27
