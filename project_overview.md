@@ -346,3 +346,18 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-05-27 - Instructor Studio Operations UX Refactor
 - [x] Nhom lai sidebar Instructor theo flow giang vien, refactor overview/courses/course create/Q&A/analytics/profile/payment, sua mojibake instructor scope, them confirm publish/payout va harden validation payout profile. done 2026-05-27
+
+### 2026-05-27 - Endgame Demo Seed Expansion
+- [x] Mo rong `scripts/seed-all.ts` cho demo kien truc cuoi ky: payment lifecycle, retry payment, VNPay audit, earning/payout, instructor request, Q&A, support ticket, notification, audit log, DLQ, certificate deterministic, course discovery Redis warmup va AI context keywords. done 2026-05-27
+- [x] Hotfix seed Neon pool timeout: ep Prisma seed URL dung `connection_limit=1&pool_timeout=30` de tranh P2024 khi seed nhieu service DB cung luc. done 2026-05-27
+- [x] AI final quiz/chat context hardening: rut gon context ve metadata course/chapter/lesson, parse JSON an toan, retry prompt ngan hon, UTF-8 headers, demo fallback quiz co dieu kien, va redirect lesson URL cu sau reseed. done 2026-05-27
+- [x] AI chat conversation scoping fix: list conversation theo courseId va reset selected conversation khi doi course/lesson de tranh gui lesson sai khoa hoc. done 2026-05-27
+- [x] Public/shared UI refactor: chuan hoa shell/header/state/course-card, polish public pages, `/settings`, community, support, learn, AI Chat va Final Quiz. done 2026-05-27
+
+### 2026-05-27 - Payment Event Sourcing Admin UI
+- [x] Them API `GET /api/admin/orders` (list + filter + pagination) vao payment-service. done 2026-05-27
+- [x] Bo sung Server Actions `getAdminOrdersAction` va `getAdminOrderEventHistoryAction` vao web-client/actions/admin.ts. done 2026-05-27
+- [x] Tao trang admin `/admin/orders` danh sach order co filter status va search userId. done 2026-05-27
+- [x] Tao trang admin `/admin/orders/[orderId]` event timeline doc theo chieu doc, co icon theo event type va collapsible JSON payload. done 2026-05-27
+- [x] Them link "Don hang" vao sidebar admin nhom Thanh toan & doanh thu. done 2026-05-27
+- [x] Fix event types trong seed: PAYMENT_COMPLETED→ORDER_COMPLETED, PAYMENT_FAILED→ORDER_FAILED, them VNPAY_CALLBACK_RECEIVED va PAYMENT_VERIFIED cho happy path. done 2026-05-27

@@ -1,8 +1,10 @@
-﻿import { SharedNavbar } from '@/components/shared/shared-navbar';
-import { SharedFooter } from '@/components/shared/shared-footer';
-import { listInstructorsAction } from '@/app/actions/instructor';
-import { UserCircle, Search, SlidersHorizontal } from 'lucide-react';
 import Link from 'next/link';
+import { AlertCircle, UserCircle, GraduationCap, Star } from 'lucide-react';
+import { listInstructorsAction } from '@/app/actions/instructor';
+import { Button } from '@/components/ui/button';
+import { PublicPageHeader, PublicPageShell, PublicState } from '@/components/shared/public-page';
+import { InstructorAvatar } from '@/components/shared/instructor-avatar';
+import { InstructorFilters } from '@/components/shared/instructor-filters';
 
 export default async function InstructorsPage({
   searchParams,
@@ -10,7 +12,7 @@ export default async function InstructorsPage({
   searchParams: Promise<Record<string, string>>;
 }) {
   const params = await searchParams;
-  const page = params.page ? parseInt(params.page, 10) : 1;
+  const page = params.page ? Number(params.page) : 1;
   const q = params.q || '';
   const sortBy = params.sortBy || 'newest';
 
@@ -18,113 +20,113 @@ export default async function InstructorsPage({
   const items = result.success && result.data ? result.data.items : [];
 
   return (
-    <div className="glass-page min-h-screen text-foreground relative overflow-hidden">
-      <div className="absolute top-[-5%] right-[-5%] w-[40%] h-[40%] rounded-full bg-primary/10 blur-[150px] pointer-events-none" />
-      <div className="absolute top-[30%] left-[-10%] w-[35%] h-[40%] rounded-full bg-blue-300/15 blur-[120px] pointer-events-none" />
+    <PublicPageShell mainClassName="space-y-8 py-10">
+      <PublicPageHeader
+        centered
+        eyebrow="Giảng viên"
+        title={<><span className="text-primary">Chuyên gia</span> đồng hành cùng bạn</>}
+        description="Khám phá hồ sơ giảng viên, chuyên môn và các khóa học đang được giảng dạy trên NexEdu."
+      />
 
-      <SharedNavbar />
+      {/* Bộ lọc tìm kiếm và sắp xếp - Client Component quản lý trạng thái URL */}
+      <InstructorFilters initialQ={q} initialSortBy={sortBy} />
 
-      <main className="mx-auto w-full max-w-7xl px-4 py-12 md:px-8 relative z-10 space-y-12">
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight">Đội ngũ giảng viên</h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Khám phá các khóa học chất lượng từ những chuyên gia hàng đầu trong ngành.
-          </p>
-        </div>
+      {q ? (
+        <p className="text-sm font-medium text-muted-foreground">
+          Kết quả tìm kiếm cho <span className="font-bold text-foreground">&ldquo;{q}&rdquo;</span>
+        </p>
+      ) : null}
 
-        <form method="GET" className="flex flex-col gap-3 sm:flex-row items-start sm:items-center justify-between">
-          <div className="flex flex-1 items-center gap-2 max-w-md">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-              <input
-                type="text"
-                name="q"
-                defaultValue={q}
-                placeholder="Tìm theo tên, chuyên môn..."
-                className="w-full h-10 pl-9 pr-4 rounded-xl border border-border bg-white/70 text-sm shadow-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-              />
-            </div>
-            <button
-              type="submit"
-              className="h-10 px-4 rounded-xl bg-primary text-white text-sm font-bold shadow-sm hover:bg-primary/90 transition-colors"
-            >
-              Tìm
-            </button>
+      {/* TRẠNG THÁI 1: Lỗi gọi API kết nối hệ thống */}
+      {!result.success ? (
+        <div className="glass-panel rounded-2xl border-red-200/50 bg-red-50/10 p-10 text-center max-w-md mx-auto space-y-4">
+          <div className="mx-auto size-12 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+            <AlertCircle className="size-6" />
           </div>
-
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="size-4 text-muted-foreground shrink-0" />
-            <label htmlFor="sortBy" className="text-sm font-medium text-muted-foreground">Sắp xếp:</label>
-            <select
-              id="sortBy"
-              name="sortBy"
-              defaultValue={sortBy}
-              className="h-9 rounded-lg border border-border bg-white/70 px-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-primary/30"
-            >
-              <option value="newest">Mới nhất</option>
-              <option value="courses">Nhiều khóa học nhất</option>
-              <option value="rating">Đánh giá cao nhất</option>
-            </select>
-            <button
-              type="submit"
-              className="h-9 rounded-lg border border-border bg-white/70 px-3 text-sm font-semibold shadow-sm hover:bg-white"
-            >
-              Áp dụng
-            </button>
-          </div>
-        </form>
-
-        {q && (
+          <h2 className="text-lg font-bold text-foreground">Không thể tải danh sách giảng viên</h2>
           <p className="text-sm text-muted-foreground">
-            Kết quả tìm kiếm cho "<strong className="text-foreground">{q}</strong>"
+            {result.message || 'Đã xảy ra sự cố kết nối tới máy chủ. Vui lòng tải lại hoặc thử lại sau.'}
           </p>
-        )}
+          <Button asChild className="rounded-xl font-semibold shadow-md shadow-primary/10">
+            <Link href="/instructors">Thử lại</Link>
+          </Button>
+        </div>
+      ) : null}
 
-        {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 border border-dashed rounded-3xl bg-white/40">
-            <UserCircle className="size-12 text-slate-300 mb-4" />
-            <p className="text-lg font-medium text-slate-600">
-              {q ? 'Không tìm thấy giảng viên nào' : 'Chưa có giảng viên nào'}
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {items.map((instructor) => (
-              <Link key={instructor.id} href={`/instructors/${instructor.slug}`}>
-                <div className="group rounded-3xl border border-white/60 bg-white/60 p-6 backdrop-blur-md transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary/20">
-                  <div className="flex flex-col items-center text-center space-y-4">
-                    <div className="relative size-24 overflow-hidden rounded-full border border-slate-100 bg-slate-50">
-                      {instructor.avatar ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={instructor.avatar} alt={instructor.displayName} className="size-full object-cover transition-transform group-hover:scale-110" />
-                      ) : (
-                        <UserCircle className="size-full text-slate-300" />
-                      )}
+      {/* TRẠNG THÁI 2: Không có dữ liệu giảng viên */}
+      {result.success && items.length === 0 ? (
+        <PublicState
+          icon={UserCircle}
+          title={q ? 'Không tìm thấy giảng viên phù hợp' : 'Chưa có giảng viên công khai'}
+          description={q ? 'Thử tìm bằng tên khác hoặc bỏ bộ lọc tìm kiếm.' : 'Bạn có thể trở thành giảng viên đầu tiên và xây dựng khóa học trên NexEdu.'}
+          action={
+            <Button asChild className="rounded-xl font-semibold">
+              <Link href="/become-instructor">
+                <GraduationCap className="mr-2 size-4" />
+                Trở thành giảng viên
+              </Link>
+            </Button>
+          }
+        />
+      ) : null}
+
+      {/* TRẠNG THÁI 3: Hiển thị danh sách giảng viên thành công */}
+      {result.success && items.length > 0 ? (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {items.map((instructor) => (
+            <Link key={instructor.id} href={`/instructors/${instructor.slug}`} className="group">
+              <article className="glass-panel glass-card-hover h-full rounded-2xl border-white/70 p-6 flex flex-col justify-between">
+                <div className="flex flex-col items-center text-center">
+                  {/* Sử dụng InstructorAvatar Client Component để chống crash lỗi ảnh */}
+                  <div className="relative size-24 overflow-hidden rounded-full border-4 border-white bg-white shadow-sm flex items-center justify-center">
+                    <InstructorAvatar
+                      src={instructor.avatar}
+                      alt={instructor.displayName}
+                      className="size-full object-cover"
+                      fallbackClassName="size-full text-primary/30"
+                    />
+                  </div>
+                  <h2 className="mt-4 line-clamp-1 text-lg font-bold transition-colors group-hover:text-primary">{instructor.displayName}</h2>
+                  <p className="mt-1 line-clamp-2 min-h-10 text-xs font-bold text-primary tracking-wide uppercase">
+                    {instructor.headline || 'Giảng viên NexEdu'}
+                  </p>
+                  
+                  {/* Phần giới thiệu ngắn - bio */}
+                  <p className="mt-2 line-clamp-3 text-xs text-muted-foreground/80 min-h-[3rem] text-justify leading-relaxed">
+                    {instructor.bio || 'Chưa có thông tin giới thiệu chi tiết.'}
+                  </p>
+                </div>
+
+                <div className="mt-5">
+                  <div className="grid grid-cols-2 gap-3 border-t border-white/60 pt-4 text-center">
+                    <div>
+                      <p className="text-lg font-extrabold">{instructor.courseCount}</p>
+                      <p className="text-[11px] font-semibold uppercase text-muted-foreground">Khóa học</p>
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold group-hover:text-primary transition-colors">{instructor.displayName}</h3>
-                      <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{instructor.headline || 'Giảng viên NexEdu'}</p>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm font-semibold text-slate-600 pt-2 border-t w-full justify-center">
-                      <div className="flex flex-col items-center">
-                        <span className="text-lg font-bold text-slate-900">{instructor.courseCount}</span>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Khóa học</span>
-                      </div>
-                      <div className="w-px h-8 bg-slate-200" />
-                      <div className="flex flex-col items-center">
-                        <span className="text-lg font-bold text-emerald-600">{instructor.averageRating.toFixed(1)}</span>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Đánh giá</span>
-                      </div>
+                      <p className="inline-flex items-center justify-center gap-1 text-lg font-extrabold text-amber-600">
+                        <Star className="size-4 fill-current" />
+                        {instructor.averageRating.toFixed(1)}
+                      </p>
+                      <p className="text-[11px] font-semibold uppercase text-muted-foreground">Đánh giá</p>
                     </div>
                   </div>
+                  
+                  {/* Nút Xem hồ sơ kích hoạt hiệu ứng hover cùng Card */}
+                  <div className="mt-5 w-full">
+                    <Button
+                      variant="outline"
+                      className="w-full h-10 rounded-xl text-xs font-bold tracking-wide transition-all group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary shadow-sm"
+                    >
+                      Xem hồ sơ
+                    </Button>
+                  </div>
                 </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </main>
-
-      <SharedFooter />
-    </div>
+              </article>
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </PublicPageShell>
   );
 }

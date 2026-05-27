@@ -234,7 +234,8 @@ async function makeChatRequest(
 ): Promise<Response> {
   const requestUrl = `${provider.baseUrl}/chat/completions`;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json; charset=utf-8',
+    Accept: 'application/json, text/event-stream; charset=utf-8',
     Authorization: `Bearer ${provider.apiKey}`,
     ...(provider.extraHeaders || {}),
   };
@@ -382,7 +383,7 @@ export async function* streamGenerateText(
       const reader = res.body?.getReader();
       if (!reader) throw new Error('No response body');
 
-      const decoder = new TextDecoder();
+      const decoder = new TextDecoder('utf-8', { fatal: false });
       let buffer = '';
 
       while (true) {

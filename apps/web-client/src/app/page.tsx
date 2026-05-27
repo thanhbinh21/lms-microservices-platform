@@ -1,54 +1,32 @@
-import Link from 'next/link';
-import Image from 'next/image';
-import { SITE_STATS } from '@/config/site-stats';
 import { Suspense } from 'react';
-import { ArrowRight, PlayCircle, ShieldCheck, Users, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollReveal } from '@/components/ui/scroll-reveal';
-import { SharedNavbar } from '@/components/shared/shared-navbar';
-import { SharedFooter } from '@/components/shared/shared-footer';
+import Link from 'next/link';
+import { ArrowRight, BookOpen, MessageSquare, ShieldCheck, Sparkles, Users } from 'lucide-react';
+import { getPublicCoursesAction } from '@/app/actions/instructor';
 import { InstructorRequestFlash } from '@/components/home/InstructorRequestFlash';
 import { HomeAuthActions } from '@/components/home/home-auth-actions';
-import { getPublicCoursesAction } from '@/app/actions/instructor';
+import { PublicCourseCard } from '@/components/shared/public-course-card';
+import { PublicPageShell } from '@/components/shared/public-page';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { SITE_STATS } from '@/config/site-stats';
 
 const highlights = [
   {
-    id: 'personal-path',
-    title: 'Lộ Trình Cá Nhân Hóa',
-    description:
-      'AI gợi ý lộ trình phù hợp theo mục tiêu, trình độ và quỹ thời gian học của bạn.',
+    title: 'Lộ trình rõ ràng',
+    description: 'Khóa học được chia theo chương, bài học, tiến độ và bài kiểm tra cuối khóa.',
+    icon: BookOpen,
+  },
+  {
+    title: 'AI hỗ trợ học tập',
+    description: 'AI Chat và quiz theo ngữ cảnh giúp học viên ôn tập ngay trong màn hình học.',
     icon: Sparkles,
   },
   {
-    id: 'trusted-certificate',
-    title: 'Chứng Chỉ Giá Trị',
-    description:
-      'Chứng chỉ hoàn thành được thiết kế theo tiêu chuẩn doanh nghiệp và dễ đưa vào hồ sơ nghề nghiệp.',
-    icon: ShieldCheck,
-  },
-  {
-    id: 'quality-community',
-    title: 'Cộng Đồng Học Tập',
-    description:
-      'Thảo luận cùng mentor và học viên cùng lĩnh vực để tăng tốc độ phát triển kỹ năng.',
-    icon: Users,
+    title: 'Cộng đồng thực chiến',
+    description: 'Feed cộng đồng và Q&A theo khóa học giúp trao đổi với giảng viên và học viên khác.',
+    icon: MessageSquare,
   },
 ];
-
-function formatPriceVND(price: number) {
-  return `${Number(price || 0).toLocaleString('vi-VN')}đ`;
-}
-
-function formatDuration(totalSeconds: number) {
-  if (!totalSeconds) return '0 phút';
-  const totalMinutes = Math.max(1, Math.floor(totalSeconds / 60));
-  if (totalMinutes < 60) return `${totalMinutes} phút`;
-
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return minutes > 0 ? `${hours}h ${minutes}p` : `${hours}h`;
-}
 
 export default async function Home() {
   const publicCoursesResult = await getPublicCoursesAction(1, 6);
@@ -57,220 +35,132 @@ export default async function Home() {
     : [];
 
   return (
-    <div className="glass-page min-h-screen text-foreground font-sans relative overflow-hidden">
-      {/* Decorative background orbs for glass refraction */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary/20 blur-[120px] pointer-events-none" />
-      <div className="absolute top-[20%] right-[-5%] w-[30%] h-[50%] rounded-full bg-blue-400/10 blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] left-[20%] w-[50%] h-[30%] rounded-full bg-indigo-300/15 blur-[120px] pointer-events-none" />
-      
-      <SharedNavbar />
-
+    <PublicPageShell mainClassName="space-y-16 py-10 md:py-14">
       <Suspense fallback={null}>
         <InstructorRequestFlash />
       </Suspense>
 
-      <main>
-        <section id="kham-pha" className="relative overflow-hidden px-4 py-16 md:px-6 md:py-20">
-          <div className="hero-glow pointer-events-none absolute inset-0" />
-          <div className="mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-2">
-            <ScrollReveal className="space-y-8">
-              <span className="inline-flex rounded-full bg-primary/10 border border-primary/20 px-4 py-1.5 text-xs font-semibold text-primary shadow-sm backdrop-blur-md">
-                Nền tảng học tập thế hệ mới
-              </span>
-
-              <div className="space-y-4">
-                <h1 className="text-balance text-4xl font-semibold leading-tight md:text-6xl">
-                  Nâng Tầm Tri Thức Với
-                  <span className="text-primary"> Trải Nghiệm </span>
-                  Học Tập Tương Lai
-                </h1>
-                <p className="max-w-xl text-sm text-muted-foreground md:text-base">
-                  NexEdu cung cấp hành trình học tập cá nhân hóa cho từng mục tiêu nghề nghiệp. Khám phá kho nội dung
-                  thực chiến cùng cộng đồng học viên và mentor chất lượng.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <HomeAuthActions context="hero" />
-              </div>
-
-              <div className="flex items-center gap-4 text-xs text-muted-foreground md:text-sm">
-                <div className="flex -space-x-2">
-                  <span className="inline-flex size-8 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold shadow-sm">
-                    AT
-                  </span>
-                  <span className="inline-flex size-8 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold shadow-sm">
-                    HP
-                  </span>
-                  <span className="inline-flex size-8 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold shadow-sm">
-                    NL
-                  </span>
-                </div>
-                <p>{SITE_STATS.totalStudentsLong} đã bắt đầu hành trình cùng NexEdu</p>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal delay={200}>
-              <Card className="glass-panel mx-auto w-full max-w-lg rounded-2xl p-2 border-primary/10">
-                <CardHeader className="pb-4 p-2">
-                  <div className="aspect-16/10 w-full rounded-xl bg-[linear-gradient(135deg,hsl(var(--primary)/0.08),hsl(var(--primary)/0.02))] border border-white/60 shadow-inner" />
-                </CardHeader>
-                <CardContent className="space-y-3 px-4 pb-4">
-                  <span className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                    Phổ biến nhất
-                  </span>
-                  <CardTitle className="text-xl leading-snug">Kỹ Thuật Thiết Kế UI/UX Nâng Cao</CardTitle>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground md:text-sm">
-                    <p>Lê Minh Tôn, Senior Product Designer</p>
-                    <p className="font-bold text-primary">4.9</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </ScrollReveal>
+      <section className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="space-y-7">
+          <span className="inline-flex rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary">
+            Nền tảng học tập thế hệ mới
+          </span>
+          <div className="space-y-4">
+            <h1 className="text-4xl font-bold leading-tight tracking-tight md:text-6xl">
+              Học kỹ năng thực chiến cùng <span className="text-primary">NexEdu</span>
+            </h1>
+            <p className="max-w-2xl text-base font-medium leading-relaxed text-muted-foreground">
+              Khám phá khóa học chất lượng, theo dõi tiến độ, hỏi đáp với giảng viên và dùng AI để ôn tập
+              ngay trong từng bài học.
+            </p>
           </div>
-        </section>
-
-        <section className="border-y border-primary/10 bg-white/70 px-4 py-12 backdrop-blur-md md:px-6 relative z-10 shadow-[0_4px_30px_rgba(0,0,0,0.02)]">
-          <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-6 md:grid-cols-4">
+          <div className="flex flex-wrap gap-3">
+            <HomeAuthActions context="hero" />
+          </div>
+          <div className="grid max-w-2xl grid-cols-3 gap-3">
             {[
               { value: SITE_STATS.totalCourses, label: 'Khóa học' },
               { value: SITE_STATS.totalStudentsNumber, label: 'Học viên' },
-              { value: SITE_STATS.successRate, label: 'Hài lòng' },
               { value: SITE_STATS.expertInstructors, label: 'Chuyên gia' },
-            ].map((item, idx) => (
-              <ScrollReveal key={item.label} delay={idx * 100} className="text-center">
-                <p className="text-4xl font-bold text-primary drop-shadow-sm">{item.value}</p>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mt-2">{item.label}</p>
-              </ScrollReveal>
+            ].map((item) => (
+              <div key={item.label} className="glass-panel rounded-2xl border-white/70 p-4 text-center">
+                <p className="text-2xl font-extrabold text-primary">{item.value}</p>
+                <p className="mt-1 text-xs font-semibold uppercase text-muted-foreground">{item.label}</p>
+              </div>
             ))}
           </div>
-        </section>
+        </div>
 
-        <section id="khoa-hoc" className="mx-auto w-full max-w-6xl space-y-8 px-4 py-16 md:px-6 relative">
-          <div className="space-y-3">
-            <h2 className="text-2xl font-bold md:text-3xl">
-              Khám Phá Các <span className="text-primary">Khóa Học Nổi Bật</span>
-            </h2>
-            <p className="max-w-2xl text-sm text-muted-foreground md:text-base">
-              Chương trình được cập nhật theo xu hướng nghề nghiệp, tập trung vào kỹ năng ứng dụng thực tế.
-            </p>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {featuredCourses.map((course, index) => (
-              <ScrollReveal key={course.id} delay={index * 150} className="h-full">
-                <Link href={`/courses/${course.slug}`} className="block h-full">
-                  <Card className="glass-panel group rounded-3xl transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/20 border-white/60 h-full flex flex-col cursor-pointer">
-                    <CardHeader className="p-2">
-                      <div className="relative aspect-video overflow-hidden rounded-2xl bg-[linear-gradient(120deg,hsl(var(--primary)/0.08),hsl(var(--primary)/0.02))] border border-white/50">
-                        {course.thumbnail ? (
-                          <img src={course.thumbnail} alt={course.title} className="h-full w-full object-cover" />
-                        ) : null}
-                        <span className="absolute right-3 top-3 rounded-full bg-white/90 backdrop-blur-sm px-3 py-1 text-xs font-bold text-primary shadow-sm border border-primary/10">
-                          {course.level || 'BEGINNER'}
-                        </span>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4 px-6 pt-4 pb-6 flex-1">
-                      <p className="line-clamp-2 text-lg font-bold leading-tight">{course.title}</p>
-                      <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                        <span>{course.totalLessons || 0} bài học</span>
-                        <span>{formatDuration(course.totalDuration || 0)}</span>
-                      </div>
-                      <div className="flex items-center justify-between pt-2">
-                        <p className="text-2xl font-bold text-primary">{formatPriceVND(Number(course.price || 0))}</p>
-                        <p className="text-sm font-bold text-muted-foreground">{course.status || 'PUBLISHED'}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              </ScrollReveal>
-            ))}
-          </div>
-
-          {featuredCourses.length === 0 && (
-            <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
-              <CardContent className="py-10 text-center text-sm font-medium text-muted-foreground">
-                Hiện chưa có khóa học nào được xuất bản.
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="flex justify-center pt-4">
-            <Button asChild variant="outline" size="lg" className="rounded-full px-8 bg-white/50 backdrop-blur-sm border-primary/20 hover:bg-white">
-              <Link href="/courses">Xem tất cả khóa học</Link>
-            </Button>
-          </div>
-        </section>
-
-        <section id="cong-dong" className="bg-primary/5 px-4 py-20 backdrop-blur-sm md:px-6 border-y border-primary/10 relative overflow-hidden">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-blue-400/10 blur-[100px] pointer-events-none" />
-          <div className="mx-auto w-full max-w-6xl space-y-12 relative z-10">
-            <ScrollReveal className="space-y-4 text-center">
-              <h2 className="text-3xl font-bold md:text-4xl shadow-sm inline-block text-transparent bg-clip-text bg-gradient-to-r from-foreground to-foreground/80 pb-1">
-                Tại Sao Nên Chọn <span className="text-primary">NexEdu</span>?
-              </h2>
-              <p className="mx-auto max-w-2xl text-sm text-muted-foreground md:text-base">
-                Môi trường học tập cân bằng giữa lộ trình rõ ràng, cộng đồng chất lượng và kỹ năng thực chiến.
-              </p>
-            </ScrollReveal>
-
-            <div className="grid gap-6 md:grid-cols-3">
-              {highlights.map((item, idx) => (
-                <ScrollReveal key={item.id} delay={idx * 150} className="h-full">
-                  <Card className="glass-panel rounded-3xl border-white/60 hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 hover:-translate-y-2 h-full">
-                    <CardContent className="space-y-6 p-8">
-                      <div className="inline-flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 text-primary shadow-inner border border-white/50">
-                        <item.icon className="size-8 stroke-[1.5]" />
-                      </div>
-                      <h3 className="text-xl font-bold">{item.title}</h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed font-medium">
-                        {item.description}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </ScrollReveal>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <ScrollReveal>
-          <section className="px-4 py-20 md:px-6 relative z-10" id="ho-tro">
-            <div className="mx-auto grid w-full max-w-6xl gap-8 rounded-[3rem] border border-white/40 gradient-hero p-8 text-white shadow-2xl shadow-primary/30 md:grid-cols-2 md:p-16 overflow-hidden relative">
-              <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay pointer-events-none" />
-              <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-900/30 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-              
-              <div className="space-y-6 relative z-10">
-                <h2 className="text-4xl font-bold leading-tight drop-shadow-md">Sẵn Sàng Kiến Tạo<br/>Tương Lai Của Bạn?</h2>
-                <p className="text-base text-white/90 max-w-md">
-                  Tham gia cộng đồng {SITE_STATS.totalStudentsFull} học viên đang phát triển kỹ năng mỗi ngày tại NexEdu.
-                </p>
-                <div className="flex flex-wrap gap-4 pt-6">
-                  <HomeAuthActions context="cta" />
+        <Card className="glass-panel overflow-hidden rounded-2xl border-white/70">
+          <CardContent className="p-6">
+            <div className="rounded-2xl border border-white/70 bg-white/60 p-5">
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-primary">Không gian học tập</p>
+                  <h2 className="mt-1 text-2xl font-bold">Curriculum, Q&A, AI Chat</h2>
+                </div>
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                  <ShieldCheck className="size-6" />
                 </div>
               </div>
-
-              <div className="relative hidden items-center justify-center md:flex z-10">
-                <Card className="relative w-80 rotate-2 rounded-3xl border-white/20 bg-white/10 backdrop-blur-xl shadow-2xl text-white">
-                  <CardContent className="space-y-4 p-8">
-                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center border border-white/30 mb-6">
-                      <ShieldCheck className="w-6 h-6 text-white" />
-                    </div>
-                    <p className="text-2xl font-bold">Nhóm học tập<br/>chất lượng cao</p>
-                    <p className="text-sm text-white/80 leading-relaxed">
-                      Kết nối mentor và học viên theo từng mục tiêu nghề nghiệp cụ thể và bám sát thực tế thị trường.
-                    </p>
-                  </CardContent>
-                </Card>
+              <div className="space-y-3">
+                {['Theo dõi tiến độ từng bài', 'Tạo quiz theo bài học', 'Hỏi đáp và nhận hỗ trợ nhanh'].map((item) => (
+                  <div key={item} className="flex items-center gap-3 rounded-xl bg-white/70 px-4 py-3 text-sm font-semibold">
+                    <span className="size-2 rounded-full bg-primary" />
+                    {item}
+                  </div>
+                ))}
               </div>
             </div>
-          </section>
-        </ScrollReveal>
-      </main>
+          </CardContent>
+        </Card>
+      </section>
 
-      <SharedFooter />
-    </div>
+      <section className="space-y-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-primary">Khóa học nổi bật</p>
+            <h2 className="mt-1 text-2xl font-bold md:text-3xl">Bắt đầu với nội dung đã xuất bản</h2>
+            <p className="mt-2 max-w-2xl text-sm font-medium text-muted-foreground">
+              Các khóa học được cập nhật theo lộ trình nghề nghiệp và đồng bộ với trải nghiệm học tập mới.
+            </p>
+          </div>
+          <Button asChild variant="outline" className="rounded-xl bg-white/70 font-semibold">
+            <Link href="/courses">
+              Xem tất cả
+              <ArrowRight className="ml-2 size-4" />
+            </Link>
+          </Button>
+        </div>
+
+        {featuredCourses.length === 0 ? (
+          <Card className="glass-panel rounded-2xl border-white/70">
+            <CardContent className="p-8 text-center text-sm font-medium text-muted-foreground">
+              Hiện chưa có khóa học công khai.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {featuredCourses.map((course) => (
+              <PublicCourseCard key={course.id} course={course} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="grid gap-6 md:grid-cols-3">
+        {highlights.map((item) => (
+          <Card key={item.title} className="glass-panel rounded-2xl border-white/70">
+            <CardContent className="space-y-4 p-6">
+              <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <item.icon className="size-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold">{item.title}</h3>
+                <p className="mt-2 text-sm font-medium leading-relaxed text-muted-foreground">{item.description}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <section className="gradient-hero rounded-2xl p-6 text-white shadow-xl shadow-primary/20 md:p-10">
+        <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
+          <div>
+            <p className="inline-flex items-center gap-2 text-sm font-semibold text-white/80">
+              <Users className="size-4" />
+              Cộng đồng NexEdu
+            </p>
+            <h2 className="mt-2 text-3xl font-bold">Sẵn sàng xây dựng lộ trình học của bạn?</h2>
+            <p className="mt-2 max-w-2xl text-sm font-medium text-white/85">
+              Tham gia cùng {SITE_STATS.totalStudentsFull} học viên, học theo tiến độ cá nhân và nhận hỗ trợ từ cộng đồng.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <HomeAuthActions context="cta" />
+          </div>
+        </div>
+      </section>
+    </PublicPageShell>
   );
 }

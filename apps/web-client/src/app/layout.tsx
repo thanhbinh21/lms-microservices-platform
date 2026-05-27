@@ -1,24 +1,24 @@
 import StoreProvider from '@/lib/redux/StoreProvider';
 import AuthSessionBootstrap from '@/components/auth/AuthSessionBootstrap';
 import { ToastContainer } from '@/components/ui/toast';
-import type { Metadata } from "next";
-import { Be_Vietnam_Pro, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { Be_Vietnam_Pro, Geist_Mono } from 'next/font/google';
+import './globals.css';
 
 const beVietnamPro = Be_Vietnam_Pro({
-  variable: "--font-be-vietnam-pro",
-  subsets: ["vietnamese", "latin"],
-  weight: ["400", "500", "600", "700"],
+  variable: '--font-be-vietnam-pro',
+  subsets: ['vietnamese', 'latin'],
+  weight: ['400', '500', '600', '700'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
-  title: "NexEdu - Nền Tảng Quản Lý Học Tập Trực Tuyến",
-  description: "Nền tảng học tập trực tuyến theo mô hình microservices với trải nghiệm hiện đại.",
+  title: 'NexEdu - Nền tảng học tập trực tuyến',
+  description: 'Nền tảng học tập trực tuyến theo mô hình microservices với trải nghiệm hiện đại.',
 };
 
 export default function RootLayout({
@@ -28,9 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body
-        className={`${beVietnamPro.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${beVietnamPro.variable} ${geistMono.variable} antialiased`}>
         <StoreProvider>
           <AuthSessionBootstrap />
           <ToastContainer />

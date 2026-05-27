@@ -1,241 +1,186 @@
 'use client';
 
-import { SharedNavbar } from '@/components/shared/shared-navbar';
-import { SharedFooter } from '@/components/shared/shared-footer';
-import { Mail, MessageSquare, Phone, Clock, BookOpen, HelpCircle, Send } from 'lucide-react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import Link from 'next/link';
+import { BookOpen, Clock, HelpCircle, Mail, MessageSquare, Send, ShieldQuestion } from 'lucide-react';
+import { createSupportTicketAction } from '@/app/actions/support';
+import { PublicPageHeader, PublicPageShell } from '@/components/shared/public-page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useState } from 'react';
-import { useAppSelector } from '@/lib/redux/hooks';
-import { createSupportTicketAction } from '@/app/actions/support';
 import { toast } from '@/components/ui/toast';
+import { useAppSelector } from '@/lib/redux/hooks';
+
+const faqs = [
+  {
+    icon: BookOpen,
+    question: 'Làm sao để đăng ký khóa học?',
+    answer: 'Đăng nhập, mở trang chi tiết khóa học và chọn đăng ký hoặc thanh toán. Khóa miễn phí có thể bắt đầu học ngay.',
+  },
+  {
+    icon: MessageSquare,
+    question: 'Tôi đặt câu hỏi cho giảng viên ở đâu?',
+    answer: 'Trong màn hình học, mở mục Hỏi đáp của bài học hoặc vào Dashboard > Hỏi đáp để theo dõi phản hồi.',
+  },
+  {
+    icon: Mail,
+    question: 'Không nhận được email thông báo thì xử lý thế nào?',
+    answer: 'Kiểm tra hộp thư spam trước. Nếu vẫn không có, gửi ticket hỗ trợ với email tài khoản để đội ngũ kiểm tra.',
+  },
+  {
+    icon: ShieldQuestion,
+    question: 'Làm sao để trở thành giảng viên?',
+    answer: 'Gửi hồ sơ tại trang Trở thành giảng viên. Admin sẽ xét duyệt và phản hồi trong 1-3 ngày làm việc.',
+  },
+];
 
 export default function SupportPage() {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
-  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
+  const [form, setForm] = useState({ subject: '', message: '' });
+  const [fieldError, setFieldError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFieldError('');
+
     if (!isAuthenticated) {
-      toast('info', 'Cần đăng nhập', 'Vui lòng đăng nhập để gửi ticket hỗ trợ cá nhân.');
+      toast('info', 'Cần đăng nhập', 'Vui lòng đăng nhập để gửi và theo dõi ticket hỗ trợ.');
       return;
     }
+    if (form.subject.trim().length < 8) {
+      setFieldError('Chủ đề cần có ít nhất 8 ký tự.');
+      return;
+    }
+    if (form.message.trim().length < 20) {
+      setFieldError('Nội dung cần mô tả rõ hơn, tối thiểu 20 ký tự.');
+      return;
+    }
+
     setSubmitting(true);
-    const res = await createSupportTicketAction({
+    const result = await createSupportTicketAction({
       subject: form.subject.trim(),
       description: form.message.trim(),
       category: 'OTHER',
       priority: 'NORMAL',
     });
     setSubmitting(false);
-    if (res.success) {
+
+    if (result.success) {
       setSubmitted(true);
-      toast('success', 'Đã gửi yêu cầu', 'Đội ngũ hỗ trợ sẽ phản hồi bạn sớm nhất.');
+      setForm({ subject: '', message: '' });
+      toast('success', 'Đã gửi yêu cầu', 'Đội ngũ hỗ trợ sẽ phản hồi trong dashboard của bạn.');
       return;
     }
-    toast('error', 'Gửi yêu cầu thất bại', res.message || 'Vui lòng thử lại sau.');
+
+    toast('error', 'Không gửi được yêu cầu', result.message || 'Vui lòng thử lại sau.');
   };
 
   return (
-    <div className="glass-page min-h-screen text-foreground">
-      <SharedNavbar />
+    <PublicPageShell mainClassName="max-w-5xl space-y-10 py-10">
+      <PublicPageHeader
+        centered
+        eyebrow="Hỗ trợ"
+        title={<><span className="text-primary">Trung tâm</span> trợ giúp NexEdu</>}
+        description="Tìm câu trả lời nhanh hoặc gửi ticket để đội ngũ hỗ trợ xử lý theo tài khoản của bạn."
+      />
 
-      <main className="relative z-10">
-        {/* Hero */}
-        <section className="relative overflow-hidden px-4 py-16 md:px-8 md:py-24">
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary/10 blur-[120px] pointer-events-none" />
-          <div className="mx-auto max-w-4xl text-center space-y-4">
-            <div className="inline-flex items-center justify-center rounded-full bg-primary/10 p-3">
-              <HelpCircle className="size-8 text-primary" />
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight md:text-5xl">
-              Trung tâm Hỗ trợ <span className="text-primary">NexEdu</span>
-            </h1>
-            <p className="text-base text-muted-foreground md:text-lg max-w-2xl mx-auto">
-              Chúng tôi luôn sẵn sàng hỗ trợ bạn. Tìm câu trả lời nhanh chóng hoặc gửi yêu cầu hỗ trợ.
-            </p>
-          </div>
-        </section>
+      <section className="grid gap-4 md:grid-cols-2">
+        {faqs.map((faq) => (
+          <Card key={faq.question} className="glass-panel rounded-2xl border-white/70">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-start gap-3 text-base font-bold">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <faq.icon className="size-5" />
+                </span>
+                {faq.question}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm font-medium leading-relaxed text-muted-foreground">{faq.answer}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
 
-        {/* FAQ */}
-        <section className="px-4 pb-16 md:px-8">
-          <div className="mx-auto max-w-4xl space-y-8">
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card className="glass-panel">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base font-bold">
-                    <BookOpen className="size-5 text-primary" />
-                    Làm sao để đăng ký khóa học?
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Sau khi đăng nhập, vào trang khóa học và chọn khóa bạn quan tâm. Nhấn "Đăng ký" để hoàn tất thanh toán hoặc chọn khóa miễn phí để bắt đầu học ngay.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="glass-panel">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base font-bold">
-                    <MessageSquare className="size-5 text-primary" />
-                    Làm sao để đặt câu hỏi trong khóa học?
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Mở bài học bạn đang học, cuộn xuống phần "Hỏi đáp" để đặt câu hỏi. Giảng viên sẽ phản hồi trong thời gian sớm nhất.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="glass-panel">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base font-bold">
-                    <Mail className="size-5 text-primary" />
-                    Tôi không nhận được email xác nhận?
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Vui lòng kiểm tra hộp thư spam hoặc thư rác. Nếu vẫn không nhận được, liên hệ hỗ trợ qua form bên dưới.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="glass-panel">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base font-bold">
-                    <Phone className="size-5 text-primary" />
-                    Làm sao để trở thành giảng viên?
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Gửi hồ sơ ứng tuyển tại trang "Trở thành Giảng viên". Admin sẽ xem xét và phản hồi trong 1-3 ngày làm việc.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Contact Form */}
-            <Card className="glass-panel overflow-hidden">
-              <CardHeader className="px-6 pt-8 pb-2">
-                <CardTitle className="text-xl font-bold">Gửi yêu cầu hỗ trợ</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Điền thông tin bên dưới, chúng tôi sẽ phản hồi trong vòng 24 giờ làm việc.
-                </p>
-              </CardHeader>
-              <CardContent className="px-6 pb-8">
-                {submitted ? (
-                  <div className="flex flex-col items-center gap-4 py-12 text-center">
-                    <div className="flex size-16 items-center justify-center rounded-full bg-emerald-100">
-                      <Send className="size-8 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-lg font-bold text-emerald-700">Đã gửi yêu cầu!</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Chúng tôi đã nhận được yêu cầu của bạn và sẽ phản hồi trong thời gian sớm nhất.
-                      </p>
-                    </div>
-                    <Button variant="outline" onClick={() => setSubmitted(false)}>
-                      Gửi yêu cầu khác
-                    </Button>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-semibold" htmlFor="name">Họ và tên</label>
-                        <Input
-                          id="name"
-                          placeholder="Nguyễn Văn A"
-                          value={form.name}
-                          onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-semibold" htmlFor="email">Email</label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="email@example.com"
-                          value={form.email}
-                          onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-semibold" htmlFor="subject">Chủ đề</label>
-                      <Input
-                        id="subject"
-                        placeholder="Vấn đề bạn cần hỗ trợ"
-                        value={form.subject}
-                        onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-semibold" htmlFor="message">Nội dung</label>
-                      <Textarea
-                        id="message"
-                        placeholder="Mô tả chi tiết vấn đề của bạn..."
-                        rows={5}
-                        value={form.message}
-                        onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))}
-                        required
-                        className="resize-none"
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={submitting || !isAuthenticated}
-                      className="w-full md:w-auto gap-2 font-bold shadow-md shadow-primary/20"
-                    >
-                      {submitting ? (
-                        <>
-                          <div className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          Đang gửi...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="size-4" />
-                          Gửi yêu cầu
-                        </>
-                      )}
-                    </Button>
-                    {!isAuthenticated && (
-                      <p className="text-xs text-muted-foreground">
-                        Bạn cần đăng nhập trước khi gửi ticket. Sau khi đăng nhập, có thể theo dõi tại `/dashboard/support`.
-                      </p>
-                    )}
-                  </form>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Contact info */}
-            <div className="flex flex-col gap-4 items-center text-center text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Mail className="size-4" />
-                <span>support@nexedu.com</span>
+      <Card className="glass-panel rounded-2xl border-white/70">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-xl font-bold">
+            <HelpCircle className="size-5 text-primary" />
+            Gửi ticket hỗ trợ
+          </CardTitle>
+          <p className="text-sm font-medium text-muted-foreground">
+            Ticket cá nhân yêu cầu đăng nhập để bảo vệ dữ liệu và giúp bạn theo dõi phản hồi tại Dashboard.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {submitted ? (
+            <div className="flex flex-col items-center gap-4 py-10 text-center">
+              <div className="flex size-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                <Send className="size-7" />
               </div>
-              <div className="flex items-center gap-2">
-                <Clock className="size-4" />
-                <span>Phản hồi trong 24 giờ làm việc (Thứ 2 - Thứ 6)</span>
+              <div>
+                <h2 className="text-lg font-bold">Ticket đã được ghi nhận</h2>
+                <p className="mt-1 text-sm font-medium text-muted-foreground">Bạn có thể theo dõi trạng thái tại Dashboard hỗ trợ.</p>
+              </div>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button asChild className="rounded-xl font-semibold">
+                  <Link href="/dashboard/support">Xem ticket của tôi</Link>
+                </Button>
+                <Button variant="outline" className="rounded-xl bg-white/70 font-semibold" onClick={() => setSubmitted(false)}>
+                  Gửi ticket khác
+                </Button>
               </div>
             </div>
-          </div>
-        </section>
-      </main>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="subject" className="text-sm font-semibold">Chủ đề</label>
+                <Input
+                  id="subject"
+                  value={form.subject}
+                  onChange={(event) => setForm((prev) => ({ ...prev, subject: event.target.value }))}
+                  placeholder="Ví dụ: Không truy cập được bài học đã mua"
+                  className="h-11 rounded-xl bg-white/70"
+                  disabled={submitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="message" className="text-sm font-semibold">Nội dung</label>
+                <Textarea
+                  id="message"
+                  value={form.message}
+                  onChange={(event) => setForm((prev) => ({ ...prev, message: event.target.value }))}
+                  placeholder="Mô tả vấn đề, khóa học liên quan và thao tác bạn đã thử..."
+                  rows={6}
+                  className="resize-none rounded-xl bg-white/70"
+                  disabled={submitting}
+                />
+              </div>
+              {fieldError ? <p className="text-sm font-semibold text-red-600">{fieldError}</p> : null}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Button type="submit" disabled={submitting || !isAuthenticated} className="gap-2 rounded-xl font-semibold">
+                  {submitting ? <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Send className="size-4" />}
+                  Gửi yêu cầu
+                </Button>
+                {!isAuthenticated ? (
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Bạn cần <Link href="/login" className="font-bold text-primary hover:underline">đăng nhập</Link> trước khi gửi ticket.
+                  </p>
+                ) : null}
+              </div>
+            </form>
+          )}
+        </CardContent>
+      </Card>
 
-      <SharedFooter />
-    </div>
+      <div className="flex flex-col items-center gap-3 text-center text-sm font-medium text-muted-foreground">
+        <span className="inline-flex items-center gap-2"><Mail className="size-4" /> support@nexedu.com</span>
+        <span className="inline-flex items-center gap-2"><Clock className="size-4" /> Phản hồi trong 24 giờ làm việc, thứ 2 đến thứ 6</span>
+      </div>
+    </PublicPageShell>
   );
 }

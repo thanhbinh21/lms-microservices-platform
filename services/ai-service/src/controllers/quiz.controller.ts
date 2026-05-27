@@ -9,6 +9,7 @@ import { handlePrismaError } from '../lib/prisma-errors.js';
 import { checkRateLimit, generateText, isGeminiRateLimitError } from '../lib/gemini.js';
 import { verifyEnrollment } from '../lib/access-control.js';
 import { fetchCourseContext, fetchLessonAiContext, fetchCompletionStatus, fetchLessonCompletionStatus } from '../lib/course-client.js';
+import { AI_SERVICE_ENV } from '../lib/env.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,10 @@ const QUIZ_PASS_SCORE = 70;
 const QUIZ_SESSION_EXPIRY_MINUTES = 30;
 const LESSON_QUIZ_MAX_QUESTIONS = 10;
 const FINAL_QUIZ_MAX_QUESTIONS = 20;
+const MAX_LESSON_QUIZ_CONTEXT_CHARS = 3500;
+const MAX_COURSE_QUIZ_CONTEXT_CHARS = 3800;
+const MAX_DESCRIPTION_CHARS = 500;
+const MAX_LESSON_SUMMARY_CHARS = 180;
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -44,6 +49,137 @@ interface QuizCorrectData {
 
 type CourseContext = NonNullable<Awaited<ReturnType<typeof fetchCourseContext>>>;
 type LessonContext = CourseContext['curriculum'][number]['lessons'][number];
+
+const quizQuestionSchema = z.object({
+  question: z.string().trim().min(8),
+  options: z.array(z.string().trim().min(1)).length(4),
+  correctIndex: z.number().int().min(0).max(3),
+  explanation: z.string().trim().min(3),
+}).transform((item) => ({
+  question: sanitizeText(item.question),
+  options: item.options.map((option) => sanitizeText(option)).slice(0, 4),
+  correctIndex: item.correctIndex,
+  explanation: sanitizeText(item.explanation),
+}));
+
+const quizQuestionArraySchema = z.array(quizQuestionSchema).min(1).max(FINAL_QUIZ_MAX_QUESTIONS);
+
+function sanitizeText(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .normalize('NFC')
+    .replace(/^\uFEFF/, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
+    .replace(/[┌┐└┘├┤┬┴┼═║╔╗╚╝]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function sanitizeMultilineText(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .normalize('NFC')
+    .replace(/^\uFEFF/, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
+    .replace(/[┌┐└┘├┤┬┴┼═║╔╗╚╝]/g, ' ')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function truncateText(value: string | null | undefined, maxChars: number): string {
+  const clean = sanitizeText(value);
+  if (clean.length <= maxChars) return clean;
+  return `${clean.slice(0, Math.max(0, maxChars - 3)).trim()}...`;
+}
+
+function splitSentences(value: string | null | undefined, maxSentences = 2): string {
+  const clean = sanitizeText(value);
+  if (!clean) return '';
+  const sentences = clean.match(/[^.!?。！？]+[.!?。！？]?/g) || [clean];
+  return truncateText(sentences.slice(0, maxSentences).join(' '), MAX_LESSON_SUMMARY_CHARS);
+}
+
+function extractKeywordsFromText(value: string, maxKeywords = 8): string[] {
+  const ignored = new Set([
+    'khoa', 'hoc', 'bai', 'chuong', 'noi', 'dung', 'giang', 'vien', 'thuc', 'hanh',
+    'course', 'lesson', 'chapter', 'the', 'and', 'with', 'for', 'can', 'ban', 'mot',
+  ]);
+
+  const matches = sanitizeText(value)
+    .toLowerCase()
+    .match(/[a-z0-9.+#-]{3,}|[a-z]+\.js|next\.js/gi) || [];
+
+  const keywords: string[] = [];
+  for (const item of matches) {
+    const keyword = item.trim().toLowerCase();
+    if (ignored.has(keyword) || keywords.includes(keyword)) continue;
+    keywords.push(keyword);
+    if (keywords.length >= maxKeywords) break;
+  }
+  return keywords;
+}
+
+function compactContext(value: string, maxChars: number): string {
+  const clean = sanitizeMultilineText(value);
+  if (clean.length <= maxChars) return clean;
+
+  const lines = clean
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const selected: string[] = [];
+  let total = 0;
+  for (const line of lines) {
+    const next = truncateText(line, 240);
+    if (total + next.length + 1 > maxChars) break;
+    selected.push(next);
+    total += next.length + 1;
+  }
+
+  const result = selected.join('\n').trim();
+  return result || truncateText(clean, maxChars);
+}
+
+export function buildCompactQuizContext(course: CourseContext): string {
+  const contextParts: string[] = [
+    `Course: ${sanitizeText(course.title)}`,
+    course.description ? `Description: ${truncateText(course.description, MAX_DESCRIPTION_CHARS)}` : '',
+    course.category ? `Category: ${sanitizeText(course.category)}` : '',
+    course.level ? `Level: ${sanitizeText(course.level)}` : '',
+  ].filter(Boolean);
+
+  const courseKeywords = extractKeywordsFromText([
+    course.title,
+    course.description || '',
+    ...course.curriculum.flatMap((chapter) => [
+      chapter.title,
+      ...chapter.lessons.flatMap((lesson) => [lesson.title, lesson.content || '']),
+    ]),
+  ].join(' '), 16);
+  if (courseKeywords.length > 0) {
+    contextParts.push(`Keywords: ${courseKeywords.join(', ')}`);
+  }
+
+  contextParts.push('Curriculum:');
+  for (const chapter of course.curriculum) {
+    contextParts.push(`- Chapter: ${sanitizeText(chapter.title)}`);
+    for (const lesson of chapter.lessons) {
+      const summary = splitSentences(lesson.content, 2);
+      const lessonKeywords = extractKeywordsFromText(`${lesson.title} ${lesson.content || ''}`, 5);
+      contextParts.push([
+        `  - Lesson: ${sanitizeText(lesson.title)}`,
+        summary ? `summary: ${summary}` : '',
+        lessonKeywords.length > 0 ? `keywords: ${lessonKeywords.join(', ')}` : '',
+      ].filter(Boolean).join(' | '));
+    }
+  }
+
+  contextParts.push('Instruction: Generate a final course quiz from this compact metadata only. Do not require full transcripts.');
+  return compactContext(contextParts.join('\n'), MAX_COURSE_QUIZ_CONTEXT_CHARS);
+}
 
 function buildLessonKeywordContext(course: CourseContext, lesson: LessonContext | undefined): string {
   const lessonChapter = lesson
@@ -168,10 +304,11 @@ async function hasValidFinalQuizContext(courseId: string, traceId: string): Prom
   };
 }
 
-const QUIZ_SYSTEM_INSTRUCTION = `Ban la he thong tao quiz tu dong. Nhiem vu cua ban chi la tra ve mot JSON array, KHONG co bat ky text nao khac.
-Output phai la JSON array hop le bat dau bang [ va ket thuc bang ].
-Moi phan tu trong array la object co cac truong: question (string), options (array of 4 strings), correctIndex (number 0-3), explanation (string).
-TUYET DOI khong viet text giai thich, khong viet 'Day la...' hay bat ky chu nao truoc hoac sau JSON array.`;
+const QUIZ_SYSTEM_INSTRUCTION = `You generate LMS multiple-choice quizzes.
+Return raw JSON only. No markdown fences. No prose. No explanation outside JSON.
+The response must be a valid JSON array starting with [ and ending with ].
+Each item must be: {"question":"...","options":["...","...","...","..."],"correctIndex":0,"explanation":"..."}.
+Use Vietnamese text inside JSON string values. Escape quotes and newlines correctly.`;
 
 function buildLessonQuizPrompt(
   lessonTitle: string,
@@ -180,13 +317,17 @@ function buildLessonQuizPrompt(
   level: string,
   count: number,
 ): string {
-  return `Tao ${count} cau MCQ kiem tra kien thuc bai "${lessonTitle}" (khoa "${courseTitle}", trinh do ${level}).
+  return `Return exactly ${count} MCQ questions as raw JSON array only.
+Topic: lesson "${sanitizeText(lessonTitle)}" in course "${sanitizeText(courseTitle)}". Level: ${sanitizeText(level)}.
 
-NOI DUNG BAI HOC:
-${textContent}
+COMPACT_LESSON_CONTEXT:
+${compactContext(textContent, MAX_LESSON_QUIZ_CONTEXT_CHARS)}
 
-Yeu cau: 4 lua chon A/B/C/D, 1 dap an dung, giai thich ngan bang tieng Viet.
-Chi tra ve JSON array, khong co text khac.`;
+Rules:
+- 4 options per question.
+- correctIndex must be 0, 1, 2, or 3.
+- Explanation is one short Vietnamese sentence.
+- Output raw JSON only. No markdown. No text before or after JSON.`;
 }
 
 function buildFinalQuizPrompt(
@@ -195,87 +336,108 @@ function buildFinalQuizPrompt(
   combinedContent: string,
   count: number,
 ): string {
-  return `Tao ${count} cau MCQ tong hop cho khoa hoc "${courseTitle}" (trinh do ${level}).
+  return `Return exactly ${count} final-course MCQ questions as raw JSON array only.
+Course: "${sanitizeText(courseTitle)}". Level: ${sanitizeText(level)}.
 
-Yeu cau dac biet:
-- Bao phu nhieu bai hoc khac nhau.
-- Ket hop cau hoi nho + hieu + van dung.
-- Day la bai kiem tra cuoi khoa.
+COMPACT_COURSE_CONTEXT:
+${compactContext(combinedContent, MAX_COURSE_QUIZ_CONTEXT_CHARS)}
 
-NOI DUNG TOAN KHOA:
-${combinedContent}
-
-Yeu cau: 4 lua chon A/B/C/D, 1 dap an dung, giai thich ngan bang tieng Viet.
-Chi tra ve JSON array, khong co text khac.`;
+Rules:
+- Cover multiple chapters/lessons.
+- Mix recall, understanding, and practical application.
+- 4 options per question.
+- correctIndex must be 0, 1, 2, or 3.
+- Explanation is one short Vietnamese sentence.
+- Output raw JSON only. No markdown. No text before or after JSON.`;
 }
 
 function buildStaticFallbackQuiz(
   courseTitle: string,
   lessonTitle: string | undefined,
   count: number,
+  keywords: string[] = [],
 ): QuizQuestion[] {
   const subject = lessonTitle ? `bai "${lessonTitle}"` : `khoa hoc "${courseTitle}"`;
+  const cleanKeywords = keywords.length > 0 ? keywords : extractKeywordsFromText(`${courseTitle} ${lessonTitle || ''}`, count + 3);
+  const topicPool = cleanKeywords.length > 0 ? cleanKeywords : ['kien thuc cot loi', 'ung dung thuc te', 'quy trinh hoc tap'];
 
   return Array.from({ length: count }, (_, index) => ({
-    question: `Cau hoi du phong ${index + 1} cho ${subject}.`,
+    question: `Trong ${subject}, khai niem "${topicPool[index % topicPool.length]}" nen duoc hieu nhu the nao?`,
     options: [
-      'Noi dung dang duoc cap nhat.',
-      'Can xem lai bai hoc de nho hon.',
-      'Vui long thu lai sau de nhan quiz day du.',
-      'Lien he giang vien neu can ho tro.',
+      'La mot chu de can nam vung va ap dung dung ngu canh.',
+      'La noi dung phu, co the bo qua trong moi tinh huong.',
+      'Chi la ten cong cu, khong lien quan den tu duy giai quyet van de.',
+      'La loi he thong va khong nam trong noi dung khoa hoc.',
     ],
-    correctIndex: 2,
-    explanation: 'Quiz du phong khi he thong AI tam thoi khong san sang.',
+    correctIndex: 0,
+    explanation: `Cau hoi du phong duoc tao tu metadata cua ${subject} de demo on dinh khi provider AI loi.`,
   }));
 }
 
 async function generateQuizWithLLM(
   prompt: string,
   expectedCount: number,
+  retryPrompt?: string,
 ): Promise<{ questions: QuizQuestion[]; raw: string }> {
   const maxAttempts = 2;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     // Dung system instruction de ep model tra ve JSON thuần.
-    const raw = await generateText(prompt, QUIZ_SYSTEM_INSTRUCTION, {
+    const activePrompt = attempt === 1 ? prompt : (retryPrompt || compactContext(prompt, 2200));
+    const raw = await generateText(activePrompt, QUIZ_SYSTEM_INSTRUCTION, {
       temperature: attempt === 1 ? 0.3 : 0.1,
-      maxTokens: 2048,
+      maxTokens: 1400,
     });
 
     try {
-      let jsonStr = raw.trim();
-      // Strip markdown code blocks neu co.
-      jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
-      // Strip text truoc/sau JSON array.
-      const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        logger.warn({ attempt, rawPreview: raw.slice(0, 300) }, 'Quiz LLM: khong tim thay JSON array');
-        if (attempt < maxAttempts) continue;
-        throw new Error('LLM response khong chua JSON array');
+      const jsonCandidate = extractJsonCandidate(raw);
+      const parsed = JSON.parse(jsonCandidate);
+      const maybeQuestions = Array.isArray(parsed)
+        ? parsed
+        : typeof parsed === 'object' && parsed !== null && Array.isArray((parsed as { questions?: unknown }).questions)
+          ? (parsed as { questions: unknown[] }).questions
+          : parsed;
+
+      const validation = quizQuestionArraySchema.safeParse(maybeQuestions);
+      if (!validation.success) {
+        throw new Error(validation.error.issues.map((issue) => issue.message).join('; '));
       }
 
-      const parsed = JSON.parse(jsonMatch[0]) as QuizQuestion[];
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        throw new Error('Parsed result khong phai la array hoac rong');
-      }
-
-      const valid = parsed.filter(
-        (q) => q.question && Array.isArray(q.options) && q.options.length >= 2
-          && typeof q.correctIndex === 'number' && q.correctIndex >= 0,
-      );
-
-      if (valid.length === 0) {
-        throw new Error('Khong co question nao hop le sau validation');
-      }
-
-      return { questions: valid, raw };
+      return { questions: validation.data.slice(0, expectedCount), raw };
     } catch (parseErr) {
-      logger.warn({ attempt, err: parseErr, rawPreview: raw.slice(0, 300) }, 'Quiz LLM: parse/validate that bai');
+      logger.warn({ attempt, err: parseErr, rawPreview: sanitizeText(raw).slice(0, 300) }, 'Quiz LLM: parse/validate that bai');
       if (attempt >= maxAttempts) throw parseErr;
     }
   }
 
   throw new Error('generateQuizWithLLM: het so lan thu');
+}
+
+function stripMarkdownFences(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .replace(/```(?:json)?/gi, '')
+    .replace(/```/g, '')
+    .trim();
+}
+
+function extractJsonCandidate(raw: string): string {
+  const clean = stripMarkdownFences(raw).replace(/^\uFEFF/, '');
+  const arrayStart = clean.indexOf('[');
+  const arrayEnd = clean.lastIndexOf(']');
+  if (arrayStart >= 0 && arrayEnd > arrayStart) {
+    return clean.slice(arrayStart, arrayEnd + 1);
+  }
+
+  const objectStart = clean.indexOf('{');
+  const objectEnd = clean.lastIndexOf('}');
+  if (objectStart >= 0 && objectEnd > objectStart) {
+    return clean.slice(objectStart, objectEnd + 1);
+  }
+
+  throw new Error('LLM response khong chua JSON array/object');
 }
 
 function hashQuestions(questions: QuizQuestion[]): string {
@@ -394,24 +556,17 @@ export async function generateQuiz(req: Request, res: Response): Promise<Respons
         const lesson = course.curriculum.flatMap((ch) => ch.lessons).find((l) => l.id === effectiveLessonId);
         const fallback = buildLessonKeywordContext(course, lesson);
         if (fallback.trim()) {
-          textContent = `[AUTO_CONTEXT]\n${fallback}`;
+          textContent = `[AUTO_CONTEXT]\n${compactContext(fallback, MAX_LESSON_QUIZ_CONTEXT_CHARS)}`;
         } else {
           contextErrorCode = ctx.reason;
         }
       } else {
-        textContent = ctx.textContent!;
+        textContent = compactContext(ctx.textContent!, MAX_LESSON_QUIZ_CONTEXT_CHARS);
       }
     } else {
-      const ctx = await hasValidFinalQuizContext(courseId, traceId);
-      if (!ctx.available) {
-        const fallback = buildCourseKeywordContext(course);
-        if (fallback.trim()) {
-          textContent = `[AUTO_CONTEXT]\n${fallback}`;
-        } else {
-          contextErrorCode = ctx.reason;
-        }
-      } else {
-        textContent = ctx.combinedContent!;
+      textContent = buildCompactQuizContext(course);
+      if (!textContent.trim()) {
+        contextErrorCode = course.curriculum.length === 0 ? 'EMPTY_COURSE' : 'INSUFFICIENT_CONTENT';
       }
     }
 
@@ -448,17 +603,24 @@ export async function generateQuiz(req: Request, res: Response): Promise<Respons
       return res.status(500).json(createErrorResponse('Không thể lấy thông tin khóa học', 500, traceId));
     }
 
-    textContent = `${textContent}
+    const maxContextChars = quizType === 'FINAL_COURSE'
+      ? MAX_COURSE_QUIZ_CONTEXT_CHARS
+      : MAX_LESSON_QUIZ_CONTEXT_CHARS;
+
+    textContent = compactContext(`${textContent}
 
 YEU CAU KEYWORD_EXPANSION:
 - Tao quiz dua tren chu de, tu khoa, tieu de, mo ta va text giang vien cung cap.
 - Duoc mo rong sang kien thuc nen tang lien quan truc tiep den khoa hoc/bai hoc.
 - Khong can transcript am thanh day du.
-- Tranh hoi vao chi tiet qua cu the neu ngu canh khong neu ro.`;
+- Tranh hoi vao chi tiet qua cu the neu ngu canh khong neu ro.`, maxContextChars);
 
     let prompt: string;
+    let retryPrompt: string;
+    let lessonTitle: string | undefined;
     if (quizType === 'LESSON' && effectiveLessonId) {
       const lesson = course.curriculum.flatMap((ch) => ch.lessons).find((l) => l.id === effectiveLessonId);
+      lessonTitle = lesson?.title;
       prompt = buildLessonQuizPrompt(
         lesson?.title || 'Bài học',
         textContent,
@@ -466,25 +628,38 @@ YEU CAU KEYWORD_EXPANSION:
         course.level,
         effectiveCount,
       );
+      retryPrompt = buildLessonQuizPrompt(
+        lesson?.title || 'Bài học',
+        compactContext(textContent, 1800),
+        course.title,
+        course.level,
+        effectiveCount,
+      );
     } else {
       prompt = buildFinalQuizPrompt(course.title, course.level, textContent, effectiveCount);
+      retryPrompt = buildFinalQuizPrompt(course.title, course.level, compactContext(textContent, 2200), effectiveCount);
     }
 
-    let quizQuestions: QuizQuestion[];
+    let quizQuestions: QuizQuestion[] = [];
     try {
-      const { questions } = await generateQuizWithLLM(prompt, effectiveCount);
+      const { questions } = await generateQuizWithLLM(prompt, effectiveCount, retryPrompt);
       quizQuestions = questions.slice(0, effectiveCount);
     } catch (err) {
       logger.warn({ err, traceId }, 'Quiz generation failed');
+      if (AI_SERVICE_ENV.AI_DEMO_FALLBACK_QUIZ.toLowerCase() === 'true') {
+        const fallbackCount = Math.max(3, Math.min(5, effectiveCount));
+        const keywords = extractKeywordsFromText(`${course.title} ${textContent}`, fallbackCount + 4);
+        quizQuestions = buildStaticFallbackQuiz(course.title, lessonTitle, fallbackCount, keywords);
+      }
       // Tra loi loi thay vi quiz du phong vo nghia.
-      if (isGeminiRateLimitError(err)) {
+      if (quizQuestions.length === 0 && isGeminiRateLimitError(err)) {
         return res.status(429).json(createErrorResponse(
           'AI đang tạm hết quota. Vui lòng thử lại sau vài phút.',
           429,
           traceId,
         ));
       }
-      return res.status(503).json(createErrorResponse(
+      if (quizQuestions.length === 0) return res.status(503).json(createErrorResponse(
         'AI tạm thời không thể tạo quiz. Vui lòng thử lại sau.',
         503,
         traceId,

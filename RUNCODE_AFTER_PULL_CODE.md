@@ -46,6 +46,28 @@ pnpm seed
 
 Dự án dùng Turborepo nên bạn có thể chạy đồng loạt nhiều service. Các script `dev` đã được tích hợp luồng **tự động kill port** rác trước khi chạy, hạn chế lỗi "Port already in use".
 
+**Chạy từng service riêng lẻ:**
+```bash
+# Frontend
+pnpm --filter web-client dev
+
+# Backend services
+pnpm --filter @lms/auth-service dev
+pnpm --filter @lms/course-service dev
+pnpm --filter @lms/learning-service dev
+pnpm --filter @lms/community-service dev
+pnpm --filter @lms/media-service dev
+pnpm --filter @lms/notification-service dev
+pnpm --filter @lms/payment-service dev
+pnpm --filter @lms/ai-service dev
+
+# Service phụ trợ dùng chung
+pnpm --parallel --filter @lms/env-validator --filter @lms/logger --filter @lms/types --filter @lms/kafka-client dev
+
+# Tác vụ riêng của course-service
+pnpm --filter @lms/course-service dev:transcript-worker
+```
+
 **Chạy toàn bộ Backend Services + Frontend Web (Khuyên dùng):**
 ```bash
 pnpm dev:web

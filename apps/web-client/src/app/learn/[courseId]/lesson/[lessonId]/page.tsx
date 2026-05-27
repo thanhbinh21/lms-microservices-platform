@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Loader2, Clock3, PlayCircle, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, HelpCircle, Keyboard, ListChecks, X, Award, MessageSquare } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getLearnDataAction, updateLessonProgressAction, type LearnDataDto, type LearnLessonDto } from '@/app/actions/learning';
@@ -26,6 +26,7 @@ function formatDuration(seconds: number) {
 
 export default function LessonPage() {
   const params = useParams();
+  const router = useRouter();
   const courseId = params.courseId as string;
   const lessonId = params.lessonId as string;
 
@@ -54,11 +55,15 @@ export default function LessonPage() {
       setData(res.data);
       const allLessons = res.data.chapters.flatMap((ch) => ch.lessons);
       const found = allLessons.find((l) => l.id === lessonId);
+      if (!found && allLessons.length > 0) {
+        router.replace(`/learn/${courseId}/lesson/${allLessons[0].id}`);
+        return;
+      }
       setLesson(found || null);
       setCourseCompleted(res.data.progressPercent >= 100);
     }
     setLoading(false);
-  }, [courseId, lessonId]);
+  }, [courseId, lessonId, router]);
 
   // Fetch AI context status once when lesson loads
   useEffect(() => {

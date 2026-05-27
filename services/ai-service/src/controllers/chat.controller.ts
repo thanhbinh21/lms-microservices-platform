@@ -18,6 +18,9 @@ const CHAT_RATE_LIMIT_WINDOW = 3600; // 1 hour in seconds
 const MAX_RECENT_MESSAGES = 6;
 const MAX_SUMMARY_MESSAGES = 10;
 const MIN_CONTEXT_LENGTH = 1;
+const MAX_CHAT_CONTEXT_CHARS = 1400;
+const MAX_CHAT_DESCRIPTION_CHARS = 180;
+const MAX_CHAT_LESSON_CONTENT_CHARS = 220;
 
 // ─── Public: AI Context Status ───────────────────────────────────────────────
 
@@ -65,6 +68,54 @@ function getTranscriptWindow(
     .filter((s) => s.start >= start && s.end <= end)
     .map((s) => s.text)
     .join(' ');
+}
+
+function sanitizeContextText(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .normalize('NFC')
+    .replace(/^\uFEFF/, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
+    .replace(/[┌┐└┘├┤┬┴┼═║╔╗╚╝]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function truncateContextText(value: string | null | undefined, maxChars: number): string {
+  const clean = sanitizeContextText(value);
+  if (clean.length <= maxChars) return clean;
+  return `${clean.slice(0, Math.max(0, maxChars - 3)).trim()}...`;
+}
+
+function extractContextKeywords(value: string, maxKeywords = 8): string[] {
+  const ignored = new Set([
+    'khoa', 'hoc', 'bai', 'chuong', 'noi', 'dung', 'giang', 'vien', 'thuc', 'hanh',
+    'course', 'lesson', 'chapter', 'the', 'and', 'with', 'for', 'can', 'ban', 'mot',
+  ]);
+  const matches = sanitizeContextText(value)
+    .toLowerCase()
+    .match(/[a-z0-9.+#-]{3,}|[a-z]+\.js|next\.js/gi) || [];
+
+  const keywords: string[] = [];
+  for (const item of matches) {
+    const keyword = item.trim().toLowerCase();
+    if (ignored.has(keyword) || keywords.includes(keyword)) continue;
+    keywords.push(keyword);
+    if (keywords.length >= maxKeywords) break;
+  }
+  return keywords;
+}
+
+function compactChatContext(parts: string[]): string {
+  const selected: string[] = [];
+  let total = 0;
+  for (const part of parts.map((item) => item.trim()).filter(Boolean)) {
+    const line = truncateContextText(part, 260);
+    if (total + line.length + 1 > MAX_CHAT_CONTEXT_CHARS) break;
+    selected.push(line);
+    total += line.length + 1;
+  }
+  return selected.join('\n');
 }
 
 function buildSystemPrompt(
@@ -132,63 +183,45 @@ async function buildChatContext(
   courseContext: NonNullable<Awaited<ReturnType<typeof fetchCourseContext>>>,
   lessonId: string | undefined,
   currentTimeSec: number | undefined,
-  traceId: string,
+  _traceId: string,
 ): Promise<{ textContent: string; sources: string[] }> {
   const sources: string[] = [];
-  const contentParts: string[] = [];
+  const allLessons = courseContext.curriculum.flatMap((ch) =>
+    ch.lessons.map((lesson) => ({ ...lesson, chapterTitle: ch.title })),
+  );
+  const currentLesson = lessonId ? allLessons.find((lesson) => lesson.id === lessonId) : undefined;
+  const chapterTitles = courseContext.curriculum.map((chapter, index) => `${index + 1}. ${chapter.title}`);
+  const nearbyLessons = currentLesson
+    ? allLessons.filter((lesson) => lesson.chapterTitle === currentLesson.chapterTitle).slice(0, 6)
+    : allLessons.slice(0, 8);
+  const keywords = extractContextKeywords([
+    courseContext.title,
+    courseContext.description || '',
+    currentLesson?.chapterTitle || '',
+    currentLesson?.title || '',
+    currentLesson?.content || '',
+    ...chapterTitles,
+  ].join(' '), 10);
 
-  if (lessonId) {
-    const aiContext = await fetchLessonAiContext(lessonId, traceId);
-    if (aiContext?.available && aiContext.textContent) {
-      const segments = (aiContext.segments || []) as { start: number; end: number; text: string }[];
-      let contextText = aiContext.textContent;
+  const contextParts = [
+    `Khoa hoc: ${courseContext.title}`,
+    courseContext.description ? `Mo ta ngan: ${truncateContextText(courseContext.description, MAX_CHAT_DESCRIPTION_CHARS)}` : '',
+    courseContext.level ? `Trinh do: ${courseContext.level}` : '',
+    chapterTitles.length > 0 ? `Cac chuong: ${chapterTitles.join(' | ')}` : '',
+    currentLesson ? `Chuong hien tai: ${currentLesson.chapterTitle}` : '',
+    currentLesson ? `Bai hoc hien tai: ${currentLesson.title}` : '',
+    currentLesson?.content ? `Goi y noi dung: ${truncateContextText(currentLesson.content, MAX_CHAT_LESSON_CONTENT_CHARS)}` : '',
+    nearbyLessons.length > 0 ? `Bai lien quan: ${nearbyLessons.map((lesson) => lesson.title).join(' | ')}` : '',
+    keywords.length > 0 ? `Tu khoa: ${keywords.join(', ')}` : '',
+    'Che do AI: giai thich co ban, mo rong kien thuc lien quan; khong xem day la transcript day du cua khoa hoc.',
+  ];
 
-      if (currentTimeSec !== undefined && segments.length > 0) {
-        const windowText = getTranscriptWindow(segments, currentTimeSec);
-        contextText = windowText.trim() || aiContext.textContent;
-      }
-
-      // Groq free tier gioi han 6000 TPM — giu context nho de du cho system prompt + history.
-      if (contextText.length > 1500) {
-        contextText = contextText.slice(0, 1500);
-      }
-
-      contentParts.push(`[${aiContext.sourceType}]\n${contextText}`);
-      sources.push(...aiContext.sources);
-    }
+  if (currentTimeSec !== undefined && lessonId) {
+    contextParts.push(`Vi tri video tham khao: ${currentTimeSec} giay.`);
   }
+  sources.push('COURSE_METADATA', 'LESSON_METADATA', 'KEYWORD_CONTEXT');
 
-  // Fallback: chi dung metadata bai hoc hien tai, KHONG dump toan bo danh sach lessons.
-  if (contentParts.length === 0) {
-    const allLessons = courseContext.curriculum.flatMap((ch) =>
-      ch.lessons.map((lesson) => ({ ...lesson, chapterTitle: ch.title })),
-    );
-    const currentLesson = lessonId ? allLessons.find((lesson) => lesson.id === lessonId) : undefined;
-    const fallbackParts = [
-      `Khoa hoc: ${courseContext.title}`,
-      courseContext.description?.trim() ? `Mo ta: ${courseContext.description.trim().slice(0, 200)}` : '',
-      courseContext.level ? `Trinh do: ${courseContext.level}` : '',
-    ];
-
-    if (currentLesson) {
-      fallbackParts.push(
-        `Chuong: ${currentLesson.chapterTitle}`,
-        `Bai hoc hien tai: ${currentLesson.title}`,
-      );
-      if (currentLesson.content?.trim()) {
-        fallbackParts.push(`Noi dung giang vien: ${currentLesson.content.trim().slice(0, 500)}`);
-      }
-    } else {
-      // Khong co lessonId — chi liet ke ten bai hoc (khong content) de tiet kiem token.
-      const lessonNames = allLessons.slice(0, 10).map((l, i) => `${i + 1}. ${l.title}`).join('\n');
-      fallbackParts.push(`Danh sach bai hoc:\n${lessonNames}`);
-    }
-
-    contentParts.push(`[AUTO_CONTEXT]\n${fallbackParts.filter(Boolean).join('\n')}`);
-    sources.push('COURSE_METADATA', 'LESSON_METADATA', 'AUTO_CONTEXT');
-  }
-
-  return { textContent: contentParts.join('\n\n---\n\n'), sources: Array.from(new Set(sources)) };
+  return { textContent: `[COMPACT_CONTEXT]\n${compactChatContext(contextParts)}`, sources: Array.from(new Set(sources)) };
 }
 
 async function getRecentMessages(conversationId: string): Promise<{ role: string; content: string }[]> {
@@ -301,10 +334,12 @@ export async function listConversations(req: Request, res: Response): Promise<Re
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
     const skip = (page - 1) * limit;
+    const courseId = typeof req.query.courseId === 'string' ? req.query.courseId : undefined;
+    const where = { userId, ...(courseId ? { courseId } : {}) };
 
     const [conversations, total] = await Promise.all([
       prisma.aiConversation.findMany({
-        where: { userId },
+        where,
         orderBy: { updatedAt: 'desc' },
         skip,
         take: limit,
@@ -312,7 +347,7 @@ export async function listConversations(req: Request, res: Response): Promise<Re
           _count: { select: { messages: true } },
         },
       }),
-      prisma.aiConversation.count({ where: { userId } }),
+      prisma.aiConversation.count({ where }),
     ]);
 
     return res.status(200).json(createSuccessResponse({

@@ -60,6 +60,7 @@ const envSchema = z.object({
   OPENROUTER_APP_NAME: z.string().optional(),
 
   AI_STRICT_CONTEXT_GATE: z.string().default('false'),
+  AI_DEMO_FALLBACK_QUIZ: z.string().default('false'),
 
   // Internal auth
   INTERNAL_SERVICE_SECRET: z.string().min(1),

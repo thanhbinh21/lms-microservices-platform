@@ -527,3 +527,84 @@ export async function upsertAdminSystemConfigAction(payload: {
   }
   return result;
 }
+
+// ---------------------------------------------------------------------------
+// Payment Order Management (Event Sourcing)
+// ---------------------------------------------------------------------------
+
+export interface AdminOrderDto {
+  id: string;
+  userId: string;
+  courseId: string;
+  courseTitle: string | null;
+  instructorId?: string;
+  amount: number;
+  currency: string;
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'EXPIRED' | 'REFUNDED';
+  paymentMethod: string;
+  vnpTxnRef: string;
+  vnpPayUrl: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderEventItemDto {
+  id: string;
+  version: number;
+  type: string;
+  occurredAt: string;
+  createdAt: string;
+  payload: unknown;
+  metadata: unknown;
+}
+
+export interface OrderEventHistoryDto {
+  orderId: string;
+  currentState: {
+    status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'EXPIRED' | 'REFUNDED';
+    version: number;
+    amount: number;
+    currency: string;
+    userId: string;
+    courseId: string;
+    instructorId: string;
+    paidAt: string | null;
+    expiresAt: string | null;
+    vnpTxnRef: string;
+    vnpTransactionNo: string | null;
+    vnpResponseCode: string | null;
+  };
+  totalEvents: number;
+  events: OrderEventItemDto[];
+}
+
+export async function getAdminOrdersAction(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  userId?: string;
+}): Promise<ApiResponse<{ orders: AdminOrderDto[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>> {
+  const query = new URLSearchParams();
+  if (params?.page) query.set('page', String(params.page));
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.status) query.set('status', params.status);
+  if (params?.userId) query.set('userId', params.userId);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return callApi<{ orders: AdminOrderDto[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
+    `/payment/api/admin/orders${suffix}`,
+    { method: 'GET' },
+    true,
+  );
+}
+
+export async function getAdminOrderEventHistoryAction(
+  orderId: string,
+): Promise<ApiResponse<OrderEventHistoryDto>> {
+  return callApi<OrderEventHistoryDto>(
+    `/payment/api/admin/orders/${orderId}/events`,
+    { method: 'GET' },
+    true,
+  );
+}
+

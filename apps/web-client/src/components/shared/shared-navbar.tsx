@@ -1,16 +1,27 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Clapperboard, LayoutDashboard, LogOut, Menu, X, GraduationCap } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import {
+  BookOpen,
+  Clapperboard,
+  GraduationCap,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Settings,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
 import { logoutAction } from '@/app/actions/auth';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { logout } from '@/lib/redux/authSlice';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
+import { cn } from '@/lib/utils';
 import { NotificationBell } from './notification-bell';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const navItems = [
   { label: 'Trang chủ', href: '/' },
@@ -20,30 +31,68 @@ const navItems = [
   { label: 'Hỗ trợ', href: '/support' },
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  if (href === '/') {
-    return pathname === '/';
-  }
+function isActive(pathname: string, href: string) {
+  if (href === '/') return pathname === '/';
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function roleLabel(role?: string) {
+  switch ((role || '').toUpperCase()) {
+    case 'ADMIN':
+      return 'Quản trị viên';
+    case 'INSTRUCTOR':
+      return 'Giảng viên';
+    case 'STUDENT':
+    default:
+      return 'Học viên';
+  }
 }
 
 export function SharedNavbar() {
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
 
+  // Tránh hydration mismatch bằng cách chỉ render role-aware menu sau khi component đã mount trên client.
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const showRoleAware = mounted && isAuthenticated && user;
+
   const normalizedRole = (user?.role || '').toUpperCase();
-  const canBecomeInstructor = isAuthenticated && normalizedRole === 'STUDENT';
-  const canAccessInstructorStudio = isAuthenticated && normalizedRole === 'INSTRUCTOR';
-  const canAccessDashboard = isAuthenticated && normalizedRole === 'STUDENT';
-  const isAdmin = normalizedRole === 'ADMIN';
+  const primaryHref = normalizedRole === 'ADMIN' ? '/admin' : normalizedRole === 'INSTRUCTOR' ? '/instructor' : '/dashboard';
+  const primaryLabel = normalizedRole === 'ADMIN' ? 'Admin' : normalizedRole === 'INSTRUCTOR' ? 'Studio' : 'Dashboard';
+  const PrimaryIcon = normalizedRole === 'INSTRUCTOR' ? Clapperboard : LayoutDashboard;
+
+  const accountLinks = useMemo(() => {
+    const links = [
+      { label: primaryLabel, href: primaryHref, icon: PrimaryIcon },
+      { label: 'Hồ sơ & cài đặt', href: '/settings', icon: Settings },
+    ];
+    if (normalizedRole === 'STUDENT') {
+      links.splice(1, 0, { label: 'Khóa học của tôi', href: '/dashboard/courses', icon: BookOpen });
+      links.push({ label: 'Trở thành giảng viên', href: '/become-instructor', icon: GraduationCap });
+    }
+    if (normalizedRole === 'ADMIN') {
+      links.push({ label: 'Quản trị hệ thống', href: '/admin/system', icon: ShieldCheck });
+    }
+    return links;
+  }, [PrimaryIcon, normalizedRole, primaryHref, primaryLabel]);
+
+  const closeMobileMenu = useCallback(() => setMobileOpen(false), []);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeMobileMenu();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [closeMobileMenu, mobileOpen]);
 
   const handleLogout = async () => {
     await logoutAction();
@@ -52,143 +101,107 @@ export function SharedNavbar() {
     router.refresh();
   };
 
-  const closeMobileMenu = useCallback(() => setMobileOpen(false), []);
-
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeMobileMenu();
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [mobileOpen, closeMobileMenu]);
-
-  if (!mounted) {
-    return <header className="glass-navbar sticky top-0 z-40 shadow-sm h-16"></header>;
-  }
-
   return (
     <header className="glass-navbar sticky top-0 z-40 shadow-sm">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-8">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2" aria-label="Về trang chủ NexEdu">
           <Image src="/nexedu-logo.svg" alt="Logo NexEdu" width={40} height={40} priority />
           <span className="text-xl font-bold tracking-tight">NexEdu</span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-muted-foreground">
+        <nav className="hidden items-center gap-7 text-sm font-semibold text-muted-foreground md:flex" aria-label="Điều hướng chính">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={isActive(pathname, item.href) ? 'border-b-2 border-primary pb-1 text-primary' : 'pb-1 transition-colors hover:text-primary'}
+              className={cn(
+                'rounded-md px-1 py-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                isActive(pathname, item.href) && 'text-primary',
+              )}
+              aria-current={isActive(pathname, item.href) ? 'page' : undefined}
             >
               {item.label}
             </Link>
           ))}
         </nav>
 
-        <div className="hidden md:flex items-center gap-4">
-          {isAuthenticated ? (
-            <div className="flex items-center gap-2">
-              {canAccessDashboard && (
-                <Link href="/dashboard">
-                  <Button variant="ghost" className="font-bold gap-2 hover:bg-primary/10">
-                    <LayoutDashboard className="size-4 text-muted-foreground" />
-                    Dashboard
-                  </Button>
+        <div className="hidden items-center gap-3 md:flex">
+          {showRoleAware ? (
+            <>
+              <Button asChild variant="ghost" className="gap-2 rounded-xl font-semibold hover:bg-primary/10">
+                <Link href={primaryHref}>
+                  <PrimaryIcon className="size-4" />
+                  {primaryLabel}
                 </Link>
-              )}
-              
-              {canAccessInstructorStudio && (
-                <Link href="/instructor">
-                  <Button variant="ghost" className="font-bold gap-2 hover:bg-primary/10">
-                    <Clapperboard className="size-4 text-muted-foreground" />
-                    Studio
-                  </Button>
-                </Link>
-              )}
-
-              {(normalizedRole === 'ADMIN') && (
-                <Link href="/admin">
-                  <Button variant="ghost" className="font-bold gap-2 hover:bg-primary/10">
-                    <LayoutDashboard className="size-4 text-muted-foreground" />
-                    Quản trị
-                  </Button>
-                </Link>
-              )}
-              
+              </Button>
               <NotificationBell />
-              
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" className="relative flex items-center gap-2 rounded-full pl-2 pr-3 py-1 h-9 hover:bg-slate-100">
-                    {user?.avatar ? (
-                      <span className="flex size-7 shrink-0 overflow-hidden rounded-full border border-primary/20 bg-primary/10 shadow-sm">
-                        <Image src={user.avatar} alt={user.name || 'Ảnh đại diện'} width={28} height={28} className="size-full object-cover" />
+                  <Button variant="ghost" className="h-10 gap-2 rounded-full pl-2 pr-3 hover:bg-white/70" aria-label="Mở menu tài khoản">
+                    {user.avatar ? (
+                      <span className="relative size-8 overflow-hidden rounded-full border border-primary/20 bg-primary/10">
+                        <Image src={user.avatar} alt={user.name || 'Ảnh đại diện'} width={32} height={32} className="size-full object-cover" />
                       </span>
                     ) : (
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-bold text-primary shadow-sm">
-                        {user!.name?.charAt(0) || 'U'}
+                      <span className="flex size-8 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-bold text-primary">
+                        {user.name?.charAt(0) || 'U'}
                       </span>
                     )}
-                    <span className="text-sm font-semibold truncate max-w-40">{user!.name}</span>
+                    <span className="max-w-36 truncate text-sm font-semibold">{user.name}</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-60 p-2 rounded-xl">
-                  <div className="flex flex-col space-y-1">
-                    <div className="px-2 py-2.5 flex flex-col">
-                      <p className="text-sm font-medium leading-none">{user!.name}</p>
-                      <p className="text-xs text-muted-foreground mt-1 truncate">{user!.email}</p>
-                    </div>
-                    <div className="h-px bg-slate-100 my-1" />
-                    
-                    <Link href="/profile">
-                      <Button variant="ghost" className="w-full justify-start font-medium px-2 h-9">Hồ sơ cá nhân</Button>
-                    </Link>
-                    
-                    {canBecomeInstructor && (
-                      <Link href="/become-instructor">
-                        <Button variant="ghost" className="w-full justify-start font-medium px-2 h-9 gap-2 text-primary hover:text-primary hover:bg-primary/10">
-                          <GraduationCap className="size-4" />
-                          Trở thành Giảng viên
-                        </Button>
-                      </Link>
-                    )}
-                    
-                    <div className="h-px bg-slate-100 my-1" />
-                    
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full justify-start font-medium px-2 h-9 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={handleLogout}
-                    >
-                      <LogOut className="size-4 mr-2" />
-                      Đăng xuất
-                    </Button>
+                <PopoverContent align="end" className="w-72 rounded-xl p-2">
+                  <div className="px-2 py-2">
+                    <p className="truncate text-sm font-semibold">{user.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                    <p className="mt-2 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+                      {roleLabel(user.role)}
+                    </p>
                   </div>
+                  <div className="my-1 h-px bg-border/70" />
+                  <div className="space-y-1">
+                    {accountLinks.map((item) => (
+                      <Button key={item.href} asChild variant="ghost" className="h-9 w-full justify-start gap-2 rounded-lg px-2 font-medium">
+                        <Link href={item.href}>
+                          <item.icon className="size-4" />
+                          {item.label}
+                        </Link>
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="my-1 h-px bg-border/70" />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-9 w-full justify-start gap-2 rounded-lg px-2 font-medium text-red-600 hover:bg-red-50 hover:text-red-700"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="size-4" />
+                    Đăng xuất
+                  </Button>
                 </PopoverContent>
               </Popover>
-            </div>
+            </>
           ) : (
             <>
-              <Link href="/login">
-                <Button variant="ghost" className="font-bold">Đăng nhập</Button>
-              </Link>
-              <Link href="/register">
-                <Button className="font-bold shadow-md shadow-primary/20">Đăng ký</Button>
-              </Link>
+              <Button asChild variant="ghost" className="font-semibold">
+                <Link href="/login">Đăng nhập</Link>
+              </Button>
+              <Button asChild className="font-semibold shadow-md shadow-primary/20">
+                <Link href="/register">Đăng ký</Link>
+              </Button>
             </>
           )}
         </div>
 
-        <div className="flex md:hidden items-center gap-2">
-          {isAuthenticated && <NotificationBell />}
+        <div className="flex items-center gap-2 md:hidden">
+          {mounted && isAuthenticated ? <NotificationBell /> : null}
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            aria-label="Mở menu điều hướng"
+            aria-label={mobileOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
+            aria-expanded={mobileOpen}
             onClick={() => setMobileOpen((prev) => !prev)}
           >
             {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
@@ -196,78 +209,60 @@ export function SharedNavbar() {
         </div>
       </div>
 
-      {mobileOpen && (
-        <div className="glass-panel md:hidden border-t border-white/50 px-4 py-4">
-          <div className="flex flex-col gap-2">
+      {mobileOpen ? (
+        <div className="glass-panel border-t border-white/50 px-4 py-4 md:hidden">
+          <div className="flex flex-col gap-1">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={isActive(pathname, item.href) ? 'rounded-md bg-primary/10 px-3 py-2 text-sm font-semibold text-primary' : 'rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground'}
+                onClick={closeMobileMenu}
+                className={cn(
+                  'rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground',
+                  isActive(pathname, item.href) && 'bg-primary/10 text-primary',
+                )}
               >
                 {item.label}
               </Link>
             ))}
           </div>
-          <div className="mt-4 grid grid-cols-1 gap-2">
-            {isAuthenticated ? (
+          <div className="mt-4 grid gap-2">
+            {showRoleAware ? (
               <>
-                {canAccessDashboard && (
-                  <Link href="/dashboard" onClick={closeMobileMenu}>
-                    <Button variant="outline" className="w-full">Dashboard</Button>
-                  </Link>
-                )}
-                {isAdmin && (
-                  <Link href="/admin" onClick={closeMobileMenu}>
-                    <Button variant="outline" className="w-full gap-2 border-primary/30 font-bold">
-                      <LayoutDashboard className="size-4 shrink-0" />
-                      Quản trị
-                    </Button>
-                  </Link>
-                )}
-                <Link href="/profile" onClick={closeMobileMenu}>
-                  <Button variant="outline" className="w-full font-bold">Hồ sơ & tài khoản</Button>
-                </Link>
-                {canAccessInstructorStudio && (
-                  <Link href="/instructor" onClick={closeMobileMenu}>
-                    <Button variant="outline" className="w-full gap-2 border-primary/30 font-bold">
-                      <Clapperboard className="size-4 shrink-0" />
-                      Studio giảng viên
-                    </Button>
-                  </Link>
-                )}
-                {canBecomeInstructor && (
-                  <Link href="/become-instructor" onClick={closeMobileMenu}>
-                    <Button className="w-full">Đăng ký GV</Button>
-                  </Link>
-                )}
+                {accountLinks.map((item) => (
+                  <Button key={item.href} asChild variant="outline" className="w-full justify-start gap-2 rounded-xl bg-white/70 font-semibold">
+                    <Link href={item.href} onClick={closeMobileMenu}>
+                      <item.icon className="size-4" />
+                      {item.label}
+                    </Link>
+                  </Button>
+                ))}
                 <Button
                   type="button"
                   variant="ghost"
-                  className="flex h-11 w-full items-center justify-center text-muted-foreground hover:bg-transparent hover:text-primary"
+                  className="w-full gap-2 text-red-600"
                   onClick={async () => {
                     closeMobileMenu();
                     await handleLogout();
                   }}
-                  aria-label="Đăng xuất"
                 >
-                  <LogOut className="size-5 shrink-0" />
+                  <LogOut className="size-4" />
+                  Đăng xuất
                 </Button>
               </>
             ) : (
               <>
-                <Link href="/login" onClick={closeMobileMenu}>
-                  <Button variant="outline" className="w-full">Đăng nhập</Button>
-                </Link>
-                <Link href="/register" onClick={closeMobileMenu}>
-                  <Button className="w-full">Đăng ký</Button>
-                </Link>
+                <Button asChild variant="outline" className="w-full rounded-xl bg-white/70">
+                  <Link href="/login" onClick={closeMobileMenu}>Đăng nhập</Link>
+                </Button>
+                <Button asChild className="w-full rounded-xl">
+                  <Link href="/register" onClick={closeMobileMenu}>Đăng ký</Link>
+                </Button>
               </>
             )}
           </div>
         </div>
-      )}
+      ) : null}
     </header>
   );
 }

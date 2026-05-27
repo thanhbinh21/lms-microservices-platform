@@ -664,3 +664,71 @@ export const getAdminRevenueAnalytics = async (req: Request, res: Response): Pro
     return apiError(res, 500, 'Internal server error', traceId);
   }
 };
+
+/**
+ * GET /api/admin/orders — danh sach order toan nen tang (chi admin).
+ * Ho tro filter status, search theo userId, pagination.
+ */
+export const getAdminOrders = async (req: Request, res: Response): Promise<Response | void> => {
+  const traceId = (req.headers['x-trace-id'] as string) || '';
+  const page = Math.max(1, parseInt((req.query.page as string) || '1', 10));
+  const limit = Math.min(50, Math.max(1, parseInt((req.query.limit as string) || '20', 10)));
+  const status = req.query.status as string | undefined;
+  const userId = req.query.userId as string | undefined;
+  const skip = (page - 1) * limit;
+
+  try {
+    const where: Record<string, unknown> = {};
+    if (status && ['PENDING', 'COMPLETED', 'FAILED', 'EXPIRED', 'REFUNDED'].includes(status)) {
+      where.status = status;
+    }
+    if (userId) {
+      where.userId = userId;
+    }
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          userId: true,
+          courseId: true,
+          courseTitle: true,
+          amount: true,
+          currency: true,
+          status: true,
+          paymentMethod: true,
+          vnpTxnRef: true,
+          vnpPayUrl: true,
+          paidAt: true,
+          expiresAt: true,
+          createdAt: true,
+          updatedAt: true,
+          instructorId: true,
+        },
+      }),
+      prisma.order.count({ where }),
+    ]);
+
+    const response: ApiResponse<{
+      orders: OrderDto[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }> = {
+      success: true,
+      code: 200,
+      message: 'OK',
+      data: {
+        orders: orders.map((o) => toDto(o as PaymentOrderRecord)),
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      },
+      trace_id: traceId,
+    };
+    return res.status(200).json(response);
+  } catch (err) {
+    logger.error({ err }, 'getAdminOrders error');
+    return apiError(res, 500, 'Internal server error', traceId);
+  }
+};
