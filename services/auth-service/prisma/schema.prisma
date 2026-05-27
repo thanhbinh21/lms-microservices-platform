@@ -166,6 +166,7 @@ model InstructorRequest {
   courseDescription String    @map("course_description")
   targetStudents    String?   @map("target_students")
   status            String    @default("pending")
+  rejectionReason   String?   @map("rejection_reason")
   reviewedBy        String?   @map("reviewed_by")
   reviewedAt        DateTime? @map("reviewed_at")
   createdAt         DateTime  @default(now()) @map("created_at")

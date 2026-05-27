@@ -33,7 +33,11 @@ const updateAnswerSchema = z.object({
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(30).default(10),
+  limit: z.preprocess((value) => {
+    const parsed = Number(value ?? 20);
+    if (!Number.isFinite(parsed)) return 20;
+    return Math.min(30, Math.max(1, Math.trunc(parsed)));
+  }, z.number().int().min(1).max(30)),
   status: z.enum(['all', 'unanswered', 'resolved']).default('all'),
   sortBy: z.enum(['recent', 'popular', 'upvotes']).default('recent'),
   courseId: z.string().uuid().optional(),

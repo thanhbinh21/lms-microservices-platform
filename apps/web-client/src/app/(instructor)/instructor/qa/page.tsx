@@ -45,7 +45,7 @@ export default function InstructorQaPage() {
       getInstructorQaCoursesAction(),
       listQuestionsAction({
         page: 1,
-        limit: 50,
+        limit: 30,
         status,
         courseId: selectedCourseId || undefined,
         search: search.trim() || undefined,

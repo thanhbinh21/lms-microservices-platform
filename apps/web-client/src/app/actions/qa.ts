@@ -59,7 +59,7 @@ export async function listQuestionsAction(params?: {
 }) {
   const query = new URLSearchParams();
   if (params?.page) query.set('page', String(params.page));
-  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.limit) query.set('limit', String(Math.min(30, Math.max(1, params.limit))));
   if (params?.status) query.set('status', params.status);
   if (params?.sortBy) query.set('sortBy', params.sortBy);
   if (params?.courseId) query.set('courseId', params.courseId);
@@ -82,7 +82,7 @@ export async function getCourseQuestionsAction(courseId: string, params?: {
 }) {
   const query = new URLSearchParams();
   if (params?.page) query.set('page', String(params.page));
-  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.limit) query.set('limit', String(Math.min(30, Math.max(1, params.limit))));
   if (params?.status) query.set('status', params.status);
   if (params?.lessonId) query.set('lessonId', params.lessonId);
   const suffix = query.toString() ? `?${query.toString()}` : '';
