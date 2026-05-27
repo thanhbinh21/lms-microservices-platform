@@ -340,3 +340,6 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-05-27 - Payment And Revenue Flow Audit
 - [x] Audit va harden flow VNPay/enrollment/earning/payout: instructor role guard, idempotent earning notification, payout audit log, admin/instructor payout notification, va internal admins/notification endpoints. done 2026-05-27
+
+### 2026-05-27 - Admin Dashboard Operations UX Refactor
+- [x] Nhom lai sidebar admin theo nghiep vu, them alias `/admin/settings` va `/admin/dlq`, refactor system config thanh setting co label/validation/default, va bo sung confirm/loading/toast cho cac flow admin nhay cam. done 2026-05-27

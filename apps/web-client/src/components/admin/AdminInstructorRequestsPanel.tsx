@@ -10,6 +10,7 @@ import {
   type InstructorRequestDto,
 } from '@/app/actions/instructor';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollReveal } from '@/components/ui/scroll-reveal';
 import { StatusMessage } from '@/components/ui/status-message';
@@ -73,6 +74,10 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
   const [detailError, setDetailError] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; mode: 'approve' | 'reject' | null }>({
+    isOpen: false,
+    mode: null,
+  });
 
   useEffect(() => {
     if (requestId) return;
@@ -190,6 +195,19 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
     onBackToList();
   };
 
+  const openApproveConfirm = () => setConfirmDialog({ isOpen: true, mode: 'approve' });
+
+  const openRejectConfirm = () => {
+    const reason = rejectReason.trim();
+    if (reason.length < 10) {
+      const message = 'Lý do từ chối phải có ít nhất 10 ký tự.';
+      setDetailError(message);
+      toast('error', 'Thiếu lý do', message);
+      return;
+    }
+    setConfirmDialog({ isOpen: true, mode: 'reject' });
+  };
+
   if (requestId) {
     return (
       <div className="space-y-8">
@@ -243,11 +261,11 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" disabled={actionLoading} className="gap-2 rounded-xl font-bold shadow-md" onClick={handleApprove}>
+                      <Button type="button" disabled={actionLoading} className="gap-2 rounded-xl font-bold shadow-md" onClick={openApproveConfirm}>
                         {actionLoading ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle className="size-4" />}
                         Duyệt
                       </Button>
-                      <Button type="button" variant="destructive" disabled={actionLoading} className="gap-2 rounded-xl font-bold" onClick={handleReject}>
+                      <Button type="button" variant="destructive" disabled={actionLoading} className="gap-2 rounded-xl font-bold" onClick={openRejectConfirm}>
                         <XCircle className="size-4" />
                         Từ chối
                       </Button>
@@ -294,6 +312,21 @@ export function AdminInstructorRequestsPanel({ requestId, onOpenDetail, onBackTo
                 </div>
               </CardContent>
             </Card>
+
+            <ConfirmDialog
+              isOpen={confirmDialog.isOpen}
+              onClose={() => setConfirmDialog({ isOpen: false, mode: null })}
+              onConfirm={confirmDialog.mode === 'reject' ? handleReject : handleApprove}
+              title={confirmDialog.mode === 'reject' ? 'Từ chối đơn giảng viên' : 'Duyệt đơn giảng viên'}
+              message={
+                confirmDialog.mode === 'reject'
+                  ? 'Bạn có chắc muốn từ chối đơn này? Lý do từ chối sẽ được lưu để học viên bổ sung hồ sơ.'
+                  : 'Bạn có chắc muốn duyệt đơn này và nâng quyền tài khoản thành giảng viên?'
+              }
+              variant={confirmDialog.mode === 'reject' ? 'danger' : 'default'}
+              confirmLabel={confirmDialog.mode === 'reject' ? 'Từ chối' : 'Duyệt'}
+              loading={actionLoading}
+            />
           </>
         ) : null}
       </div>

@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Flag, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
+import { toast } from '@/components/ui/toast';
 import { getAdminReviews, flagAdminReview, deleteAdminReview } from '@/app/actions/admin';
 
 function StarRating({ rating }: { rating: number }) {
@@ -25,6 +26,8 @@ export default function AdminReviewsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [flagFilter, setFlagFilter] = useState('');
+  const [error, setError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -36,6 +39,7 @@ export default function AdminReviewsPage() {
 
   const fetchReviews = useCallback(async () => {
     setLoading(true);
+    setError('');
     const res = await getAdminReviews({
       page,
       limit: 10,
@@ -44,6 +48,8 @@ export default function AdminReviewsPage() {
     if (res.success && res.data) {
       setReviews(res.data.reviews);
       setPagination(res.data.pagination);
+    } else {
+      setError(res.message || 'Không thể tải danh sách đánh giá.');
     }
     setLoading(false);
   }, [page, flagFilter]);
@@ -56,9 +62,27 @@ export default function AdminReviewsPage() {
     setPage(1);
   }, [flagFilter]);
 
-  const handleToggleFlag = async (reviewId: string, currentFlagged: boolean) => {
-    const res = await flagAdminReview(reviewId, !currentFlagged);
-    if (res.success) fetchReviews();
+  const handleToggleFlag = (reviewId: string, currentFlagged: boolean) => {
+    const nextFlagged = !currentFlagged;
+    setConfirmDialog({
+      isOpen: true,
+      title: nextFlagged ? 'Gắn cờ đánh giá' : 'Bỏ cờ đánh giá',
+      message: nextFlagged
+        ? 'Bạn có chắc muốn gắn cờ đánh giá này để đưa vào luồng kiểm duyệt?'
+        : 'Bạn có chắc muốn bỏ cờ đánh giá này?',
+      variant: nextFlagged ? 'danger' : 'default',
+      onConfirm: async () => {
+        setActionLoading(true);
+        const res = await flagAdminReview(reviewId, nextFlagged);
+        setActionLoading(false);
+        if (res.success) {
+          toast('success', nextFlagged ? 'Đã gắn cờ đánh giá' : 'Đã bỏ cờ đánh giá');
+          fetchReviews();
+          return;
+        }
+        toast('error', 'Cập nhật đánh giá thất bại', res.message || 'Vui lòng thử lại.');
+      },
+    });
   };
 
   const handleDelete = (reviewId: string) => {
@@ -68,8 +92,15 @@ export default function AdminReviewsPage() {
       message: 'Bạn có chắc muốn xóa đánh giá này? Hành động không thể hoàn tác.',
       variant: 'danger',
       onConfirm: async () => {
+        setActionLoading(true);
         const res = await deleteAdminReview(reviewId);
-        if (res.success) fetchReviews();
+        setActionLoading(false);
+        if (res.success) {
+          toast('success', 'Đã xóa đánh giá');
+          fetchReviews();
+          return;
+        }
+        toast('error', 'Xóa đánh giá thất bại', res.message || 'Vui lòng thử lại.');
       },
     });
   };
@@ -82,6 +113,8 @@ export default function AdminReviewsPage() {
           Kiểm duyệt, gắn cờ và xóa các đánh giá vi phạm.
         </p>
       </div>
+
+      {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">{error}</div>}
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
@@ -211,6 +244,7 @@ export default function AdminReviewsPage() {
         title={confirmDialog.title}
         message={confirmDialog.message}
         variant={confirmDialog.variant}
+        loading={actionLoading}
       />
     </div>
   );

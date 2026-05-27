@@ -515,9 +515,15 @@ export async function upsertAdminSystemConfigAction(payload: {
   value: unknown;
   description?: string;
 }): Promise<ApiResponse<AdminSystemConfigDto>> {
-  return callApi<AdminSystemConfigDto>(
+  const result = await callApi<AdminSystemConfigDto>(
     `/auth/admin/system-configs`,
     { method: 'PUT', body: JSON.stringify(payload) },
     true,
   );
+  if (result.success) {
+    revalidatePath('/admin/settings');
+    revalidatePath('/admin/system-config');
+    revalidatePath('/admin/audit-log');
+  }
+  return result;
 }

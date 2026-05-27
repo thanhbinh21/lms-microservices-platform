@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
+import { toast } from '@/components/ui/toast';
 import {
   getAdminFailedEvent,
   getAdminFailedEvents,
@@ -31,6 +32,8 @@ export default function AdminSystemEventsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [topicFilter, setTopicFilter] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [error, setError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
   const [payloadModal, setPayloadModal] = useState<{ isOpen: boolean; event: any | null }>({ isOpen: false, event: null });
   const [payloadLoading, setPayloadLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -44,6 +47,7 @@ export default function AdminSystemEventsPage() {
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
+    setError('');
     const [eventsRes, statsRes] = await Promise.all([
       getAdminFailedEvents({ page, limit: 10, status: statusFilter || undefined, topic: topicFilter || undefined }),
       getAdminFailedEventStats(),
@@ -51,6 +55,8 @@ export default function AdminSystemEventsPage() {
     if (eventsRes.success && eventsRes.data) {
       setEvents(eventsRes.data.events);
       setPagination(eventsRes.data.pagination);
+    } else {
+      setError(eventsRes.message || 'Không thể tải danh sách sự kiện lỗi.');
     }
     if (statsRes.success) setStats(statsRes.data);
     setLoading(false);
@@ -91,15 +97,39 @@ export default function AdminSystemEventsPage() {
       message: 'Bạn có chắc muốn đưa sự kiện này vào luồng xử lý lại?',
       variant: 'default',
       onConfirm: async () => {
+        setActionLoading(true);
         const result = await retryAdminFailedEvent(eventId);
-        if (result.success) void fetchEvents();
+        setActionLoading(false);
+        if (result.success) {
+          toast('success', 'Đã đưa sự kiện vào luồng thử lại');
+          void fetchEvents();
+          return;
+        }
+        toast('error', 'Retry thất bại', result.message || 'Vui lòng thử lại.');
       },
     });
   }
 
-  async function handleResolve(eventId: string, status: string) {
-    const result = await resolveAdminFailedEvent(eventId, status);
-    if (result.success) void fetchEvents();
+  function handleResolve(eventId: string, status: string) {
+    setConfirmDialog({
+      isOpen: true,
+      title: status === 'IGNORED' ? 'Bỏ qua sự kiện lỗi' : 'Đánh dấu đã xử lý',
+      message: status === 'IGNORED'
+        ? 'Bạn có chắc muốn bỏ qua sự kiện này? Chỉ dùng khi đã xác nhận sự kiện không cần xử lý lại.'
+        : 'Bạn có chắc sự kiện này đã được xử lý thủ công?',
+      variant: status === 'IGNORED' ? 'danger' : 'default',
+      onConfirm: async () => {
+        setActionLoading(true);
+        const result = await resolveAdminFailedEvent(eventId, status);
+        setActionLoading(false);
+        if (result.success) {
+          toast('success', status === 'IGNORED' ? 'Đã bỏ qua sự kiện' : 'Đã đánh dấu xử lý');
+          void fetchEvents();
+          return;
+        }
+        toast('error', 'Cập nhật sự kiện thất bại', result.message || 'Vui lòng thử lại.');
+      },
+    });
   }
 
   const pendingCount = stats?.pendingCount ?? 0;
@@ -121,6 +151,8 @@ export default function AdminSystemEventsPage() {
           </p>
         </div>
       )}
+
+      {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">{error}</div>}
 
       <Card className="rounded-2xl border-white/60 bg-white/50 backdrop-blur-md">
         <CardHeader>
@@ -198,7 +230,7 @@ export default function AdminSystemEventsPage() {
                                 className="rounded-md border border-input bg-background px-2 py-1 text-xs"
                                 value=""
                                 onChange={(selectEvent) => {
-                                  if (selectEvent.target.value) void handleResolve(event.id, selectEvent.target.value);
+                                  if (selectEvent.target.value) handleResolve(event.id, selectEvent.target.value);
                                 }}
                               >
                                 <option value="">Xử lý...</option>
@@ -296,9 +328,9 @@ export default function AdminSystemEventsPage() {
         title={confirmDialog.title}
         message={confirmDialog.message}
         variant={confirmDialog.variant}
+        loading={actionLoading}
       />
     </div>
   );
 }
-
 
