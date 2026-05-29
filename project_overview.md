@@ -361,3 +361,6 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 - [x] Tao trang admin `/admin/orders/[orderId]` event timeline doc theo chieu doc, co icon theo event type va collapsible JSON payload. done 2026-05-27
 - [x] Them link "Don hang" vao sidebar admin nhom Thanh toan & doanh thu. done 2026-05-27
 - [x] Fix event types trong seed: PAYMENT_COMPLETED→ORDER_COMPLETED, PAYMENT_FAILED→ORDER_FAILED, them VNPAY_CALLBACK_RECEIVED va PAYMENT_VERIFIED cho happy path. done 2026-05-27
+
+### 2026-05-29 - AI Learning Agent Quiz Hotfix
+- [x] Chan final quiz dung demo fallback khi LLM loi, het quota hoac tra JSON hong; expire session fallback cu, uu tien OpenRouter, tang token JSON generation, va thay native confirm bang modal quiz noi bo. done 2026-05-29

@@ -168,7 +168,7 @@ function EventCard({ event, isLast }: { event: OrderEventItemDto; isLast: boolea
         <p className="mt-1 text-xs text-muted-foreground">{formatDate(event.occurredAt)}</p>
         <div className="mt-2 rounded-xl border border-white/60 bg-white/40 p-3">
           <JsonBlock data={event.payload} />
-          {event.metadata && (
+          {event.metadata != null && (
             <div className="mt-1">
               <JsonBlock data={event.metadata} />
             </div>

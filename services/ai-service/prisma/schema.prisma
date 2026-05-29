@@ -32,6 +32,8 @@ model AiMessage {
   role           String   // 'user' | 'assistant' | 'system'
   content        String   @db.Text @map("content")
   tokenCount     Int?     @map("token_count")
+  sources        Json?    @map("sources")
+  metadata       Json?    @map("metadata")
   isError        Boolean  @default(false) @map("is_error")
   createdAt      DateTime @default(now()) @map("created_at")
 
@@ -69,6 +71,9 @@ model AiQuizSession {
   questionsHash  String    @map("questions_hash")
   questions      Json      @map("questions_client") // Cau hoi KHONG kem dap an
   correctData    Json      @map("correct_data")     // Dap an (server-only)
+  contextSnapshot Json?     @map("context_snapshot")
+  blueprint      Json?      @map("blueprint")
+  qualityReport  Json?      @map("quality_report")
 
   score          Int?
   totalQ         Int       @map("total_questions")

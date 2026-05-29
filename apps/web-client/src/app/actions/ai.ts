@@ -19,6 +19,8 @@ export interface AiMessageDto {
   content: string;
   createdAt: string;
   isError?: boolean;
+  sources?: string[];
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface AiContextStatusDto {
@@ -34,12 +36,37 @@ export interface QuizQuestionDto {
   options: string[];
 }
 
+export interface ContextCoverageDto {
+  totalLessons: number;
+  lessonsWithUsableContext: number;
+  coveragePercent: number;
+  averageContextChars: number;
+  quality: 'HIGH' | 'MEDIUM' | 'LOW';
+  missingFields: string[];
+  sources: string[];
+}
+
+export interface QuizQualityReportDto {
+  expectedCount: number;
+  acceptedCount: number;
+  rejectedCount: number;
+  duplicateCount: number;
+  optionIssueCount: number;
+  genericCount: number;
+  answerDistribution: Record<string, number>;
+  warnings: string[];
+}
+
 export interface QuizSessionDto {
   sessionId: string;
   questions: QuizQuestionDto[];
   totalQuestions?: number;
   expiresAt?: string;
   reused?: boolean;
+  contextQuality?: 'HIGH' | 'MEDIUM' | 'LOW';
+  coverage?: ContextCoverageDto;
+  qualityReport?: QuizQualityReportDto;
+  warnings?: string[];
 }
 
 export interface QuizSubmitResultDto {
@@ -50,11 +77,17 @@ export interface QuizSubmitResultDto {
   passScore: number;
   results: {
     questionIndex: number;
+    question: string;
+    options: string[];
     selected: number;
     correct: number;
+    selectedAnswer: string;
+    correctAnswer: string;
     isCorrect: boolean;
     explanation: string;
   }[];
+  contextSnapshot?: unknown;
+  qualityReport?: QuizQualityReportDto;
 }
 
 export interface QuizHistoryDto {

@@ -123,7 +123,7 @@ export async function checkRateLimit(
 const PROVIDER_BASE_URLS: Record<string, string> = {
   deepseek: 'https://api.deepseek.com/v1',
   groq: 'https://api.groq.com/openai/v1',
-  openrouter: 'https://openrouter.ai/api/v1',
+  openrouter: AI_SERVICE_ENV.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
 };
 
 const STATIC_FALLBACK_TEXT = 'He thong AI tam thoi khong san sang. Vui long thu lai sau.';

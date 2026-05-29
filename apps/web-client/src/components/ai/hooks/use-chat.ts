@@ -2,12 +2,29 @@
 
 import { useCallback, useRef, useState } from 'react';
 
+export interface ChatAgentStep {
+  step: string;
+  label: string;
+  quality?: 'HIGH' | 'MEDIUM' | 'LOW';
+  coverage?: number;
+  matches?: number;
+  hasProgress?: boolean;
+  quizAttempts?: number;
+}
+
+export interface ChatDonePayload {
+  sources?: string[];
+  contextQuality?: 'HIGH' | 'MEDIUM' | 'LOW';
+  coverage?: unknown;
+}
+
 interface UseChatOptions {
   conversationId: string;
   onChunk?: (text: string) => void;
-  onDone?: (sources?: string[]) => void;
+  onDone?: (payload?: ChatDonePayload) => void;
   onError?: (message: string) => void;
   onMessageId?: (id: string) => void;
+  onAgentStep?: (step: ChatAgentStep) => void;
 }
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || 'http://localhost:8000';
@@ -120,14 +137,16 @@ export function useChat(options: UseChatOptions) {
               setStreamingContent((prev) => prev + data.text);
               options.onChunk?.(data.text);
             } else if (eventName === 'done') {
-              options.onDone?.(data.sources);
+              options.onDone?.(data);
+            } else if (eventName === 'agent_step') {
+              options.onAgentStep?.(data);
             } else if (eventName === 'error') {
               const errMsg = friendlyChatError(data.message);
               setError(errMsg);
               options.onError?.(errMsg);
             }
           } catch {
-            // SSE co the bi cat nho theo chunk; bo qua block loi de tiep tuc stream.
+            // SSE có thể bị cắt nhỏ theo chunk nên bỏ qua block lỗi để stream tiếp.
           }
         }
       }
