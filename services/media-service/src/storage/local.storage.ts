@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import mime from 'mime-types';
-import type { StorageProvider } from './storage.interface';
+import type { StorageProvider } from './storage.interface.js';
 
 const DEFAULT_UPLOAD_DIR = './uploads';
 

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import type { ApiResponse } from '@lms/types';
 import { withRetry } from '@lms/db-prisma';
-import prisma from '../lib/prisma';
+import prisma from '../lib/prisma.js';
 import { logger } from '@lms/logger';
 
 const ALLOWED_INTERNAL_TYPES = new Set([

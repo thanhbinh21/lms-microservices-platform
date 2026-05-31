@@ -1,4 +1,4 @@
-import './lib/load-env';
+import './lib/load-env.js';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -26,35 +26,35 @@ import {
   deleteInstructorCertificateTemplate,
   getCourseCertificateTemplates,
   updateCourseCertificateTemplates,
-} from './controllers/course.controller';
+} from './controllers/course.controller.js';
 import {
   listInstructors,
   getInstructorBySlug,
   listInstructorCoursesBySlug,
   getMyInstructorProfile,
   updateMyInstructorProfile,
-} from './controllers/instructor.controller';
+} from './controllers/instructor.controller.js';
 import {
   createChapter,
   updateChapter,
   deleteChapter,
   reorderChapters,
-} from './controllers/chapter.controller';
+} from './controllers/chapter.controller.js';
 import {
   createLesson,
   updateLesson,
   deleteLesson,
   getLessonPlayback,
-} from './controllers/lesson.controller';
-import { listCategories, createCategory } from './controllers/category.controller';
-import { getCourseByIdInternal, getLessonByIdInternal, getCourseCurriculumInternal, getInstructorCourseIdsInternal, getLessonAiContextStatus, getLessonAiContext, getLessonTranscript, createManualTranscript, createSubtitleTranscript, retryTranscript } from './controllers/internal.controller';
-import { requireAuth, requireRole } from './middleware/require-auth';
-import adminRouter from './routes/admin.routes';
-import prisma from './lib/prisma';
-import { disconnectProducer } from './lib/kafka-producer';
-import { startKafkaConsumers } from './lib/kafka-consumer';
-import { startReadModelConsumer } from './lib/read-model-consumer';
-import { startTranscriptWorker } from './workers/transcript.worker';
+} from './controllers/lesson.controller.js';
+import { listCategories, createCategory } from './controllers/category.controller.js';
+import { getCourseByIdInternal, getLessonByIdInternal, getCourseCurriculumInternal, getInstructorCourseIdsInternal, getLessonAiContextStatus, getLessonAiContext, getLessonTranscript, createManualTranscript, createSubtitleTranscript, retryTranscript } from './controllers/internal.controller.js';
+import { requireAuth, requireRole } from './middleware/require-auth.js';
+import adminRouter from './routes/admin.routes.js';
+import prisma from './lib/prisma.js';
+import { disconnectProducer } from './lib/kafka-producer.js';
+import { startKafkaConsumers } from './lib/kafka-consumer.js';
+import { startReadModelConsumer } from './lib/read-model-consumer.js';
+import { startTranscriptWorker } from './workers/transcript.worker.js';
 import { initCache, closeCache } from '@lms/cache';
 
 // Validate bien moi truong khi khoi dong
@@ -71,6 +71,15 @@ app.use(helmet());
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000', credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 
+// Chi bat trong demo rieng de chung minh timeout va circuit breaker.
+app.use(async (req, _res, next) => {
+  const delayMs = Number(process.env.COURSE_FAULT_DELAY_MS || 0);
+  if (process.env.FAULT_INJECTION_ENABLED === 'true' && delayMs > 0 && req.path.startsWith('/internal/')) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  next();
+});
+
 // Ghi log request
 app.use((req: Request, _res: Response, next: NextFunction) => {
   logger.info({ method: req.method, url: req.url, traceId: req.headers['x-trace-id'] }, 'Incoming request');
@@ -78,7 +87,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 });
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
-app.get('/health', (_req: Request, res: Response) => {
+app.get(['/health', '/livez', '/readyz'], (_req: Request, res: Response) => {
   const response: ApiResponse<{ service: string }> = {
     success: true,
     code: 200,

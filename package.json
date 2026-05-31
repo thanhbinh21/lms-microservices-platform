@@ -8,9 +8,10 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-dev-ports.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path 'apps/web-client/.next/dev/lock') { Remove-Item 'apps/web-client/.next/dev/lock' -Force }\" && turbo run dev --concurrency=20",
-    "dev:web": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-dev-ports.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path 'apps/web-client/.next/dev/lock') { Remove-Item 'apps/web-client/.next/dev/lock' -Force }\" && turbo run dev --concurrency=20 --filter web-client --filter @lms/auth-service --filter @lms/course-service --filter @lms/learning-service --filter @lms/community-service --filter @lms/media-service --filter @lms/notification-service --filter @lms/payment-service --filter @lms/ai-service --filter @lms/env-validator --filter @lms/logger --filter @lms/types --filter @lms/kafka-client",
-    "dev:web:lite": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-dev-ports.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path 'apps/web-client/.next/dev/lock') { Remove-Item 'apps/web-client/.next/dev/lock' -Force }\" && turbo run dev --concurrency=10 --filter web-client --filter @lms/auth-service --filter @lms/course-service --filter @lms/community-service --filter @lms/env-validator --filter @lms/logger --filter @lms/types --filter @lms/kafka-client",
+    "dev": "pnpm build:shared && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-dev-ports.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path 'apps/web-client/.next/dev/lock') { Remove-Item 'apps/web-client/.next/dev/lock' -Force }\" && turbo run dev --concurrency=20",
+    "dev:web": "pnpm build:shared && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-dev-ports.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path 'apps/web-client/.next/dev/lock') { Remove-Item 'apps/web-client/.next/dev/lock' -Force }\" && turbo run dev --concurrency=20 --filter web-client --filter @lms/auth-service --filter @lms/course-service --filter @lms/learning-service --filter @lms/community-service --filter @lms/media-service --filter @lms/notification-service --filter @lms/payment-service --filter @lms/ai-service --filter @lms/env-validator --filter @lms/logger --filter @lms/types --filter @lms/kafka-client",
+    "dev:web:lite": "pnpm build:shared && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-dev-ports.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path 'apps/web-client/.next/dev/lock') { Remove-Item 'apps/web-client/.next/dev/lock' -Force }\" && turbo run dev --concurrency=10 --filter web-client --filter @lms/auth-service --filter @lms/course-service --filter @lms/community-service --filter @lms/env-validator --filter @lms/logger --filter @lms/types --filter @lms/kafka-client",
+    "build:shared": "pnpm --filter @lms/types build && pnpm --filter @lms/logger build && pnpm --filter @lms/env-validator build && pnpm --filter @lms/db-prisma build && pnpm --filter @lms/cache build && pnpm --filter @lms/kafka-client build",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
@@ -24,6 +25,9 @@
     "docker:down": "docker-compose down --remove-orphans",
     "docker:logs": "docker-compose logs -f",
     "docker:health": "docker-compose ps",
+    "docker:prod:up": "docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml up -d --build",
+    "docker:prod:down": "docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml down",
+    "deploy:lightsail": "bash scripts/deploy-lightsail.sh",
     "seed": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-all.ts"
   },
   "devDependencies": {

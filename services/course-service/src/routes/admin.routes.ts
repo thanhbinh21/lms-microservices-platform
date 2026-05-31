@@ -6,15 +6,15 @@ import {
   flagReview,
   deleteReview,
   getAdminStats,
-} from '../controllers/admin.controller';
+} from '../controllers/admin.controller.js';
 import {
   listFailedEvents,
   getFailedEventStats,
   getFailedEvent,
   retryFailedEvent,
   resolveFailedEvent,
-} from '../controllers/dlq.controller';
-import { updateCategory, deleteCategory } from '../controllers/category.controller';
+} from '../controllers/dlq.controller.js';
+import { updateCategory, deleteCategory } from '../controllers/category.controller.js';
 
 const router: ExpressRouter = Router();
 

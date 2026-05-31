@@ -1,9 +1,9 @@
 import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import type { ApiResponse } from '@lms/types';
-import prisma from '../lib/prisma';
-import { handlePrismaError } from '../lib/prisma-errors';
-import { getStorageProvider } from '../storage';
+import prisma from '../lib/prisma.js';
+import { handlePrismaError } from '../lib/prisma-errors.js';
+import { getStorageProvider } from '../storage/index.js';
 
 function inferSourceType(url?: string | null): 'UPLOAD' | 'YOUTUBE' {
   if (!url) return 'UPLOAD';

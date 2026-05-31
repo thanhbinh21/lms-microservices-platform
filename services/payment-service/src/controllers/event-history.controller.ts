@@ -2,8 +2,8 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ApiResponse } from '@lms/types';
 import { logger } from '@lms/logger';
-import prisma from '../lib/prisma';
-import { foldOrderEvents } from '../lib/order-aggregate';
+import prisma from '../lib/prisma.js';
+import { foldOrderEvents } from '../lib/order-aggregate.js';
 
 const paramsSchema = z.object({
   orderId: z.string().min(1),

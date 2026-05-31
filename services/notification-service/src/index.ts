@@ -17,17 +17,17 @@ import {
   type KafkaEventEnvelope,
   type KafkaTopic,
 } from '@lms/kafka-client';
-import prisma from './lib/prisma';
-import { requireAuth } from './middleware/require-auth';
+import prisma from './lib/prisma.js';
+import { requireAuth } from './middleware/require-auth.js';
 import {
   listMyNotifications,
   listAdminNotifications,
   markAllAsRead,
   markAsRead,
   createInternalNotification,
-} from './controllers/notification.controller';
-import { sendEmail, getPaymentSuccessTemplate, getEnrollmentCreatedTemplate } from './lib/mailer';
-import { getUserData } from './lib/user';
+} from './controllers/notification.controller.js';
+import { sendEmail, getPaymentSuccessTemplate, getEnrollmentCreatedTemplate } from './lib/mailer.js';
+import { getUserData } from './lib/user.js';
 
 // Validate env khi khoi dong
 validateNotificationServiceEnv();
@@ -38,6 +38,41 @@ const requireAdmin = createRequireAdmin();
 const requireInternal = createRequireInternal({
   internalSecret: process.env.INTERNAL_SERVICE_SECRET || '',
 });
+const demoEmailAttempts = new Map<string, number>();
+
+async function deliverEmail(params: {
+  notificationId: string;
+  eventId: string;
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  const configuredFailures = Number(process.env.DEMO_NOTIFICATION_FAIL_ATTEMPTS || 0);
+  const attempt = (demoEmailAttempts.get(params.eventId) || 0) + 1;
+  demoEmailAttempts.set(params.eventId, attempt);
+
+  try {
+    if (attempt <= configuredFailures) {
+      logger.warn({ eventId: params.eventId, attempt }, 'Demo transient email failure');
+      throw new Error(`Demo transient email failure attempt ${attempt}`);
+    }
+    await sendEmail(params.to, params.subject, params.html);
+    await withRetry(() =>
+      prisma.notification.update({
+        where: { id: params.notificationId },
+        data: { status: 'SENT', sentAt: new Date() },
+      }),
+    );
+  } catch (err) {
+    await withRetry(() =>
+      prisma.notification.update({
+        where: { id: params.notificationId },
+        data: { status: 'FAILED' },
+      }),
+    );
+    throw err;
+  }
+}
 
 app.use(helmet());
 app.use(
@@ -48,7 +83,7 @@ app.use(
 );
 app.use(express.json());
 
-app.get('/health', (_req: Request, res: Response) => {
+app.get(['/health', '/livez', '/readyz'], (_req: Request, res: Response) => {
   const response: ApiResponse<{ service: string }> = {
     success: true,
     code: 200,
@@ -109,29 +144,18 @@ async function startConsumers() {
       }),
     );
 
+    if (notification.status === 'SENT') return;
     const userData = await getUserData(user_id);
-    if (userData) {
-      const html = getPaymentSuccessTemplate(userData.name, amount, currency, order_id);
-      sendEmail(userData.email, 'Thanh toan thanh cong don hang tren LMS', html)
-        .then(async () => {
-          await withRetry(() =>
-            prisma.notification.update({
-              where: { id: notification.id },
-              data: { status: 'SENT', sentAt: new Date() },
-            }),
-          );
-          logger.info({ orderId: order_id, userId: user_id }, 'Email Payment Success sent.');
-        })
-        .catch(async (err) => {
-          await withRetry(() =>
-            prisma.notification.update({
-              where: { id: notification.id },
-              data: { status: 'FAILED' },
-            }),
-          );
-          logger.error({ err, orderId: order_id }, 'Email Payment Success failed.');
-        });
-    }
+    if (!userData) throw new Error(`User ${user_id} unavailable for payment email`);
+    const html = getPaymentSuccessTemplate(userData.name, amount, currency, order_id);
+    await deliverEmail({
+      notificationId: notification.id,
+      eventId: event.event_id,
+      to: userData.email,
+      subject: 'Thanh toan thanh cong don hang tren LMS',
+      html,
+    });
+    logger.info({ orderId: order_id, userId: user_id }, 'Email Payment Success sent.');
   };
 
   const paymentTopics: KafkaTopic[] = [
@@ -178,29 +202,18 @@ async function startConsumers() {
       }),
     );
 
+    if (notification.status === 'SENT') return;
     const userData = await getUserData(user_id);
-    if (userData) {
-      const html = getEnrollmentCreatedTemplate(userData.name);
-      sendEmail(userData.email, 'Ghi danh thanh cong khoa hoc tren LMS', html)
-        .then(async () => {
-          await withRetry(() =>
-            prisma.notification.update({
-              where: { id: notification.id },
-              data: { status: 'SENT', sentAt: new Date() },
-            }),
-          );
-          logger.info({ courseId: course_id, userId: user_id }, 'Email Enrollment Created sent.');
-        })
-        .catch(async (err) => {
-          await withRetry(() =>
-            prisma.notification.update({
-              where: { id: notification.id },
-              data: { status: 'FAILED' },
-            }),
-          );
-          logger.error({ err, courseId: course_id }, 'Email Enrollment Created failed.');
-        });
-    }
+    if (!userData) throw new Error(`User ${user_id} unavailable for enrollment email`);
+    const html = getEnrollmentCreatedTemplate(userData.name);
+    await deliverEmail({
+      notificationId: notification.id,
+      eventId: event.event_id,
+      to: userData.email,
+      subject: 'Ghi danh thanh cong khoa hoc tren LMS',
+      html,
+    });
+    logger.info({ courseId: course_id, userId: user_id }, 'Email Enrollment Created sent.');
   };
 
   const enrollmentTopics: KafkaTopic[] = [

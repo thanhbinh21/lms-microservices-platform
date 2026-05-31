@@ -36,7 +36,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/health', (_req, res) => {
+app.get(['/health', '/livez', '/readyz'], (_req, res) => {
   res.json({ status: 'ok', service: 'community-service', port: PORT });
 });
 

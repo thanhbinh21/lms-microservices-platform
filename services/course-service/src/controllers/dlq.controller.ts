@@ -2,9 +2,9 @@ import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import type { ApiResponse } from '@lms/types';
 import { logger } from '@lms/logger';
-import prisma from '../lib/prisma';
-import { publishEvent } from '../lib/kafka-producer';
-import { handlePrismaError } from '../lib/prisma-errors';
+import prisma from '../lib/prisma.js';
+import { publishEvent } from '../lib/kafka-producer.js';
+import { handlePrismaError } from '../lib/prisma-errors.js';
 
 /** GET /api/admin/failed-events */
 export async function listFailedEvents(req: Request, res: Response) {

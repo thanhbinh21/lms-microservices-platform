@@ -5,8 +5,8 @@ import {
   type PaymentOrderCompletedEvent,
 } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
-import prisma from './prisma';
-import type { Prisma } from '../generated/prisma';
+import prisma from './prisma.js';
+import type { Prisma } from '../generated/prisma/index.js';
 
 const MAX_ATTEMPTS = Number(process.env.OUTBOX_MAX_ATTEMPTS || 10);
 const POLL_INTERVAL_MS = Number(process.env.OUTBOX_POLL_INTERVAL_MS || 5_000);
@@ -97,6 +97,7 @@ async function publishOutboxBatch(): Promise<void> {
             lastError: null,
           },
         });
+        logger.info({ event: 'outbox.published', outboxId: event.id, topic: event.topic }, 'Payment outbox event published');
       } catch (err) {
         const nextRetryCount = event.retryCount + 1;
         const failedPermanently = nextRetryCount >= MAX_ATTEMPTS;
@@ -109,7 +110,7 @@ async function publishOutboxBatch(): Promise<void> {
             lastError: err instanceof Error ? err.message : String(err),
           },
         });
-        logger.error({ err, outboxId: event.id, topic: event.topic }, 'Payment outbox publish failed');
+        logger.error({ err, event: 'outbox.publish_failed', outboxId: event.id, topic: event.topic }, 'Payment outbox publish failed');
       }
     }
   } finally {

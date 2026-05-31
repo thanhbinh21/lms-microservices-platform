@@ -1,4 +1,4 @@
-import { PrismaClient } from '../generated/prisma';
+import { PrismaClient } from '../generated/prisma/index.js';
 
 // Singleton Prisma Client — tranh tao nhieu instance khi hot-reload
 declare global {

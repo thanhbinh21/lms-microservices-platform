@@ -4,13 +4,13 @@ import { z } from 'zod';
 import type { Prisma } from '../generated/prisma/index.js';
 import type { ApiResponse } from '@lms/types';
 import { logger } from '@lms/logger';
-import prisma from '../lib/prisma';
-import { handlePrismaError } from '../lib/prisma-errors';
+import prisma from '../lib/prisma.js';
+import { handlePrismaError } from '../lib/prisma-errors.js';
 import { withRetry } from '@lms/db-prisma';
 import { cacheGet, cacheInvalidate, cacheInvalidatePattern } from '@lms/cache';
-import { fetchWithTimeout } from '../lib/http';
-import { queryCourseReadStore } from '../lib/read-store';
-import { publishCourseCatalogEvent } from '../lib/course-catalog-events';
+import { fetchWithTimeout } from '../lib/http.js';
+import { queryCourseReadStore } from '../lib/read-store.js';
+import { publishCourseCatalogEvent } from '../lib/course-catalog-events.js';
 
 // Schema tao khoa hoc
 const createCourseSchema = z.object({

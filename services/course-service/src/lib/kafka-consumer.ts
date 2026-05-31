@@ -10,8 +10,8 @@ import {
   EnrollmentCreatedSchema,
 } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
-import prisma from './prisma';
-import { publishCourseCatalogEvent } from './course-catalog-events';
+import prisma from './prisma.js';
+import { publishCourseCatalogEvent } from './course-catalog-events.js';
 
 /**
  * Course-service Kafka consumers (Phase 4 cleanup).

@@ -1,5 +1,5 @@
 import { logger } from '@lms/logger';
-import prisma from './prisma';
+import prisma from './prisma.js';
 import {
   buildAutoContextText,
   buildAutoContextTranscriptId,
@@ -8,7 +8,7 @@ import {
   computeContentHash,
   computeVideoHash,
   type LessonForAiContext,
-} from './transcript-context';
+} from './transcript-context.js';
 
 export type EnqueueTranscriptResult = {
   queued: boolean;

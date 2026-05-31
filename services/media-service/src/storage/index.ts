@@ -4,9 +4,9 @@
  * - "s3" -> S3StorageProvider (AWS S3 presigned URLs, production)
  * - Neu co CLOUDINARY_URL -> uu tien Cloudinary, fallback local neu khoi tao that bai.
  */
-import type { StorageProvider } from './storage.interface';
-import { LocalStorageProvider } from './local.storage';
-import { S3StorageProvider } from './s3.storage';
+import type { StorageProvider } from './storage.interface.js';
+import { LocalStorageProvider } from './local.storage.js';
+import { S3StorageProvider } from './s3.storage.js';
 import { v2 as cloudinary } from 'cloudinary';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '@lms/logger';

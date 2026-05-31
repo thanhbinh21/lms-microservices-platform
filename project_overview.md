@@ -364,3 +364,9 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-05-29 - AI Learning Agent Quiz Hotfix
 - [x] Chan final quiz dung demo fallback khi LLM loi, het quota hoac tra JSON hong; expire session fallback cu, uu tien OpenRouter, tang token JSON generation, va thay native confirm bang modal quiz noi bo. done 2026-05-29
+
+### 2026-06-01 - Demo-ready VPS Deployment Baseline
+- [x] Thu gon production-like VPS demo: health/liveness/readiness toi thieu, Kong rate limit + upstream timeout, circuit breaker `payment -> course`, outbox co san, Kafka retry 5s/1m + DLQ, notification retry demo, console log, K6 smoke/rate-limit va production compose; loai bo full observability stack. done 2026-06-01
+
+### 2026-06-01 - AWS Lightsail Demo Deploy Runbook
+- [x] Harden production Compose cho Lightsail: chi publish Web/Kong proxy tren loopback, render Kong production voi Docker DNS + secret/domain deploy, them env production example, script deploy va runbook smoke/demo/rollback. done 2026-06-01

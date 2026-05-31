@@ -10,7 +10,7 @@ import {
   validateKafkaEvent,
 } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
-import { createInstructorEarning } from './earnings-service';
+import { createInstructorEarning } from './earnings-service.js';
 
 const HANDLER_GROUP = 'payment-service.earnings-writer';
 

@@ -61,8 +61,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Kiem tra suc khoe
-app.get('/health', (req: Request, res: Response) => {
+// Readiness toi thieu de Docker phat hien process khong con phuc vu request.
+app.get(['/health', '/livez', '/readyz'], (req: Request, res: Response) => {
   const response: ApiResponse<{ service: string; status: string; timestamp: string }> = {
     success: true,
     code: 200,
