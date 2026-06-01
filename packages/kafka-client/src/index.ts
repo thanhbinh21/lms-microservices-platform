@@ -15,8 +15,14 @@ export const createProducer = async (): Promise<Producer> => {
     allowAutoTopicCreation: true,
     idempotent: false,
   });
-  await producer.connect();
-  return producer;
+  try {
+    await producer.connect();
+    return producer;
+  } catch (err) {
+    // Don producer loi de caller co the tao ket noi moi khi broker phuc hoi.
+    await producer.disconnect().catch(() => undefined);
+    throw err;
+  }
 };
 
 export const createConsumer = async (groupId: string): Promise<Consumer> => {

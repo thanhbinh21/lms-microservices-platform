@@ -52,7 +52,7 @@ export async function startKafkaConsumers(): Promise<void> {
       return;
     }
 
-    const enrollment = await prisma.$transaction(async (tx) => {
+    const { enrollment, outbox } = await prisma.$transaction(async (tx) => {
       const created = await tx.enrollment.create({
         data: {
           userId: user_id,
@@ -63,7 +63,7 @@ export async function startKafkaConsumers(): Promise<void> {
       });
 
       // Enrollment paid va downstream event di cung transaction de tranh mat event.
-      await enqueueEnrollmentCreatedOutbox(
+      const outbox = await enqueueEnrollmentCreatedOutbox(
         tx,
         {
           user_id,
@@ -74,9 +74,15 @@ export async function startKafkaConsumers(): Promise<void> {
         event.trace_id,
       );
 
-      return created;
+      return { enrollment: created, outbox };
     });
 
+    if (outbox.created) {
+      logger.info(
+        { event: 'outbox.created', outboxId: outbox.id, topic: 'learning.enrollment.created', orderId: order_id },
+        'outbox.created',
+      );
+    }
     logger.info(
       { enrollmentId: enrollment.id, orderId: order_id, userId: user_id, courseId: course_id },
       '[learning-service] Enrollment created',

@@ -379,3 +379,6 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-06-01 - VNPay Return Callback Completion Hotfix
 - [x] Dung chung completion helper cho VNPay Return/IPN, cho phep Return production hoan tat order idempotently va tao transactional outbox khi sandbox IPN khong den VPS. done 2026-06-01
+
+### 2026-06-01 - Outbox Kafka Producer Reconnect Hotfix
+- [x] Reset producer promise/instance khi Kafka connect hoac publish loi, tu reconnect va drain outbox PENDING/FAILED theo backoff ma khong restart Payment/Learning Service; bo sung log demo va cap nhat runbook. done 2026-06-01

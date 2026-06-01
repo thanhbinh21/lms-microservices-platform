@@ -489,8 +489,9 @@ order by created_at desc
 limit 10;
 ```
 
-Expected: order da complete, event `payment.order.completed` van `PENDING`, log co
-`outbox.publish_failed`.
+Expected: order da complete, event `payment.order.completed` van `PENDING` hoac
+`FAILED`, log co `outbox.publish_failed`, `outbox.worker_tick_failed` hoac
+`kafka.producer.reconnect_scheduled`.
 
 Khoi phuc:
 
@@ -500,7 +501,8 @@ $COMPOSE logs -f payment-service learning-service
 ```
 
 Expected: log `outbox.published`, enrollment duoc tao idempotent va outbox thanh
-`PUBLISHED`.
+`PUBLISHED`. Khong can restart `payment-service`; tick tiep theo tu tao producer
+moi va drain event `PENDING`/`FAILED` theo backoff.
 
 ### 7.5 Retry Notification Khi Loi Tam Thoi
 

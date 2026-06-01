@@ -54,13 +54,13 @@ export const enrollCourse = async (req: Request, res: Response): Promise<Respons
     }
 
     const orderId = `FREE-${randomUUID()}`;
-    await prisma.$transaction(async (tx) => {
+    const outbox = await prisma.$transaction(async (tx) => {
       const enrollment = await tx.enrollment.create({
         data: { userId, courseId, orderId },
       });
 
       // Enrollment va event phai atomic de downstream khong bi lech counter/notification.
-      await enqueueEnrollmentCreatedOutbox(
+      return enqueueEnrollmentCreatedOutbox(
         tx,
         {
           user_id: userId,
@@ -71,6 +71,12 @@ export const enrollCourse = async (req: Request, res: Response): Promise<Respons
         traceId,
       );
     });
+    if (outbox.created) {
+      logger.info(
+        { event: 'outbox.created', outboxId: outbox.id, topic: 'learning.enrollment.created', orderId },
+        'outbox.created',
+      );
+    }
     const response: ApiResponse<null> = {
       success: true, code: 201, message: 'Ghi danh thành công', data: null, trace_id: traceId,
     };
