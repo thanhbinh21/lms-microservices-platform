@@ -328,6 +328,12 @@ export async function consumeWithRetry<T = unknown>(
               },
             ],
           });
+          console.warn(JSON.stringify({
+            event: 'kafka.dlq',
+            sourceTopic: topic,
+            deadLetterTopic: retry.deadLetterTopic,
+            reason: 'invalid-json',
+          }));
           await commitMessage(consumer, payload);
           return;
         }
@@ -365,6 +371,13 @@ export async function consumeWithRetry<T = unknown>(
               },
             ],
           });
+          console.warn(JSON.stringify({
+            event: 'kafka.dlq',
+            sourceTopic: retry.mainTopic,
+            deadLetterTopic: retry.deadLetterTopic,
+            retryCount,
+            reason: err instanceof Error ? err.message : String(err),
+          }));
           await commitMessage(consumer, payload);
           return;
         }
@@ -387,6 +400,13 @@ export async function consumeWithRetry<T = unknown>(
             },
           ],
         });
+        console.warn(JSON.stringify({
+          event: 'kafka.retry',
+          sourceTopic: retry.mainTopic,
+          retryTopic: nextStep.topic,
+          retryCount: retryCount + 1,
+          delayMs: nextStep.delayMs,
+        }));
         await commitMessage(consumer, payload);
       }
     },

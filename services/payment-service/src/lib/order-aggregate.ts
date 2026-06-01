@@ -1,5 +1,5 @@
-import { Prisma } from '../generated/prisma';
-import prisma from './prisma';
+import { Prisma } from '../generated/prisma/index.js';
+import prisma from './prisma.js';
 
 export const ORDER_EVENT_TYPES = {
   ORDER_CREATED: 'ORDER_CREATED',

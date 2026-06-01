@@ -1,0 +1,30 @@
+FROM node:20-alpine AS build
+
+RUN corepack enable
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.json ./
+COPY scripts ./scripts
+COPY packages ./packages
+COPY services ./services
+COPY apps ./apps
+
+RUN pnpm install --frozen-lockfile
+
+ARG SERVICE_FILTER
+ARG NEXT_PUBLIC_GATEWAY_URL
+ENV NEXT_PUBLIC_GATEWAY_URL="${NEXT_PUBLIC_GATEWAY_URL}"
+RUN pnpm exec turbo run build --filter="${SERVICE_FILTER}"
+
+FROM node:20-alpine AS runtime
+
+RUN corepack enable
+WORKDIR /app
+
+COPY --from=build /app /app
+
+ARG SERVICE_FILTER
+ENV SERVICE_FILTER="${SERVICE_FILTER}"
+ENV NODE_ENV=production
+
+CMD ["sh", "-c", "pnpm --filter \"$SERVICE_FILTER\" start"]

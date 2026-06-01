@@ -3,7 +3,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import mime from 'mime-types';
-import type { StorageProvider } from './storage.interface';
+import type { StorageProvider } from './storage.interface.js';
 
 /**
  * AWS S3 storage provider cho moi truong production.

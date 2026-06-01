@@ -28,6 +28,10 @@ function decimal(value: number) {
   return { toNumber: () => value };
 }
 
+function normalizeText(value: string) {
+  return value.normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+}
+
 function mockResponse(userId = 'instructor-1', userRole = 'INSTRUCTOR') {
   const res: any = {
     locals: { userId, userRole },
@@ -57,7 +61,7 @@ describe('payout controller', () => {
     await createPayout({ body: { amount: 50_000 }, headers: {} } as any, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json.mock.calls[0][0].message).toContain('thong tin nhan thanh toan');
+    expect(normalizeText(res.json.mock.calls[0][0].message)).toContain('thong tin nhan thanh toan');
   });
 
   it('khong cho tao payout vuot so du kha dung', async () => {
@@ -72,7 +76,7 @@ describe('payout controller', () => {
     await createPayout({ body: { amount: 100_000 }, headers: {} } as any, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json.mock.calls[0][0].message).toContain('vuot qua so du');
+    expect(normalizeText(res.json.mock.calls[0][0].message)).toContain('vuot qua so du');
   });
 
   it('khong cho tao payout thu hai khi dang co PENDING', async () => {
@@ -87,7 +91,7 @@ describe('payout controller', () => {
     await createPayout({ body: { amount: 50_000 }, headers: {} } as any, res);
 
     expect(res.status).toHaveBeenCalledWith(409);
-    expect(res.json.mock.calls[0][0].message).toContain('dang co mot yeu cau');
+    expect(normalizeText(res.json.mock.calls[0][0].message)).toContain('dang co mot yeu cau');
   });
 
   it('admin PAID chuyen earning sang WITHDRAWN va ghi audit', async () => {

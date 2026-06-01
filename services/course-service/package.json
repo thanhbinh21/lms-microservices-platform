@@ -7,7 +7,7 @@
     "postinstall": "node ../../scripts/prisma-postinstall.cjs",
     "dev": "tsx watch src/index.ts",
     "dev:transcript-worker": "tsx watch src/workers/transcript.worker.ts",
-    "build": "tsc",
+    "build": "tsc && node ../../scripts/prisma-postinstall.cjs --copy-to-dist",
     "start": "node dist/index.js",
     "start:transcript-worker": "node dist/workers/transcript.worker.js",
     "transcript:backfill": "cross-env NODE_ENV=production tsx src/scripts/backfill-ai-context.ts",

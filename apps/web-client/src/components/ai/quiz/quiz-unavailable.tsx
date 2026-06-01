@@ -32,7 +32,7 @@ const REASONS: Record<string, { icon: ReactNode; title: string; description: str
   INSUFFICIENT_COURSE_COVERAGE: {
     icon: <AlertCircle className="size-4" />,
     title: 'Ngữ cảnh khóa học chưa đủ rộng',
-    description: 'Hệ thống không còn bắt buộc transcript, nhưng khóa học cần thêm nội dung để tạo câu hỏi tốt hơn.',
+    description: 'Bài kiểm tra cuối khóa cần bao phủ nhiều bài học hơn. Vui lòng bổ sung mô tả hoặc nội dung bài học trước khi xét chứng chỉ.',
     severity: 'warning',
   },
   EMPTY_COURSE: {

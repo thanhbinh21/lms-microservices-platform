@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { Prisma } from '../generated/prisma';
+import { Prisma } from '../generated/prisma/index.js';
 import { logger } from '@lms/logger';
 import type { ApiResponse } from '@lms/types';
 

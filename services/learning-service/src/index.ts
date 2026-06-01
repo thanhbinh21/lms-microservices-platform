@@ -67,7 +67,7 @@ app.use((req, _res, next) => {
 
 // ─── Health Check ────────────────────────────────────────────────────────────
 
-app.get('/health', (_req, res) => {
+app.get(['/health', '/livez', '/readyz'], (_req, res) => {
   res.json({ status: 'ok', service: 'learning-service', port: PORT });
 });
 

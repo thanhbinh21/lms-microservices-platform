@@ -1,5 +1,5 @@
 import { logger } from '@lms/logger';
-import { fetchWithTimeout } from './http';
+import { fetchWithTimeout } from './http.js';
 
 export interface UserInternalData {
   id: string;

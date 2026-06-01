@@ -1,9 +1,9 @@
-import prisma from '../lib/prisma';
-import { calculateRevenueSplit } from './revenue-share';
+import prisma from '../lib/prisma.js';
+import { calculateRevenueSplit } from './revenue-share.js';
 import type { Decimal } from '@prisma/client/runtime/library';
-import { createInternalNotification } from './auth-client';
-import { writeAuditLog } from './audit';
-import { Prisma } from '../generated/prisma';
+import { createInternalNotification } from './auth-client.js';
+import { writeAuditLog } from './audit.js';
+import { Prisma } from '../generated/prisma/index.js';
 
 export async function createInstructorEarning(
   orderId: string,

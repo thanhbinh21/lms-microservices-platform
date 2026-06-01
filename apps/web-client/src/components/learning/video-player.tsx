@@ -20,6 +20,7 @@ interface VideoPlayerProps {
     courseCompleted?: boolean;
     certificateNumber?: string | null;
   }) => void;
+  onPositionChange?: (seconds: number) => void;
 }
 
 function extractYoutubeId(url: string): string | null {
@@ -40,6 +41,7 @@ export function VideoPlayer({
   lastPosition,
   isCompleted: initialCompleted,
   onComplete,
+  onPositionChange,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const watchedRef = useRef(0);
@@ -92,6 +94,7 @@ export function VideoPlayer({
 
     positionRef.current = el.currentTime;
     watchedRef.current = Math.max(watchedRef.current, el.currentTime);
+    onPositionChange?.(el.currentTime);
 
     if (!isCompleted && duration > 0 && watchedRef.current >= duration * COMPLETION_THRESHOLD) {
       setCanComplete(true);
@@ -115,11 +118,11 @@ export function VideoPlayer({
         setIsCompleted(true);
 
         if (res.data?.certificate) {
-          setCompletionMessage('Chuc mung! Ban da duoc cap chung chi cho khoa hoc nay.');
+          setCompletionMessage('Chúc mừng! Bạn đã được cấp chứng chỉ cho khóa học này.');
         } else if (res.data?.courseCompleted) {
-          setCompletionMessage('Ban da hoan thanh khoa hoc.');
+          setCompletionMessage('Bạn đã hoàn thành khóa học.');
         } else {
-          setCompletionMessage('Ban da hoan thanh bai hoc nay.');
+          setCompletionMessage('Bạn đã hoàn thành bài học này.');
         }
 
         if (typeof window !== 'undefined') {
@@ -151,7 +154,7 @@ export function VideoPlayer({
               className="absolute inset-0 h-full w-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
-              title="Video bai hoc"
+              title="Video bài học"
             />
           ) : (
             <video
@@ -172,7 +175,7 @@ export function VideoPlayer({
               value={playbackSpeed}
               onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
               className="rounded-lg border border-white/30 bg-black/60 px-2 py-1 text-xs text-white backdrop-blur-sm focus:border-white/60 focus:outline-none"
-              title="Toc do phat"
+              title="Tốc độ phát"
             >
               <option value={0.5}>0.5x</option>
               <option value={0.75}>0.75x</option>
@@ -191,7 +194,7 @@ export function VideoPlayer({
           <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-600">
             <span className="inline-flex items-center gap-1">
               <CircleDashed className="size-3.5" />
-              Tien do xem video
+              Tiến độ xem video
             </span>
             <span>{watchedPercent}%</span>
           </div>
@@ -202,7 +205,7 @@ export function VideoPlayer({
             />
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
-            Nut hoan thanh mo sau khi ban xem toi thieu 80% video.
+            Nút hoàn thành mở sau khi bạn xem tối thiểu 80% video.
           </p>
         </div>
       )}
@@ -211,9 +214,9 @@ export function VideoPlayer({
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
           <p className="inline-flex items-center gap-1 font-semibold">
             <Youtube className="size-3.5" />
-            Bai hoc YouTube khong the track chinh xac thoi luong xem.
+            Bài học YouTube không thể theo dõi chính xác thời lượng xem.
           </p>
-          <p className="mt-1">Sau khi hoc xong, bam nut ben duoi de danh dau hoan thanh bai hoc.</p>
+          <p className="mt-1">Sau khi học xong, bấm nút bên dưới để đánh dấu hoàn thành bài học.</p>
         </div>
       )}
 
@@ -229,7 +232,7 @@ export function VideoPlayer({
             ) : (
               <CheckCircle2 className="size-5" />
             )}
-            Danh dau hoan thanh bai hoc
+            Đánh dấu hoàn thành bài học
           </Button>
         </div>
       )}
@@ -242,7 +245,7 @@ export function VideoPlayer({
           )}
         >
           <CheckCircle2 className="size-5 text-emerald-500" />
-          {completionMessage || 'Ban da hoan thanh bai hoc nay'}
+          {completionMessage || 'Bạn đã hoàn thành bài học này'}
         </div>
       )}
     </div>

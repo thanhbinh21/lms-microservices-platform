@@ -3,10 +3,10 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ApiResponse } from '@lms/types';
 import { logger } from '@lms/logger';
-import prisma from '../lib/prisma';
-import { handlePrismaError } from '../lib/prisma-errors';
-import { fetchWithTimeout } from '../lib/http';
-import { upsertAutoContextAndQueueStt } from '../lib/transcript-jobs';
+import prisma from '../lib/prisma.js';
+import { handlePrismaError } from '../lib/prisma-errors.js';
+import { fetchWithTimeout } from '../lib/http.js';
+import { upsertAutoContextAndQueueStt } from '../lib/transcript-jobs.js';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 

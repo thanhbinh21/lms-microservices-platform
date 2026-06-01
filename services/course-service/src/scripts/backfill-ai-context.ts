@@ -1,7 +1,7 @@
-import '../lib/load-env';
+import '../lib/load-env.js';
 import { logger } from '@lms/logger';
-import prisma from '../lib/prisma';
-import { upsertAutoContextAndQueueStt } from '../lib/transcript-jobs';
+import prisma from '../lib/prisma.js';
+import { upsertAutoContextAndQueueStt } from '../lib/transcript-jobs.js';
 
 const BATCH_SIZE = Number(process.env.TRANSCRIPT_BACKFILL_BATCH_SIZE || 100);
 

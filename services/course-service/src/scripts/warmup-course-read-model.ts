@@ -1,9 +1,9 @@
-import '../lib/load-env';
+import '../lib/load-env.js';
 import { initCache, closeCache } from '@lms/cache';
 import { logger } from '@lms/logger';
 import type { CourseCatalogSnapshot } from '@lms/kafka-client';
-import prisma from '../lib/prisma';
-import { clearCourseReadStore, updateCourseReadModel } from '../lib/read-store';
+import prisma from '../lib/prisma.js';
+import { clearCourseReadStore, updateCourseReadModel } from '../lib/read-store.js';
 
 type PublishedCourseRow = Awaited<ReturnType<typeof findPublishedCourses>>[number];
 

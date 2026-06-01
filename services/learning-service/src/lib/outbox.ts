@@ -97,6 +97,7 @@ async function publishOutboxBatch(): Promise<void> {
             lastError: null,
           },
         });
+        logger.info({ event: 'outbox.published', outboxId: event.id, topic: event.topic }, 'Learning outbox event published');
       } catch (err) {
         const nextRetryCount = event.retryCount + 1;
         const failedPermanently = nextRetryCount >= MAX_ATTEMPTS;
@@ -109,7 +110,7 @@ async function publishOutboxBatch(): Promise<void> {
             lastError: err instanceof Error ? err.message : String(err),
           },
         });
-        logger.error({ err, outboxId: event.id, topic: event.topic }, 'Learning outbox publish failed');
+        logger.error({ err, event: 'outbox.publish_failed', outboxId: event.id, topic: event.topic }, 'Learning outbox publish failed');
       }
     }
   } finally {

@@ -7,12 +7,12 @@ import multer from 'multer';
 import { logger } from '@lms/logger';
 import { validateMediaServiceEnv } from '@lms/env-validator';
 import type { ApiResponse } from '@lms/types';
-import { requireAuth, requireRole } from './middleware/require-auth';
-import { requestPresignedUpload, confirmUpload, registerExternalMedia } from './controllers/upload.controller';
-import { getMediaAsset, getMediaByLesson, getMediaByCourse, deleteMediaAsset } from './controllers/media.controller';
-import { getActiveStorageProvider, shouldEnableLocalUploadRoutes } from './storage';
-import { LocalStorageProvider } from './storage/local.storage';
-import prisma from './lib/prisma';
+import { requireAuth, requireRole } from './middleware/require-auth.js';
+import { requestPresignedUpload, confirmUpload, registerExternalMedia } from './controllers/upload.controller.js';
+import { getMediaAsset, getMediaByLesson, getMediaByCourse, deleteMediaAsset } from './controllers/media.controller.js';
+import { getActiveStorageProvider, shouldEnableLocalUploadRoutes } from './storage/index.js';
+import { LocalStorageProvider } from './storage/local.storage.js';
+import prisma from './lib/prisma.js';
 import { initCache, closeCache } from '@lms/cache';
 
 // Validate bien moi truong khi khoi dong
@@ -37,14 +37,13 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   next();
 });
 
-// Kiem tra suc khoe
-app.get('/health', (_req: Request, res: Response) => {
-  const activeStorage = getActiveStorageProvider();
+// Readiness toi thieu, khong keo them monitoring stack vao VPS demo.
+app.get(['/health', '/livez', '/readyz'], (_req: Request, res: Response) => {
   const response: ApiResponse<{ service: string; storage: string }> = {
     success: true, code: 200, message: 'OK',
     data: {
       service: 'media-service',
-      storage: activeStorage,
+      storage: getActiveStorageProvider(),
     },
     trace_id: '',
   };

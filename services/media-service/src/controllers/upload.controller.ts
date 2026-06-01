@@ -2,9 +2,9 @@ import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ApiResponse } from '@lms/types';
-import prisma from '../lib/prisma';
-import { handlePrismaError } from '../lib/prisma-errors';
-import { forceLocalStorageFallback, getActiveStorageProvider, getStorageProvider } from '../storage';
+import prisma from '../lib/prisma.js';
+import { handlePrismaError } from '../lib/prisma-errors.js';
+import { forceLocalStorageFallback, getActiveStorageProvider, getStorageProvider } from '../storage/index.js';
 
 // Schema yeu cau presigned URL
 const presignedUploadSchema = z.object({

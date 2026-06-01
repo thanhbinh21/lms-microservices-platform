@@ -40,7 +40,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 });
 
 // ─── Health Check ───────────────────────────────────────────────────────────────
-app.get('/health', (_req: Request, res: Response) => {
+app.get(['/health', '/livez', '/readyz'], (_req: Request, res: Response) => {
   res.status(200).json({ success: true, code: 200, message: 'OK', data: { service: 'ai-service' }, trace_id: '' });
 });
 

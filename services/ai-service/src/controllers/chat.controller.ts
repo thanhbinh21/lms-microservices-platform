@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
+import type { Prisma } from '../generated/prisma/index.js';
 import { createSuccessResponse, createErrorResponse } from '@lms/types';
 import { logger } from '../lib/logger.js';
 import prisma from '../lib/prisma.js';
@@ -8,8 +9,14 @@ import { handlePrismaError } from '../lib/prisma-errors.js';
 import { checkRateLimit } from '../lib/gemini.js';
 import { guardInput, redactPII } from '../lib/input-guard.js';
 import { verifyEnrollment } from '../lib/access-control.js';
-import { fetchAiContextStatus, fetchCourseContext, fetchLessonAiContext } from '../lib/course-client.js';
+import { fetchAiContextStatus, fetchCourseContext, fetchLessonAiContext, fetchCompletionStatus } from '../lib/course-client.js';
 import { streamGenerateText } from '../lib/gemini.js';
+import {
+  buildContextPack,
+  buildLexicalSearchSnippets,
+  formatContextQualityForPrompt,
+  type ContextPack,
+} from '../lib/ai-quality.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -106,6 +113,52 @@ function extractContextKeywords(value: string, maxKeywords = 8): string[] {
   return keywords;
 }
 
+type ChatIntent = 'course_explanation' | 'practice_help' | 'progress_check' | 'out_of_scope';
+
+interface ChatLearningState {
+  progress?: {
+    completedLessons: number;
+    totalLessons: number;
+    progressPercent: number;
+    isCompleted: boolean;
+  } | null;
+  quizHistory?: {
+    bestScore: number | null;
+    attemptCount: number;
+    latestScore: number | null;
+  };
+}
+
+function classifyChatIntent(content: string): ChatIntent {
+  const lower = sanitizeContextText(content).toLowerCase();
+  if (/(diem|score|tien do|hoan thanh|chung chi|certificate|quiz)/i.test(lower)) return 'progress_check';
+  if (/(bai tap|vi du|thuc hanh|lam sao|code|debug|giai thich)/i.test(lower)) return 'practice_help';
+  if (/(thoi tiet|gia co phieu|chinh tri|tin tuc|mua ban|doi tu)/i.test(lower)) return 'out_of_scope';
+  return 'course_explanation';
+}
+
+async function getQuizLearningState(
+  userId: string,
+  courseId: string,
+): Promise<ChatLearningState['quizHistory']> {
+  const sessions = await prisma.aiQuizSession.findMany({
+    where: { userId, courseId, status: 'SUBMITTED' },
+    orderBy: { submittedAt: 'desc' },
+    take: 10,
+    select: { score: true },
+  });
+
+  const scores = sessions
+    .map((item) => item.score)
+    .filter((score): score is number => typeof score === 'number');
+
+  return {
+    bestScore: scores.length > 0 ? Math.max(...scores) : null,
+    latestScore: scores[0] ?? null,
+    attemptCount: sessions.length,
+  };
+}
+
 function compactChatContext(parts: string[]): string {
   const selected: string[] = [];
   let total = 0;
@@ -125,6 +178,10 @@ function buildSystemPrompt(
   textContent?: string,
   recentMessages?: { role: string; content: string }[],
   summaryText?: string,
+  contextPack?: ContextPack,
+  lexicalSnippets: string[] = [],
+  learningState?: ChatLearningState,
+  intent: ChatIntent = 'course_explanation',
 ): string {
   let prompt = `Ban la tro ly hoc tap AI cua he thong OLMS.
 
@@ -136,6 +193,7 @@ VAI TRO:
 
 KHOA HOC: "${courseTitle}"
 TRINH DO: ${level}
+Y DINH CAU HOI: ${intent}
 `;
 
   if (lessonTitle && textContent) {
@@ -143,6 +201,37 @@ TRINH DO: ${level}
 BAI HOC HIEN TAI: "${lessonTitle}"
 NGU CANH/TU KHOA:
 ${textContent}
+`;
+  }
+
+  if (contextPack) {
+    prompt += `
+CHAT_CONTEXT_PACK:
+${formatContextQualityForPrompt(contextPack)}
+`;
+  }
+
+  if (lexicalSnippets.length > 0) {
+    prompt += `
+KET QUA TIM KIEM NOI BO GAN NHAT:
+${lexicalSnippets.map((item, index) => `${index + 1}. ${item}`).join('\n')}
+`;
+  }
+
+  if (learningState?.progress) {
+    prompt += `
+TIEN DO HOC VIEN:
+- Hoan thanh: ${learningState.progress.completedLessons}/${learningState.progress.totalLessons} bai (${learningState.progress.progressPercent}%).
+- Trang thai khoa hoc: ${learningState.progress.isCompleted ? 'da hoan thanh' : 'dang hoc'}.
+`;
+  }
+
+  if (learningState?.quizHistory) {
+    prompt += `
+LICH SU QUIZ GAN DAY:
+- So lan nop: ${learningState.quizHistory.attemptCount}.
+- Diem gan nhat: ${learningState.quizHistory.latestScore ?? 'chua co'}.
+- Diem cao nhat: ${learningState.quizHistory.bestScore ?? 'chua co'}.
 `;
   }
 
@@ -170,6 +259,7 @@ QUY TAC:
 4. Neu hoc vien hoi ve chi tiet can tinh chinh xac cua bai giang, hay khuyen xem lai bai hoc hoac hoi giang vien.
 5. Dung markdown: **bold**, \`code\`, danh sach, code block khi can.
 6. Tra loi bang tieng Viet.
+7. Neu intent ngoai pham vi hoc tap, tu choi ngan gon va keo cau hoi ve khoa hoc.
 
 GIOI HAN:
 - Khong tra loi ngoai pham vi hoc tap.
@@ -177,6 +267,18 @@ GIOI HAN:
 `;
 
   return prompt;
+}
+
+function applyResponseSelfCheck(response: string, contextPack: ContextPack, intent: ChatIntent): string {
+  const clean = response.trim();
+  if (!clean) return clean;
+  if (intent === 'out_of_scope') {
+    return clean;
+  }
+  if (contextPack.coverage.quality === 'LOW' && !/tham kh/i.test(clean)) {
+    return `Lưu ý: phần dưới đây có dùng kiến thức mở rộng tham khảo vì ngữ cảnh khóa học còn mỏng.\n\n${clean}`;
+  }
+  return clean;
 }
 
 async function buildChatContext(
@@ -372,7 +474,7 @@ export async function getConversation(req: Request, res: Response): Promise<Resp
       include: {
         messages: {
           orderBy: { createdAt: 'asc' },
-          select: { id: true, role: true, content: true, createdAt: true },
+          select: { id: true, role: true, content: true, isError: true, sources: true, metadata: true, createdAt: true },
         },
       },
     });
@@ -485,6 +587,7 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
     }
 
     const content = guardResult.sanitized;
+    const intent = classifyChatIntent(content);
 
     // Rate limit (30 msg / hour)
     const rateKey = `ratelimit:ai:chat:${userId}`;
@@ -510,8 +613,9 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
 
     // AI Context Check
     const effectiveLessonId = lessonId || conversation.lessonId;
+    let lessonContext: Awaited<ReturnType<typeof fetchLessonAiContext>> | null = null;
     if (effectiveLessonId) {
-      const lessonContext = await fetchLessonAiContext(effectiveLessonId, traceId);
+      lessonContext = await fetchLessonAiContext(effectiveLessonId, traceId);
       if (!lessonContext) {
         logger.warn({ lessonId: effectiveLessonId, traceId }, 'Lesson AI context unavailable, using course fallback');
       } else if (lessonContext.courseId !== conversation.courseId) {
@@ -539,6 +643,11 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
         conversationId: id,
         role: 'user',
         content,
+        metadata: {
+          intent,
+          lessonId: effectiveLessonId ?? null,
+          currentTimeSec: currentTimeSec ?? null,
+        } as Prisma.InputJsonValue,
       },
     });
 
@@ -554,12 +663,29 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
       return res.status(500).json(createErrorResponse('Không thể lấy thông tin khóa học', 500, traceId));
     }
 
+    const lessonContextMap = effectiveLessonId && lessonContext
+      ? { [effectiveLessonId]: lessonContext }
+      : {};
+    const contextPack = buildContextPack(courseContext, lessonContextMap, effectiveLessonId ?? undefined);
+    const lexicalSnippets = buildLexicalSearchSnippets(courseContext, content);
+    const learningState: ChatLearningState = {
+      progress: await fetchCompletionStatus(userId, conversation.courseId, traceId),
+      quizHistory: await getQuizLearningState(userId, conversation.courseId),
+    };
+
     const { textContent: contextText, sources } = await buildChatContext(
       courseContext,
       effectiveLessonId ?? undefined,
       currentTimeSec,
       traceId,
     );
+    const mergedSources = Array.from(new Set([
+      ...sources,
+      ...contextPack.coverage.sources,
+      ...(lexicalSnippets.length > 0 ? ['LEXICAL_COURSE_SEARCH'] : []),
+      ...(learningState.progress ? ['LEARNING_PROGRESS'] : []),
+      ...(learningState.quizHistory?.attemptCount ? ['QUIZ_HISTORY'] : []),
+    ]));
 
     if (!contextText || contextText.trim().length < MIN_CONTEXT_LENGTH) {
       // Save error message
@@ -568,6 +694,12 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
           conversationId: id,
           role: 'assistant',
           content: 'AI chưa tạo được ngữ cảnh cho bài học này. Vui lòng thử lại sau hoặc bổ sung mô tả bài học.',
+          sources: mergedSources as unknown as Prisma.InputJsonValue,
+          metadata: {
+            contextQuality: contextPack.coverage.quality,
+            coverage: contextPack.coverage,
+            intent,
+          } as unknown as Prisma.InputJsonValue,
           isError: true,
         },
       });
@@ -591,6 +723,10 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
       contextText,
       recentMessages,
       summaryText,
+      contextPack,
+      lexicalSnippets,
+      learningState,
+      intent,
     );
 
     // SSE setup
@@ -606,10 +742,34 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
 
     // Send user message ID to client
     sendEvent('message_id', { messageId: userMessage.id });
+    sendEvent('agent_step', {
+      step: 'context_pack',
+      label: 'Đã tải ngữ cảnh khóa học',
+      quality: contextPack.coverage.quality,
+      coverage: contextPack.coverage.coveragePercent,
+    });
+    if (lexicalSnippets.length > 0) {
+      sendEvent('agent_step', {
+        step: 'course_search',
+        label: 'Đã tìm nội dung liên quan trong khóa học',
+        matches: lexicalSnippets.length,
+      });
+    }
+    sendEvent('agent_step', {
+      step: 'learning_state',
+      label: 'Đã kiểm tra tiến độ và lịch sử quiz',
+      hasProgress: Boolean(learningState.progress),
+      quizAttempts: learningState.quizHistory?.attemptCount ?? 0,
+    });
 
     // Stream from Gemini
     let fullResponse = '';
     let errorOccurred = false;
+    if (contextPack.coverage.quality === 'LOW' && intent !== 'out_of_scope') {
+      const note = 'Lưu ý: phần trả lời có thể dùng kiến thức mở rộng tham khảo vì ngữ cảnh khóa học còn mỏng.\n\n';
+      fullResponse += note;
+      sendEvent('chunk', { text: note });
+    }
 
     try {
       for await (const chunk of streamGenerateText(content, systemPrompt)) {
@@ -628,7 +788,11 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
         }
 
         if (chunk.done) {
-          sendEvent('done', { sources });
+          sendEvent('done', {
+            sources: mergedSources,
+            contextQuality: contextPack.coverage.quality,
+            coverage: contextPack.coverage,
+          });
           break;
         }
 
@@ -643,13 +807,23 @@ export async function sendMessage(req: Request, res: Response): Promise<Response
     }
 
     // Redact PII and save assistant message
-    const safeResponse = redactPII(fullResponse);
+    const safeResponse = redactPII(applyResponseSelfCheck(fullResponse, contextPack, intent));
     await prisma.aiMessage.create({
       data: {
         conversationId: id,
         role: 'assistant',
         content: safeResponse,
         tokenCount: Math.ceil(fullResponse.length / 4),
+        sources: mergedSources as unknown as Prisma.InputJsonValue,
+        metadata: {
+          contextQuality: contextPack.coverage.quality,
+          coverage: contextPack.coverage,
+          intent,
+          lexicalMatches: lexicalSnippets.length,
+          progressPercent: learningState.progress?.progressPercent ?? null,
+          quizAttempts: learningState.quizHistory?.attemptCount ?? 0,
+          errorOccurred,
+        } as unknown as Prisma.InputJsonValue,
       },
     });
 

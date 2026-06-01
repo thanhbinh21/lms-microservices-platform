@@ -55,6 +55,7 @@ const envSchema = z.object({
   GROQ_MODEL: z.string().optional(),
 
   OPENROUTER_API_KEY: z.string().optional(),
+  OPENROUTER_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
   OPENROUTER_MODEL: z.string().optional(),
   OPENROUTER_APP_URL: z.string().optional(),
   OPENROUTER_APP_NAME: z.string().optional(),

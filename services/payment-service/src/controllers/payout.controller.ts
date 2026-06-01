@@ -2,10 +2,10 @@ import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ApiResponse } from '@lms/types';
-import prisma from '../lib/prisma';
-import { handlePrismaError } from '../lib/prisma-errors';
-import { createInternalNotification, fetchAdminUsers, fetchUsersByIds } from '../lib/auth-client';
-import { writeAuditLog } from '../lib/audit';
+import prisma from '../lib/prisma.js';
+import { handlePrismaError } from '../lib/prisma-errors.js';
+import { createInternalNotification, fetchAdminUsers, fetchUsersByIds } from '../lib/auth-client.js';
+import { writeAuditLog } from '../lib/audit.js';
 
 const listPayoutsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

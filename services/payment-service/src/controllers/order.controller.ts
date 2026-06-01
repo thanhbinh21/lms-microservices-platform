@@ -2,12 +2,12 @@ import { Request, Response } from 'express';
 import { randomBytes, randomUUID } from 'crypto';
 import { z } from 'zod';
 import type { ApiResponse, ContinuePaymentResult, CreateOrderResult, OrderDto } from '@lms/types';
-import { Prisma } from '../generated/prisma';
-import prisma from '../lib/prisma';
+import { Prisma } from '../generated/prisma/index.js';
+import prisma from '../lib/prisma.js';
 import { logger } from '@lms/logger';
-import { buildPayUrl, loadVNPayConfig } from '../lib/vnpay';
-import { fetchCourseById, type CourseLite } from '../lib/course-client';
-import { appendOrderEvents, lockOrderForEventAppend, ORDER_EVENT_TYPES } from '../lib/order-aggregate';
+import { buildPayUrl, loadVNPayConfig } from '../lib/vnpay.js';
+import { fetchCourseById, type CourseLite } from '../lib/course-client.js';
+import { appendOrderEvents, lockOrderForEventAppend, ORDER_EVENT_TYPES } from '../lib/order-aggregate.js';
 
 const createOrderSchema = z.object({
   courseId: z.string().min(1),

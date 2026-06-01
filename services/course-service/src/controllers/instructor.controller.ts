@@ -3,9 +3,9 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '../generated/prisma/index.js';
 import type { ApiResponse } from '@lms/types';
-import prisma from '../lib/prisma';
-import { handlePrismaError } from '../lib/prisma-errors';
-import { fetchInternalInstructors, fetchInternalUsersBatch } from '../lib/auth-client';
+import prisma from '../lib/prisma.js';
+import { handlePrismaError } from '../lib/prisma-errors.js';
+import { fetchInternalInstructors, fetchInternalUsersBatch } from '../lib/auth-client.js';
 
 const listInstructorsQuerySchema = z.object({
   q: z.string().trim().optional(),

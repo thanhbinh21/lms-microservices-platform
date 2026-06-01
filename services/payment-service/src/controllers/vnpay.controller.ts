@@ -1,13 +1,13 @@
 import { Request, Response } from 'express';
 import type { ApiResponse } from '@lms/types';
-import { Prisma } from '../generated/prisma';
-import prisma from '../lib/prisma';
+import { Prisma } from '../generated/prisma/index.js';
+import prisma from '../lib/prisma.js';
 import { logger } from '@lms/logger';
-import { loadVNPayConfig, verifyReturn, isSuccessful } from '../lib/vnpay';
-import { enqueuePaymentCompletedOutbox } from '../lib/outbox';
-import { getInstructorRevenueShareRatio } from '../lib/revenue-share';
+import { loadVNPayConfig, verifyReturn, isSuccessful } from '../lib/vnpay.js';
+import { enqueuePaymentCompletedOutbox } from '../lib/outbox.js';
+import { getInstructorRevenueShareRatio } from '../lib/revenue-share.js';
 import type { PaymentOrderCompletedEvent } from '@lms/kafka-client';
-import { appendOrderEvents, lockOrderForEventAppend, ORDER_EVENT_TYPES } from '../lib/order-aggregate';
+import { appendOrderEvents, lockOrderForEventAppend, ORDER_EVENT_TYPES } from '../lib/order-aggregate.js';
 
 type OrderRecord = NonNullable<Awaited<ReturnType<typeof prisma.order.findUnique>>>;
 type VNPayCallbackKind = 'RETURN' | 'IPN';
