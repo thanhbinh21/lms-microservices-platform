@@ -376,3 +376,6 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-06-01 - AI Chatbox Cross-subdomain Auth Cookie Hotfix
 - [x] Cau hinh Web Client production ghi va xoa auth cookie theo `AUTH_COOKIE_DOMAIN=.thanhbinh.qzz.io`, `Secure`, `SameSite=None`, giu local host-only `SameSite=Lax`, va truyen env qua production Compose de AI Chatbox goi API subdomain khong con mat cookie. done 2026-06-01
+
+### 2026-06-01 - VNPay Return Callback Completion Hotfix
+- [x] Dung chung completion helper cho VNPay Return/IPN, cho phep Return production hoan tat order idempotently va tao transactional outbox khi sandbox IPN khong den VPS. done 2026-06-01
