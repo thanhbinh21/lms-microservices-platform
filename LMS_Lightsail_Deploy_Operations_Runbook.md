@@ -205,6 +205,7 @@ Cần thấy:
 ```text
 learning-service.enrollment-creator.payment.order.completed
 learning-service.enrollment-creator.payment.order.completed.retry-5s
+learning-service.enrollment-creator.payment.order.completed.retry-30s
 learning-service.enrollment-creator.payment.order.completed.retry-1m
 learning-service.dlq-processor
 [learning-service] Kafka consumer running
@@ -222,6 +223,7 @@ Cần thấy:
 ```text
 payment-service.earnings-writer.payment.order.completed
 payment-service.earnings-writer.payment.order.completed.retry-5s
+payment-service.earnings-writer.payment.order.completed.retry-30s
 payment-service.earnings-writer.payment.order.completed.retry-1m
 Payment earnings consumer running
 ```

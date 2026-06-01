@@ -560,7 +560,7 @@ pnpm dev
                       │   (consumer #2)  │
                       └──────────────────┘
 
-Retry chain: main -> retry-5s -> retry-1m -> system.dead-letter
+Retry chain: main -> retry-5s -> retry-30s -> retry-1m -> system.dead-letter
 ```
 
 ### Prerequisites
@@ -612,10 +612,11 @@ VNPAY_IPN_URL=https://<ngrok-id>.ngrok.app/payment/api/vnpay-ipn
 
 | Topic | Producer | Consumer(s) |
 |---|---|---|
-| `payment.order.completed` | payment-service | course-service, notification-service |
+| `payment.order.completed` | payment-service | learning-service, notification-service, payment-service |
 | `payment.order.completed.retry-5s` | (republished on failure) | same |
+| `payment.order.completed.retry-30s` | (republished on failure) | same |
 | `payment.order.completed.retry-1m` | (republished on failure) | same |
-| `learning.enrollment.created` | course-service | notification-service |
+| `learning.enrollment.created` | learning-service | course-service, notification-service |
 | `system.dead-letter` | (after retry exhaustion) | — (admin inspects) |
 
 Retry helper lives in `packages/kafka-client/src/index.ts` → `consumeWithRetry()`.

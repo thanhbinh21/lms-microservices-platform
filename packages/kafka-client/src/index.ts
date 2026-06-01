@@ -44,6 +44,7 @@ export const TOPICS = {
   // Payment flow (Phase 15)
   PAYMENT_ORDER_COMPLETED: 'payment.order.completed',
   PAYMENT_ORDER_COMPLETED_RETRY_5S: 'payment.order.completed.retry-5s',
+  PAYMENT_ORDER_COMPLETED_RETRY_30S: 'payment.order.completed.retry-30s',
   PAYMENT_ORDER_COMPLETED_RETRY_1M: 'payment.order.completed.retry-1m',
 
   // Enrollment flow (Phase 16)
@@ -186,6 +187,7 @@ export interface EnrollmentCreatedEvent {
 export interface TopicEventMap {
   [TOPICS.PAYMENT_ORDER_COMPLETED]: PaymentOrderCompletedEvent;
   [TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_5S]: PaymentOrderCompletedEvent;
+  [TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_30S]: PaymentOrderCompletedEvent;
   [TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_1M]: PaymentOrderCompletedEvent;
   [TOPICS.ENROLLMENT_CREATED]: EnrollmentCreatedEvent;
   [TOPICS.ENROLLMENT_CREATED_RETRY_5S]: EnrollmentCreatedEvent;
@@ -244,6 +246,7 @@ export async function publishEvent<T extends KafkaTopic>(
 //
 // Kafka khong co native delayed queue. Pattern chuan:
 //   main topic -> (fail) -> retry-5s topic (delay 5s truoc khi process lai)
+//                        -> retry-30s topic (delay 30s)
 //                        -> retry-1m topic (delay 60s)
 //                        -> dead-letter topic
 // Moi topic retry co consumer rieng dung chung handler nhung delay truoc khi chay.
@@ -279,6 +282,11 @@ function getNumberHeader(payload: EachMessagePayload, key: string): number {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getRetryStage(topic: KafkaTopic): string {
+  const segments = topic.split('.');
+  return segments[segments.length - 1] || topic;
 }
 
 function nextOffset(offset: string): string {
@@ -336,6 +344,7 @@ export async function consumeWithRetry<T = unknown>(
           });
           console.warn(JSON.stringify({
             event: 'kafka.dlq',
+            message: `kafka.dlq published ${retry.deadLetterTopic}`,
             sourceTopic: topic,
             deadLetterTopic: retry.deadLetterTopic,
             reason: 'invalid-json',
@@ -379,6 +388,7 @@ export async function consumeWithRetry<T = unknown>(
           });
           console.warn(JSON.stringify({
             event: 'kafka.dlq',
+            message: `kafka.dlq published ${retry.deadLetterTopic}`,
             sourceTopic: retry.mainTopic,
             deadLetterTopic: retry.deadLetterTopic,
             retryCount,
@@ -408,6 +418,7 @@ export async function consumeWithRetry<T = unknown>(
         });
         console.warn(JSON.stringify({
           event: 'kafka.retry',
+          message: `kafka.retry scheduled ${getRetryStage(nextStep.topic)}`,
           sourceTopic: retry.mainTopic,
           retryTopic: nextStep.topic,
           retryCount: retryCount + 1,
@@ -425,6 +436,7 @@ export const PAYMENT_ORDER_COMPLETED_RETRY: RetryPolicy = {
   mainTopic: TOPICS.PAYMENT_ORDER_COMPLETED,
   retryChain: [
     { topic: TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_5S, delayMs: 5_000 },
+    { topic: TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_30S, delayMs: 30_000 },
     { topic: TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_1M, delayMs: 60_000 },
   ],
   deadLetterTopic: TOPICS.DEAD_LETTER,
