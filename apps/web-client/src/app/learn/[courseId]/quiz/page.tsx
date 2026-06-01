@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AlertCircle, Loader2, RotateCcw } from 'lucide-react';
-import { generateQuizAction, submitQuizAction } from '@/app/actions/ai';
+import { generateQuizAction, submitQuizAction, type QuizQualityReportDto } from '@/app/actions/ai';
 import { QuizPanel } from '@/components/ai/quiz/quiz-panel';
 import { QuizUnavailable } from '@/components/ai/quiz/quiz-unavailable';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,8 @@ export default function FinalQuizPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<{ question: string; options: string[] }[]>([]);
   const [expiresAt, setExpiresAt] = useState<string | undefined>();
+  const [contextQuality, setContextQuality] = useState<'HIGH' | 'MEDIUM' | 'LOW' | undefined>();
+  const [qualityReport, setQualityReport] = useState<QuizQualityReportDto | undefined>();
   const [loading, setLoading] = useState(true);
   const [unavailableReason, setUnavailableReason] = useState<string | null>(null);
 
@@ -25,6 +27,8 @@ export default function FinalQuizPage() {
     setUnavailableReason(null);
     setSessionId(null);
     setQuestions([]);
+    setContextQuality(undefined);
+    setQualityReport(undefined);
 
     const result = await generateQuizAction(courseId, undefined, 'FINAL_COURSE', 15);
     setLoading(false);
@@ -35,6 +39,7 @@ export default function FinalQuizPage() {
       if (message.includes('100%')) setUnavailableReason('COURSE_NOT_COMPLETED');
       else if (lowerMessage.includes('service') || lowerMessage.includes('unavailable') || lowerMessage.includes('không thể lấy')) setUnavailableReason('COURSE_SERVICE_UNAVAILABLE');
       else if (lowerMessage.includes('chưa có bài học') || lowerMessage.includes('empty')) setUnavailableReason('EMPTY_COURSE');
+      else if (lowerMessage.includes('ngữ cảnh khóa học')) setUnavailableReason('INSUFFICIENT_COURSE_COVERAGE');
       else setUnavailableReason('INSUFFICIENT_CONTENT');
       return;
     }
@@ -42,6 +47,8 @@ export default function FinalQuizPage() {
     setSessionId(result.data.sessionId);
     setQuestions(result.data.questions);
     setExpiresAt(result.data.expiresAt);
+    setContextQuality(result.data.contextQuality);
+    setQualityReport(result.data.qualityReport);
   }, [courseId]);
 
   useEffect(() => {
@@ -119,6 +126,8 @@ export default function FinalQuizPage() {
           sessionId={sessionId}
           questions={questions}
           expiresAt={expiresAt}
+          contextQuality={contextQuality}
+          qualityReport={qualityReport}
           onClose={() => router.back()}
           onSubmit={handleSubmit}
         />

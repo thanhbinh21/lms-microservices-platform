@@ -361,3 +361,21 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 - [x] Tao trang admin `/admin/orders/[orderId]` event timeline doc theo chieu doc, co icon theo event type va collapsible JSON payload. done 2026-05-27
 - [x] Them link "Don hang" vao sidebar admin nhom Thanh toan & doanh thu. done 2026-05-27
 - [x] Fix event types trong seed: PAYMENT_COMPLETED→ORDER_COMPLETED, PAYMENT_FAILED→ORDER_FAILED, them VNPAY_CALLBACK_RECEIVED va PAYMENT_VERIFIED cho happy path. done 2026-05-27
+
+### 2026-05-29 - AI Learning Agent Quiz Hotfix
+- [x] Chan final quiz dung demo fallback khi LLM loi, het quota hoac tra JSON hong; expire session fallback cu, uu tien OpenRouter, tang token JSON generation, va thay native confirm bang modal quiz noi bo. done 2026-05-29
+
+### 2026-06-01 - Demo-ready VPS Deployment Baseline
+- [x] Thu gon production-like VPS demo: health/liveness/readiness toi thieu, Kong rate limit + upstream timeout, circuit breaker `payment -> course`, outbox co san, Kafka retry 5s/1m + DLQ, notification retry demo, console log, K6 smoke/rate-limit va production compose; loai bo full observability stack. done 2026-06-01
+
+### 2026-06-01 - AWS Lightsail Demo Deploy Runbook
+- [x] Harden production Compose cho Lightsail: chi publish Web/Kong proxy tren loopback, render Kong production voi Docker DNS + secret/domain deploy, them env production example, script deploy va runbook smoke/demo/rollback. done 2026-06-01
+
+### 2026-06-01 - Environment Configuration Synchronization
+- [x] Dong bo env local/example cho root, web-client va cac service; bo sung production Compose tuning cho outbox/payment, giu example chi chua placeholder/default an toan. done 2026-06-01
+
+### 2026-06-01 - AI Chatbox Cross-subdomain Auth Cookie Hotfix
+- [x] Cau hinh Web Client production ghi va xoa auth cookie theo `AUTH_COOKIE_DOMAIN=.thanhbinh.qzz.io`, `Secure`, `SameSite=None`, giu local host-only `SameSite=Lax`, va truyen env qua production Compose de AI Chatbox goi API subdomain khong con mat cookie. done 2026-06-01
+
+### 2026-06-01 - VNPay Return Callback Completion Hotfix
+- [x] Dung chung completion helper cho VNPay Return/IPN, cho phep Return production hoan tat order idempotently va tao transactional outbox khi sandbox IPN khong den VPS. done 2026-06-01

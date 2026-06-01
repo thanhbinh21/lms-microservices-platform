@@ -47,6 +47,34 @@ interface BecomeEducatorApiResponse {
   } | null;
 }
 
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
+
+function getAuthCookieOptions() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  return {
+    domain: process.env.AUTH_COOKIE_DOMAIN || undefined,
+    secure: isProduction,
+    sameSite: isProduction ? ('none' as const) : ('lax' as const),
+    path: '/',
+  };
+}
+
+function setAuthCookie(cookieStore: CookieStore, name: string, value: string, maxAge: number) {
+  const options = getAuthCookieOptions();
+  if (options.domain) {
+    cookieStore.set(name, '', { ...options, domain: undefined, maxAge: 0 });
+  }
+  cookieStore.set(name, value, { ...options, httpOnly: true, maxAge });
+}
+
+function clearAuthCookie(cookieStore: CookieStore, name: string) {
+  const options = getAuthCookieOptions();
+  cookieStore.set(name, '', { ...options, maxAge: 0 });
+  if (options.domain) {
+    cookieStore.set(name, '', { ...options, domain: undefined, maxAge: 0 });
+  }
+}
+
 function normalizeRole(role?: string | null): UserRole {
   if (!role) return 'STUDENT';
   const normalized = role.toUpperCase();
@@ -86,72 +114,42 @@ function decodeTokenPayload(token: string): TokenPayload | null {
 
 async function clearAuthCookies() {
   const cookieStore = await cookies();
-  cookieStore.delete('accessToken');
-  cookieStore.delete('refreshToken');
-  cookieStore.delete('userName');
-  cookieStore.delete('userUsername');
-  cookieStore.delete('userAvatar');
+  clearAuthCookie(cookieStore, 'accessToken');
+  clearAuthCookie(cookieStore, 'refreshToken');
+  clearAuthCookie(cookieStore, 'userName');
+  clearAuthCookie(cookieStore, 'userUsername');
+  clearAuthCookie(cookieStore, 'userAvatar');
 }
 
 async function writeAuthCookies(params: { accessToken?: string; refreshToken?: string; userName?: string; userUsername?: string | null; userAvatar?: string | null }) {
   const cookieStore = await cookies();
 
   if (params.accessToken) {
-    cookieStore.set('accessToken', params.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 15 * 60,
-      path: '/',
-    });
+    setAuthCookie(cookieStore, 'accessToken', params.accessToken, 15 * 60);
   }
 
   if (params.refreshToken) {
-    cookieStore.set('refreshToken', params.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60,
-      path: '/',
-    });
+    setAuthCookie(cookieStore, 'refreshToken', params.refreshToken, 7 * 24 * 60 * 60);
   }
 
   if (params.userName) {
     // Luu ten de hydrate UI sau refresh token ma khong can goi them API profile.
-    cookieStore.set('userName', params.userName, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60,
-      path: '/',
-    });
+    setAuthCookie(cookieStore, 'userName', params.userName, 7 * 24 * 60 * 60);
   }
   
   if (params.userUsername !== undefined) {
     if (params.userUsername) {
-      cookieStore.set('userUsername', params.userUsername, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60,
-        path: '/',
-      });
+      setAuthCookie(cookieStore, 'userUsername', params.userUsername, 7 * 24 * 60 * 60);
     } else {
-      cookieStore.delete('userUsername');
+      clearAuthCookie(cookieStore, 'userUsername');
     }
   }
 
   if (params.userAvatar !== undefined) {
     if (params.userAvatar) {
-      cookieStore.set('userAvatar', params.userAvatar, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60,
-        path: '/',
-      });
+      setAuthCookie(cookieStore, 'userAvatar', params.userAvatar, 7 * 24 * 60 * 60);
     } else {
-      cookieStore.delete('userAvatar');
+      clearAuthCookie(cookieStore, 'userAvatar');
     }
   }
 }

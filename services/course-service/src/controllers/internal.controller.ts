@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import type { ApiResponse } from '@lms/types';
-import prisma from '../lib/prisma';
+import prisma from '../lib/prisma.js';
 import { logger } from '@lms/logger';
 import type { Prisma } from '../generated/prisma/index.js';
 import {
@@ -11,8 +11,8 @@ import {
   pickBestTranscript,
   type LessonForAiContext,
   type TranscriptCandidate,
-} from '../lib/transcript-context';
-import { enqueueAutoSttJob } from '../lib/transcript-jobs';
+} from '../lib/transcript-context.js';
+import { enqueueAutoSttJob } from '../lib/transcript-jobs.js';
 
 type LessonTranscriptForContext = TranscriptCandidate & {
   lessonId?: string;

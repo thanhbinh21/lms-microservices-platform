@@ -5,7 +5,7 @@
  */
 import { Request, Response } from 'express';
 import type { ApiResponse } from '@lms/types';
-import prisma from '../lib/prisma';
+import prisma from '../lib/prisma.js';
 import { z } from 'zod';
 
 function apiError(res: Response, code: number, message: string, traceId: string): Response {

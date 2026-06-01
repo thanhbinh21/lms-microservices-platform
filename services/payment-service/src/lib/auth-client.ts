@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from './http';
+import { fetchWithTimeout } from './http.js';
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3101';
 const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';

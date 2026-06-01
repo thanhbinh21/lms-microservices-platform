@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Loader2, Clock3, PlayCircle, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, HelpCircle, Keyboard, ListChecks, X, Award, MessageSquare } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getLearnDataAction, updateLessonProgressAction, type LearnDataDto, type LearnLessonDto } from '@/app/actions/learning';
-import { generateQuizAction, getAiContextStatusAction, submitQuizAction } from '@/app/actions/ai';
+import { generateQuizAction, getAiContextStatusAction, submitQuizAction, type QuizQualityReportDto } from '@/app/actions/ai';
 import { VideoPlayer } from '@/components/learning/video-player';
 import { CourseQaSection } from '@/components/learning/course-qa-section';
 import { Button } from '@/components/ui/button';
@@ -43,10 +43,13 @@ export default function LessonPage() {
   const [quizSessionId, setQuizSessionId] = useState<string | null>(null);
   const [quizQuestions, setQuizQuestions] = useState<{ question: string; options: string[] }[]>([]);
   const [quizExpiresAt, setQuizExpiresAt] = useState<string | undefined>();
+  const [quizContextQuality, setQuizContextQuality] = useState<'HIGH' | 'MEDIUM' | 'LOW' | undefined>();
+  const [quizQualityReport, setQuizQualityReport] = useState<QuizQualityReportDto | undefined>();
   const [quizUnavailableReason, setQuizUnavailableReason] = useState<string | null>(null);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
   const [aiUnavailableReason, setAiUnavailableReason] = useState<string | undefined>(undefined);
   const [chatOpen, setChatOpen] = useState(false);
+  const [currentTimeSec, setCurrentTimeSec] = useState<number | undefined>(undefined);
   const hasTriggeredConfetti = useRef(false);
 
   const fetchData = useCallback(async () => {
@@ -90,8 +93,11 @@ export default function LessonPage() {
       setQuizOpen(false);
       setQuizSessionId(null);
       setQuizQuestions([]);
+      setQuizContextQuality(undefined);
+      setQuizQualityReport(undefined);
       setQuizUnavailableReason(null);
       setChatOpen(false);
+      setCurrentTimeSec(undefined);
       void fetchData();
     }, 0);
     return () => window.clearTimeout(timer);
@@ -102,6 +108,8 @@ export default function LessonPage() {
     setQuizOpen(true);
     setQuizLoading(true);
     setQuizUnavailableReason(null);
+    setQuizContextQuality(undefined);
+    setQuizQualityReport(undefined);
 
     const res = await generateQuizAction(courseId, lessonId, 'LESSON', 5);
     setQuizLoading(false);
@@ -121,6 +129,8 @@ export default function LessonPage() {
     setQuizSessionId(res.data.sessionId);
     setQuizQuestions(res.data.questions);
     setQuizExpiresAt(res.data.expiresAt);
+    setQuizContextQuality(res.data.contextQuality);
+    setQuizQualityReport(res.data.qualityReport);
   };
 
   useEffect(() => {
@@ -251,6 +261,7 @@ export default function LessonPage() {
             lastPosition={lesson.progress?.lastWatched || 0}
             isCompleted={isCompleted}
             onComplete={handleComplete}
+            onPositionChange={setCurrentTimeSec}
           />
         ) : (
           <div className="flex aspect-video items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white">
@@ -460,6 +471,7 @@ export default function LessonPage() {
       <ChatWidget
         courseId={courseId}
         lessonId={lessonId}
+        currentTimeSec={currentTimeSec}
         aiAvailable={aiAvailable ?? true}
         aiUnavailableReason={aiUnavailableReason}
         open={chatOpen}
@@ -491,6 +503,8 @@ export default function LessonPage() {
                 sessionId={quizSessionId}
                 questions={quizQuestions}
                 expiresAt={quizExpiresAt}
+                contextQuality={quizContextQuality}
+                qualityReport={quizQualityReport}
                 onClose={() => setQuizOpen(false)}
                 onSubmit={(answers) => submitQuizAction(quizSessionId, answers)}
               />

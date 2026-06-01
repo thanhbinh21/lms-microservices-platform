@@ -9,7 +9,7 @@ import {
   type KafkaTopic,
 } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
-import { deleteCourseReadModel, updateCourseReadModel } from './read-store';
+import { deleteCourseReadModel, updateCourseReadModel } from './read-store.js';
 
 const COURSE_CATALOG_TOPICS: KafkaTopic[] = [
   TOPICS.COURSE_PUBLISHED,

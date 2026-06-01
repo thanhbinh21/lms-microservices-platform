@@ -81,6 +81,34 @@ interface AccessTokenPayload {
   role: string;
 }
 
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
+
+function getAuthCookieOptions() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  return {
+    domain: process.env.AUTH_COOKIE_DOMAIN || undefined,
+    secure: isProduction,
+    sameSite: isProduction ? ('none' as const) : ('lax' as const),
+    path: '/',
+  };
+}
+
+function setAuthCookie(cookieStore: CookieStore, name: string, value: string, maxAge: number) {
+  const options = getAuthCookieOptions();
+  if (options.domain) {
+    cookieStore.set(name, '', { ...options, domain: undefined, maxAge: 0 });
+  }
+  cookieStore.set(name, value, { ...options, httpOnly: true, maxAge });
+}
+
+function clearAuthCookie(cookieStore: CookieStore, name: string) {
+  const options = getAuthCookieOptions();
+  cookieStore.set(name, '', { ...options, maxAge: 0 });
+  if (options.domain) {
+    cookieStore.set(name, '', { ...options, domain: undefined, maxAge: 0 });
+  }
+}
+
 export interface CourseDto {
   id: string;
   title: string;
@@ -271,30 +299,18 @@ async function writeAuthCookies(params: { accessToken?: string; refreshToken?: s
   const cookieStore = await cookies();
 
   if (params.accessToken) {
-    cookieStore.set('accessToken', params.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 15 * 60,
-      path: '/',
-    });
+    setAuthCookie(cookieStore, 'accessToken', params.accessToken, 15 * 60);
   }
 
   if (params.refreshToken) {
-    cookieStore.set('refreshToken', params.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60,
-      path: '/',
-    });
+    setAuthCookie(cookieStore, 'refreshToken', params.refreshToken, 7 * 24 * 60 * 60);
   }
 }
 
 async function clearAuthCookies() {
   const cookieStore = await cookies();
-  cookieStore.delete('accessToken');
-  cookieStore.delete('refreshToken');
+  clearAuthCookie(cookieStore, 'accessToken');
+  clearAuthCookie(cookieStore, 'refreshToken');
 }
 
 async function refreshAccessToken(): Promise<string | undefined> {

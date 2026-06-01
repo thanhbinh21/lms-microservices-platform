@@ -11,6 +11,33 @@ const path = require('path');
 const serviceRoot = process.cwd();
 const pkgLabel = process.env.npm_package_name || path.basename(serviceRoot);
 const engineDll = path.join(serviceRoot, 'src', 'generated', 'prisma', 'query_engine-windows.dll.node');
+const generatedClient = path.join(serviceRoot, 'src', 'generated', 'prisma');
+const distRoot = path.join(serviceRoot, 'dist');
+const distClient = path.join(distRoot, 'generated', 'prisma');
+
+function copyGeneratedClient() {
+  const resolvedDistRoot = path.resolve(distRoot);
+  const resolvedDistClient = path.resolve(distClient);
+
+  if (!resolvedDistClient.startsWith(`${resolvedDistRoot}${path.sep}`)) {
+    throw new Error(`Thu muc dich Prisma khong hop le: ${resolvedDistClient}`);
+  }
+
+  if (!fs.existsSync(generatedClient)) {
+    throw new Error(`Chua generate Prisma client cho ${pkgLabel}. Chay pnpm prisma:generate truoc khi build.`);
+  }
+
+  fs.rmSync(resolvedDistClient, { recursive: true, force: true });
+  fs.cpSync(generatedClient, resolvedDistClient, {
+    recursive: true,
+    filter: (source) => !path.basename(source).includes('.tmp'),
+  });
+}
+
+if (process.argv.includes('--copy-to-dist')) {
+  copyGeneratedClient();
+  process.exit(0);
+}
 
 function sleepSync(ms) {
   const end = Date.now() + ms;

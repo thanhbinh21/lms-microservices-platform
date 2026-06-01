@@ -4,8 +4,8 @@ import type { ApiResponse } from '@lms/types';
 import type { Prisma } from '../generated/prisma/index.js';
 import { logger } from '@lms/logger';
 import { cacheInvalidate, cacheInvalidatePattern } from '@lms/cache';
-import prisma from '../lib/prisma';
-import { handlePrismaError } from '../lib/prisma-errors';
+import prisma from '../lib/prisma.js';
+import { handlePrismaError } from '../lib/prisma-errors.js';
 
 async function invalidateCourseDiscoveryCachesForStatusChange(): Promise<void> {
   await Promise.all([

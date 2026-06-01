@@ -6,9 +6,9 @@
   "scripts": {
     "postinstall": "node ../../scripts/prisma-postinstall.cjs",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node ../../scripts/prisma-postinstall.cjs --copy-to-dist",
     "start": "node dist/index.js",
-    "test": "vitest run",
+    "test": "vitest run --exclude \"dist/**\"",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",

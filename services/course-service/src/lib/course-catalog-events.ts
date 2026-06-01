@@ -4,8 +4,8 @@ import {
   type CourseCatalogSnapshot,
 } from '@lms/kafka-client';
 import { logger } from '@lms/logger';
-import prisma from './prisma';
-import { publishTypedEvent } from './kafka-producer';
+import prisma from './prisma.js';
+import { publishTypedEvent } from './kafka-producer.js';
 
 const TOPIC_BY_ACTION = {
   published: TOPICS.COURSE_PUBLISHED,

@@ -15,6 +15,10 @@ jwt_secrets:
 services:
   - name: auth-service
     url: http://host.docker.internal:3101
+    connect_timeout: 2000
+    read_timeout: 5000
+    write_timeout: 5000
+    retries: 0
     routes:
       - name: auth-public-route
         paths:
@@ -26,6 +30,10 @@ services:
             config:
               minute: 100
               policy: local
+              fault_tolerant: true
+              hide_client_headers: false
+              error_code: 429
+              error_message: "Too many requests. Please try again later."
           - name: pre-function
             config:
               access:
@@ -41,7 +49,10 @@ services:
                       return
                     end
                   elseif method == "GET" then
-                    if path == "/auth/health" then
+                    if path == "/auth/health"
+                      or path == "/auth/livez"
+                      or path == "/auth/readyz"
+                    then
                       return
                     end
                   elseif method == "OPTIONS" then
@@ -152,6 +163,10 @@ services:
 
   - name: course-service
     url: http://host.docker.internal:3002
+    connect_timeout: 2000
+    read_timeout: 5000
+    write_timeout: 5000
+    retries: 0
     routes:
       - name: course-protected-route
         paths:
@@ -216,6 +231,8 @@ services:
                   local path = kong.request.get_path()
                   if method == "GET" then
                     if path == "/course/health"
+                      or path == "/course/livez"
+                      or path == "/course/readyz"
                       or path == "/course/api/categories"
                       or path == "/course/api/courses"
                       or path:match("^/course/api/courses/[^/]+$")
@@ -232,6 +249,10 @@ services:
 
   - name: learning-service
     url: http://host.docker.internal:3006
+    connect_timeout: 2000
+    read_timeout: 5000
+    write_timeout: 5000
+    retries: 0
     routes:
       - name: learning-protected-route
         paths:
@@ -289,13 +310,20 @@ services:
               access:
                 - |
                   local path = kong.request.get_path()
-                  if path == "/learning/health" then
+                  if path == "/learning/health"
+                    or path == "/learning/livez"
+                    or path == "/learning/readyz"
+                  then
                     return
                   end
                   return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
 
   - name: community-service
     url: http://host.docker.internal:3007
+    connect_timeout: 2000
+    read_timeout: 5000
+    write_timeout: 5000
+    retries: 0
     routes:
       - name: community-protected-route
         paths:
@@ -355,13 +383,23 @@ services:
               access:
                 - |
                   local path = kong.request.get_path()
-                  if path == "/community/health" or path == "/qa/health" then
+                  if path == "/community/health"
+                    or path == "/community/livez"
+                    or path == "/community/readyz"
+                    or path == "/qa/health"
+                    or path == "/qa/livez"
+                    or path == "/qa/readyz"
+                  then
                     return
                   end
                   return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
 
   - name: payment-service
     url: http://host.docker.internal:3003
+    connect_timeout: 2000
+    read_timeout: 5000
+    write_timeout: 5000
+    retries: 0
     routes:
       - name: payment-protected-route
         paths:
@@ -420,7 +458,10 @@ services:
                 - |
                   local method = kong.request.get_method()
                   local path = kong.request.get_path()
-                  if path == "/payment/health" then
+                  if path == "/payment/health"
+                    or path == "/payment/livez"
+                    or path == "/payment/readyz"
+                  then
                     return
                   end
                   if path == "/payment/api/vnpay-return" and (method == "GET" or method == "POST") then
@@ -433,6 +474,10 @@ services:
 
   - name: media-service
     url: http://host.docker.internal:3004
+    connect_timeout: 2000
+    read_timeout: 5000
+    write_timeout: 5000
+    retries: 0
     routes:
       - name: media-protected-route
         paths:
@@ -491,7 +536,10 @@ services:
                 - |
                   local method = kong.request.get_method()
                   local path = kong.request.get_path()
-                  if path == "/media/health" then
+                  if path == "/media/health"
+                    or path == "/media/livez"
+                    or path == "/media/readyz"
+                  then
                     return
                   end
                   if method == "GET" and path:match("^/media/api/media/[^/]+$") then
@@ -510,6 +558,10 @@ services:
 
   - name: notification-service
     url: http://host.docker.internal:3005
+    connect_timeout: 2000
+    read_timeout: 5000
+    write_timeout: 5000
+    retries: 0
     routes:
       - name: notification-protected-route
         paths:
@@ -567,13 +619,20 @@ services:
               access:
                 - |
                   local path = kong.request.get_path()
-                  if path == "/notification/health" then
+                  if path == "/notification/health"
+                    or path == "/notification/livez"
+                    or path == "/notification/readyz"
+                  then
                     return
                   end
                   return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
 
   - name: ai-service
     url: http://host.docker.internal:3008
+    connect_timeout: 2000
+    read_timeout: 5000
+    write_timeout: 5000
+    retries: 0
     routes:
       - name: ai-protected-route
         paths:
@@ -673,7 +732,10 @@ services:
                     return
                   end
                   local path = kong.request.get_path()
-                  if path == "/ai/health" then
+                  if path == "/ai/health"
+                    or path == "/ai/livez"
+                    or path == "/ai/readyz"
+                  then
                     return
                   end
                   return kong.response.exit(401, { success = false, code = 401, message = "Unauthorized", data = nil, trace_id = kong.request.get_header("x-trace-id") or "" })
@@ -685,7 +747,7 @@ plugins:
         - "http://localhost:3000"
       methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
       headers: [Accept, Authorization, Content-Type, x-trace-id]
-      exposed_headers: [x-trace-id, X-RateLimit-Remaining, X-RateLimit-Reset]
+      exposed_headers: [x-trace-id, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-RateLimit-Limit-Minute, X-RateLimit-Remaining-Minute, Retry-After]
       credentials: true
       max_age: 3600
 

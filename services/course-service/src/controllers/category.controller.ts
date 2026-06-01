@@ -2,11 +2,11 @@ import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ApiResponse } from '@lms/types';
-import prisma from '../lib/prisma';
-import { handlePrismaError } from '../lib/prisma-errors';
+import prisma from '../lib/prisma.js';
+import { handlePrismaError } from '../lib/prisma-errors.js';
 import { cacheGet, cacheInvalidate, cacheInvalidatePattern } from '@lms/cache';
-import { writeAuditLog } from '../lib/audit';
-import { publishCourseCatalogEvent } from '../lib/course-catalog-events';
+import { writeAuditLog } from '../lib/audit.js';
+import { publishCourseCatalogEvent } from '../lib/course-catalog-events.js';
 
 const createCategorySchema = z.object({
   name: z.string().min(2, 'Ten danh muc toi thieu 2 ky tu'),

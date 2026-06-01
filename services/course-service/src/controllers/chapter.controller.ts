@@ -2,8 +2,8 @@ import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ApiResponse } from '@lms/types';
-import prisma from '../lib/prisma';
-import { handlePrismaError } from '../lib/prisma-errors';
+import prisma from '../lib/prisma.js';
+import { handlePrismaError } from '../lib/prisma-errors.js';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 

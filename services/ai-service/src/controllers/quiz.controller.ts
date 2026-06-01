@@ -10,6 +10,18 @@ import { checkRateLimit, generateText, isGeminiRateLimitError } from '../lib/gem
 import { verifyEnrollment } from '../lib/access-control.js';
 import { fetchCourseContext, fetchLessonAiContext, fetchCompletionStatus, fetchLessonCompletionStatus } from '../lib/course-client.js';
 import { AI_SERVICE_ENV } from '../lib/env.js';
+import {
+  buildContextPack,
+  buildQuizBlueprint,
+  evaluateAndSelectQuizQuestions,
+  formatBlueprintForPrompt,
+  formatContextQualityForPrompt,
+  hasMinimumFinalQuizContext,
+  hasMinimumLessonQuizContext,
+  type ContextPack,
+  type QuizBlueprint,
+  type QuizQualityReport,
+} from '../lib/ai-quality.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -223,6 +235,7 @@ async function hasValidLessonQuizContext(lessonId: string, traceId: string): Pro
   available: boolean;
   reason?: string;
   textContent?: string;
+  lessonContext?: Awaited<ReturnType<typeof fetchLessonAiContext>>;
 }> {
   const aiContext = await fetchLessonAiContext(lessonId, traceId);
   if (!aiContext) {
@@ -230,10 +243,10 @@ async function hasValidLessonQuizContext(lessonId: string, traceId: string): Pro
   }
 
   if (!aiContext.available || aiContext.textContent.trim().length === 0) {
-    return { available: false, reason: 'INSUFFICIENT_CONTENT' };
+    return { available: false, reason: 'INSUFFICIENT_CONTENT', lessonContext: aiContext };
   }
 
-  return { available: true, textContent: `[${aiContext.sourceType}]\n${aiContext.textContent}` };
+  return { available: true, textContent: `[${aiContext.sourceType}]\n${aiContext.textContent}`, lessonContext: aiContext };
 }
 
 async function hasValidFinalQuizContext(courseId: string, traceId: string): Promise<{
@@ -316,9 +329,17 @@ function buildLessonQuizPrompt(
   courseTitle: string,
   level: string,
   count: number,
+  blueprint: QuizBlueprint,
+  contextPack: ContextPack,
 ): string {
   return `Return exactly ${count} MCQ questions as raw JSON array only.
 Topic: lesson "${sanitizeText(lessonTitle)}" in course "${sanitizeText(courseTitle)}". Level: ${sanitizeText(level)}.
+
+CONTEXT_QUALITY:
+${formatContextQualityForPrompt(contextPack)}
+
+ASSESSMENT_BLUEPRINT:
+${formatBlueprintForPrompt(blueprint)}
 
 COMPACT_LESSON_CONTEXT:
 ${compactContext(textContent, MAX_LESSON_QUIZ_CONTEXT_CHARS)}
@@ -327,6 +348,8 @@ Rules:
 - 4 options per question.
 - correctIndex must be 0, 1, 2, or 3.
 - Explanation is one short Vietnamese sentence.
+- Avoid duplicate questions, duplicate option sets, and vague metadata-only wording.
+- Match each question to a blueprint row and mix recall, understanding, and application.
 - Output raw JSON only. No markdown. No text before or after JSON.`;
 }
 
@@ -335,9 +358,17 @@ function buildFinalQuizPrompt(
   level: string,
   combinedContent: string,
   count: number,
+  blueprint: QuizBlueprint,
+  contextPack: ContextPack,
 ): string {
   return `Return exactly ${count} final-course MCQ questions as raw JSON array only.
 Course: "${sanitizeText(courseTitle)}". Level: ${sanitizeText(level)}.
+
+CONTEXT_QUALITY:
+${formatContextQualityForPrompt(contextPack)}
+
+ASSESSMENT_BLUEPRINT:
+${formatBlueprintForPrompt(blueprint)}
 
 COMPACT_COURSE_CONTEXT:
 ${compactContext(combinedContent, MAX_COURSE_QUIZ_CONTEXT_CHARS)}
@@ -348,6 +379,8 @@ Rules:
 - 4 options per question.
 - correctIndex must be 0, 1, 2, or 3.
 - Explanation is one short Vietnamese sentence.
+- Avoid duplicate questions, duplicate option sets, and overusing one correct answer index.
+- Do not ask questions that could fit any course without course-specific context.
 - Output raw JSON only. No markdown. No text before or after JSON.`;
 }
 
@@ -357,21 +390,71 @@ function buildStaticFallbackQuiz(
   count: number,
   keywords: string[] = [],
 ): QuizQuestion[] {
-  const subject = lessonTitle ? `bai "${lessonTitle}"` : `khoa hoc "${courseTitle}"`;
-  const cleanKeywords = keywords.length > 0 ? keywords : extractKeywordsFromText(`${courseTitle} ${lessonTitle || ''}`, count + 3);
-  const topicPool = cleanKeywords.length > 0 ? cleanKeywords : ['kien thuc cot loi', 'ung dung thuc te', 'quy trinh hoc tap'];
+  const subject = lessonTitle ? `bài "${lessonTitle}"` : `khóa học "${courseTitle}"`;
+  const cleanKeywords = Array.from(new Set(
+    (keywords.length > 0 ? keywords : extractKeywordsFromText(`${courseTitle} ${lessonTitle || ''}`, count + 6))
+      .map((item) => sanitizeText(item))
+      .filter(Boolean),
+  ));
+  const topicPool = cleanKeywords.length > 0
+    ? cleanKeywords
+    : ['kiến thức cốt lõi', 'ứng dụng thực tế', 'quy trình học tập', 'lỗi thường gặp', 'cách ôn tập'];
+  const templates = [
+    (topic: string) => ({
+      question: `Trong ${subject}, mục tiêu học tập gắn với "${topic}" là gì?`,
+      options: [
+        `Nắm được ý nghĩa của "${topic}" và biết áp dụng vào đúng ngữ cảnh.`,
+        `Ghi nhớ tên "${topic}" nhưng không cần hiểu cách dùng.`,
+        `Bỏ qua "${topic}" vì nội dung này không ảnh hưởng đến bài học.`,
+        `Xem "${topic}" là lỗi hệ thống thay vì một nội dung cần học.`,
+      ],
+      correctIndex: 0,
+      explanation: `Cần hiểu "${topic}" theo ngữ cảnh của ${subject} để vận dụng đúng.`,
+    }),
+    (topic: string) => ({
+      question: `Khi ôn lại ${subject}, cách học hiệu quả nhất với chủ đề "${topic}" là gì?`,
+      options: [
+        `Tìm ví dụ hoặc bài tập nhỏ để kiểm tra hiểu biết về "${topic}".`,
+        `Chỉ đọc lướt tiêu đề rồi chuyển sang phần khác.`,
+        `Chọn ngẫu nhiên đáp án vì "${topic}" không cần luyện tập.`,
+        `Học thuộc từng chữ mà không liên hệ với bài học.`,
+      ],
+      correctIndex: 0,
+      explanation: `Ví dụ và bài tập giúp biến "${topic}" thành kiến thức có thể dùng được.`,
+    }),
+    (topic: string) => ({
+      question: `Dấu hiệu nào cho thấy bạn đã hiểu chủ đề "${topic}" trong ${subject}?`,
+      options: [
+        `Bạn có thể giải thích lại bằng lời của mình và nêu ví dụ phù hợp.`,
+        `Bạn chỉ nhớ vị trí xuất hiện của chủ đề trong video.`,
+        `Bạn tránh mọi câu hỏi liên quan đến "${topic}".`,
+        `Bạn chỉ học đáp án mẫu mà không hiểu lý do.`,
+      ],
+      correctIndex: 0,
+      explanation: `Tự giải thích và nêu ví dụ là dấu hiệu hiểu thật, không chỉ ghi nhớ.`,
+    }),
+  ];
 
-  return Array.from({ length: count }, (_, index) => ({
-    question: `Trong ${subject}, khai niem "${topicPool[index % topicPool.length]}" nen duoc hieu nhu the nao?`,
-    options: [
-      'La mot chu de can nam vung va ap dung dung ngu canh.',
-      'La noi dung phu, co the bo qua trong moi tinh huong.',
-      'Chi la ten cong cu, khong lien quan den tu duy giai quyet van de.',
-      'La loi he thong va khong nam trong noi dung khoa hoc.',
-    ],
-    correctIndex: 0,
-    explanation: `Cau hoi du phong duoc tao tu metadata cua ${subject} de demo on dinh khi provider AI loi.`,
-  }));
+  return Array.from({ length: count }, (_, index) => {
+    const topic = topicPool[index % topicPool.length];
+    const question = templates[index % templates.length](topic);
+    return {
+      ...question,
+      correctIndex: index % 4,
+      options: rotateOptions(question.options, index % 4),
+    };
+  });
+}
+
+function rotateOptions(options: string[], correctIndex: number): string[] {
+  const [correct, ...wrong] = options;
+  const result = [...wrong];
+  result.splice(correctIndex, 0, correct);
+  return result;
+}
+
+function getQuizMaxTokens(expectedCount: number): number {
+  return Math.min(4096, Math.max(1800, expectedCount * 260));
 }
 
 async function generateQuizWithLLM(
@@ -386,7 +469,7 @@ async function generateQuizWithLLM(
     const activePrompt = attempt === 1 ? prompt : (retryPrompt || compactContext(prompt, 2200));
     const raw = await generateText(activePrompt, QUIZ_SYSTEM_INSTRUCTION, {
       temperature: attempt === 1 ? 0.3 : 0.1,
-      maxTokens: 1400,
+      maxTokens: getQuizMaxTokens(expectedCount),
     });
 
     try {
@@ -538,20 +621,47 @@ export async function generateQuiz(req: Request, res: Response): Promise<Respons
 
     if (existingSession) {
       const questions = existingSession.questions as unknown as QuizQuestionClient[];
-      return res.status(200).json(createSuccessResponse({
-        sessionId: existingSession.id,
-        questions,
-        expiresAt: existingSession.expiresAt.toISOString(),
-        reused: true,
-      }, 'Quiz session returned', traceId));
+      const contextSnapshot = existingSession.contextSnapshot as {
+        coverage?: ContextPack['coverage'];
+        contextQuality?: ContextPack['coverage']['quality'];
+      } | null;
+      const qualityReport = existingSession.qualityReport as QuizQualityReport | null;
+      const shouldDiscardFinalFallback = quizType === 'FINAL_COURSE'
+        && (
+          existingSession.totalQ < effectiveCount
+          || Boolean(qualityReport?.warnings?.includes('DEMO_FALLBACK_QUIZ'))
+        );
+
+      if (shouldDiscardFinalFallback) {
+        await prisma.aiQuizSession.update({
+          where: { id: existingSession.id },
+          data: { status: 'EXPIRED' },
+        });
+      } else {
+        return res.status(200).json(createSuccessResponse({
+          sessionId: existingSession.id,
+          questions,
+          totalQuestions: existingSession.totalQ,
+          expiresAt: existingSession.expiresAt.toISOString(),
+          reused: true,
+          contextQuality: contextSnapshot?.contextQuality ?? contextSnapshot?.coverage?.quality,
+          coverage: contextSnapshot?.coverage,
+          qualityReport,
+          warnings: qualityReport?.warnings ?? [],
+        }, 'Quiz session returned', traceId));
+      }
     }
 
     // Context check
     let textContent: string = '';
     let contextErrorCode: string | undefined;
+    const lessonContextMap: Record<string, Awaited<ReturnType<typeof fetchLessonAiContext>> | null | undefined> = {};
 
     if (quizType === 'LESSON' && effectiveLessonId) {
       const ctx = await hasValidLessonQuizContext(effectiveLessonId, traceId);
+      if (ctx.lessonContext) {
+        lessonContextMap[effectiveLessonId] = ctx.lessonContext;
+      }
       if (!ctx.available) {
         const lesson = course.curriculum.flatMap((ch) => ch.lessons).find((l) => l.id === effectiveLessonId);
         const fallback = buildLessonKeywordContext(course, lesson);
@@ -570,6 +680,14 @@ export async function generateQuiz(req: Request, res: Response): Promise<Respons
       }
     }
 
+    const contextPack = buildContextPack(course, lessonContextMap, effectiveLessonId);
+    if (quizType === 'LESSON' && effectiveLessonId && !hasMinimumLessonQuizContext(contextPack, effectiveLessonId)) {
+      contextErrorCode = contextErrorCode || 'INSUFFICIENT_CONTENT';
+    }
+    if (quizType === 'FINAL_COURSE' && !hasMinimumFinalQuizContext(contextPack)) {
+      contextErrorCode = contextErrorCode || 'INSUFFICIENT_COURSE_COVERAGE';
+    }
+
     if (contextErrorCode) {
       const errorMessages: Record<string, string> = {
         TRANSCRIPT_NOT_READY: 'AI đang chuẩn bị ngữ cảnh bài học. Vui lòng quay lại sau.',
@@ -578,6 +696,7 @@ export async function generateQuiz(req: Request, res: Response): Promise<Respons
         COURSE_SERVICE_UNAVAILABLE: 'Không thể lấy ngữ cảnh khóa học lúc này. Vui lòng thử lại sau.',
         EMPTY_COURSE: 'Khóa học chưa có bài học để tạo quiz.',
         COURSE_NOT_FOUND: 'Không tìm thấy khóa học.',
+        INSUFFICIENT_COURSE_COVERAGE: 'Ngữ cảnh khóa học chưa đủ rộng để tạo bài kiểm tra cuối khóa đạt chuẩn chứng chỉ.',
       };
       return res.status(422).json(createErrorResponse(
         errorMessages[contextErrorCode] || 'Quiz không khả dụng cho bài học này.',
@@ -615,6 +734,11 @@ YEU CAU KEYWORD_EXPANSION:
 - Khong can transcript am thanh day du.
 - Tranh hoi vao chi tiet qua cu the neu ngu canh khong neu ro.`, maxContextChars);
 
+    const blueprint = buildQuizBlueprint(course, quizType, effectiveCount, effectiveLessonId);
+    const candidateCount = Math.min(
+      quizType === 'FINAL_COURSE' ? FINAL_QUIZ_MAX_QUESTIONS : LESSON_QUIZ_MAX_QUESTIONS,
+      effectiveCount + (quizType === 'FINAL_COURSE' ? 2 : 3),
+    );
     let prompt: string;
     let retryPrompt: string;
     let lessonTitle: string | undefined;
@@ -626,36 +750,95 @@ YEU CAU KEYWORD_EXPANSION:
         textContent,
         course.title,
         course.level,
-        effectiveCount,
+        candidateCount,
+        blueprint,
+        contextPack,
       );
       retryPrompt = buildLessonQuizPrompt(
         lesson?.title || 'Bài học',
         compactContext(textContent, 1800),
         course.title,
         course.level,
-        effectiveCount,
+        candidateCount,
+        blueprint,
+        contextPack,
       );
     } else {
-      prompt = buildFinalQuizPrompt(course.title, course.level, textContent, effectiveCount);
-      retryPrompt = buildFinalQuizPrompt(course.title, course.level, compactContext(textContent, 2200), effectiveCount);
+      prompt = buildFinalQuizPrompt(course.title, course.level, textContent, candidateCount, blueprint, contextPack);
+      retryPrompt = buildFinalQuizPrompt(course.title, course.level, compactContext(textContent, 2200), candidateCount, blueprint, contextPack);
     }
 
     let quizQuestions: QuizQuestion[] = [];
+    let qualityReport: QuizQualityReport = {
+      expectedCount: effectiveCount,
+      acceptedCount: 0,
+      rejectedCount: 0,
+      duplicateCount: 0,
+      optionIssueCount: 0,
+      genericCount: 0,
+      answerDistribution: { '0': 0, '1': 0, '2': 0, '3': 0 },
+      warnings: [],
+    };
     try {
-      const { questions } = await generateQuizWithLLM(prompt, effectiveCount, retryPrompt);
-      quizQuestions = questions.slice(0, effectiveCount);
+      const { questions } = await generateQuizWithLLM(prompt, candidateCount, retryPrompt);
+      const firstPass = evaluateAndSelectQuizQuestions(questions, effectiveCount);
+      quizQuestions = firstPass.accepted as QuizQuestion[];
+      qualityReport = firstPass.report;
+
+      if (quizQuestions.length < effectiveCount) {
+        const targetedRetryPrompt = `${retryPrompt}
+
+QUALITY_RETRY:
+- Previous accepted questions: ${quizQuestions.length}/${effectiveCount}.
+- Avoid these issues: ${qualityReport.warnings.join(', ') || 'not enough course-specific questions'}.
+- Generate fresh questions only; use different wording and balanced correctIndex values.`;
+        const retry = await generateQuizWithLLM(targetedRetryPrompt, candidateCount);
+        const secondPass = evaluateAndSelectQuizQuestions([...quizQuestions, ...retry.questions], effectiveCount);
+        quizQuestions = secondPass.accepted as QuizQuestion[];
+        qualityReport = {
+          ...secondPass.report,
+          warnings: Array.from(new Set([...qualityReport.warnings, ...secondPass.report.warnings])),
+        };
+      }
+
+      if (quizQuestions.length < effectiveCount) {
+        return res.status(422).json(createErrorResponse(
+          'AI chưa tạo đủ câu hỏi đạt chuẩn từ ngữ cảnh hiện có. Vui lòng bổ sung nội dung bài học hoặc thử lại sau.',
+          422,
+          traceId,
+        ));
+      }
     } catch (err) {
       logger.warn({ err, traceId }, 'Quiz generation failed');
-      if (AI_SERVICE_ENV.AI_DEMO_FALLBACK_QUIZ.toLowerCase() === 'true') {
+      const allowDemoFallback = AI_SERVICE_ENV.AI_DEMO_FALLBACK_QUIZ.toLowerCase() === 'true'
+        && quizType === 'LESSON';
+
+      if (allowDemoFallback) {
         const fallbackCount = Math.max(3, Math.min(5, effectiveCount));
         const keywords = extractKeywordsFromText(`${course.title} ${textContent}`, fallbackCount + 4);
         quizQuestions = buildStaticFallbackQuiz(course.title, lessonTitle, fallbackCount, keywords);
+        const fallbackQuality = evaluateAndSelectQuizQuestions(quizQuestions, quizQuestions.length);
+        quizQuestions = fallbackQuality.accepted as QuizQuestion[];
+        qualityReport = {
+          ...fallbackQuality.report,
+          warnings: Array.from(new Set([...fallbackQuality.report.warnings, 'DEMO_FALLBACK_QUIZ'])),
+        };
+        if (quizQuestions.length < fallbackCount) {
+          quizQuestions = [];
+        }
       }
       // Tra loi loi thay vi quiz du phong vo nghia.
       if (quizQuestions.length === 0 && isGeminiRateLimitError(err)) {
         return res.status(429).json(createErrorResponse(
           'AI đang tạm hết quota. Vui lòng thử lại sau vài phút.',
           429,
+          traceId,
+        ));
+      }
+      if (quizQuestions.length === 0 && quizType === 'FINAL_COURSE') {
+        return res.status(503).json(createErrorResponse(
+          'AI chưa tạo được bộ câu hỏi cuối khóa đạt chuẩn. Vui lòng thử lại sau hoặc đổi provider AI.',
+          503,
           traceId,
         ));
       }
@@ -692,6 +875,17 @@ YEU CAU KEYWORD_EXPANSION:
         questionsHash,
         questions: questionsClient as unknown as Prisma.InputJsonValue,
         correctData: correctData as unknown as Prisma.InputJsonValue,
+        contextSnapshot: {
+          courseId,
+          lessonId: effectiveLessonId ?? null,
+          quizType,
+          contextQuality: contextPack.coverage.quality,
+          coverage: contextPack.coverage,
+          lessonSummaries: contextPack.lessonSummaries,
+          generatedAt: new Date().toISOString(),
+        } as unknown as Prisma.InputJsonValue,
+        blueprint: blueprint as unknown as Prisma.InputJsonValue,
+        qualityReport: qualityReport as unknown as Prisma.InputJsonValue,
         totalQ: quizQuestions.length,
         expiresAt,
       },
@@ -703,6 +897,10 @@ YEU CAU KEYWORD_EXPANSION:
       questions: questionsClient,
       totalQuestions: quizQuestions.length,
       expiresAt: expiresAt.toISOString(),
+      contextQuality: contextPack.coverage.quality,
+      coverage: contextPack.coverage,
+      qualityReport,
+      warnings: qualityReport.warnings,
     }, 'Quiz generated', traceId, 201));
   } catch (err) {
     return handlePrismaError(err, res, traceId, 'generateQuiz');
@@ -742,17 +940,25 @@ export async function submitQuiz(req: Request, res: Response): Promise<Response>
         return { error: 'EXPIRED', code: 410, message: 'Quiz đã hết hạn (30 phút). Vui lòng tạo quiz mới.' };
       }
 
+      if (answers.length !== session.totalQ) {
+        return { error: 'INVALID_ANSWER_COUNT', code: 400, message: 'Số câu trả lời không khớp với phiên quiz.' };
+      }
+
       const correctData = session.correctData as unknown as QuizCorrectData[];
       let correctCount = 0;
 
       const results = answers.map((answer, idx) => {
-        const correct = correctData[idx]?.correctIndex;
+        const correct = correctData[idx]?.correctIndex ?? -1;
         const isCorrect = answer === correct;
         if (isCorrect) correctCount++;
         return {
           questionIndex: idx,
+          question: correctData[idx]?.question || '',
+          options: correctData[idx]?.options || [],
           selected: answer,
           correct: correct,
+          selectedAnswer: correctData[idx]?.options?.[answer] || '',
+          correctAnswer: correctData[idx]?.options?.[correct] || '',
           isCorrect,
           explanation: correctData[idx]?.explanation || '',
         };
@@ -781,6 +987,8 @@ export async function submitQuiz(req: Request, res: Response): Promise<Response>
         passed,
         results,
         quizType: session.quizType,
+        contextSnapshot: session.contextSnapshot,
+        qualityReport: session.qualityReport,
       };
     });
 
@@ -795,6 +1003,8 @@ export async function submitQuiz(req: Request, res: Response): Promise<Response>
       passed: result.passed,
       passScore: QUIZ_PASS_SCORE,
       results: result.results,
+      contextSnapshot: result.contextSnapshot,
+      qualityReport: result.qualityReport,
     }, 'Quiz submitted', traceId));
   } catch (err) {
     return handlePrismaError(err, res, traceId, 'submitQuiz');

@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import { logger } from '@lms/logger';
 import { validatePaymentServiceEnv } from '@lms/env-validator';
 import type { ApiResponse } from '@lms/types';
-import { requireAuth } from './middleware/require-auth';
+import { requireAuth } from './middleware/require-auth.js';
 import {
   createOrder,
   continuePayment,
@@ -13,21 +13,21 @@ import {
   getRevenueAnalytics,
   getAdminRevenueAnalytics,
   getAdminOrders,
-} from './controllers/order.controller';
+} from './controllers/order.controller.js';
 
-import { handleVNPayReturn, handleVNPayIPN } from './controllers/vnpay.controller';
-import { getOrderEventHistory } from './controllers/event-history.controller';
+import { handleVNPayReturn, handleVNPayIPN } from './controllers/vnpay.controller.js';
+import { getOrderEventHistory } from './controllers/event-history.controller.js';
 import {
   getInstructorEarnings,
   getInstructorEarningsSummary,
   getInstructorPayoutProfile,
   upsertInstructorPayoutProfile,
-} from './controllers/earnings.controller';
-import { createPayout, listMyPayouts, listPayouts, updatePayout } from './controllers/payout.controller';
-import prisma from './lib/prisma';
-import { startPaymentOutboxWorker, stopPaymentOutboxWorker } from './lib/outbox';
+} from './controllers/earnings.controller.js';
+import { createPayout, listMyPayouts, listPayouts, updatePayout } from './controllers/payout.controller.js';
+import prisma from './lib/prisma.js';
+import { startPaymentOutboxWorker, stopPaymentOutboxWorker } from './lib/outbox.js';
 import { createRequireAdmin } from '@lms/types';
-import { startKafkaConsumers } from './lib/kafka-consumer';
+import { startKafkaConsumers } from './lib/kafka-consumer.js';
 
 // Validate env ngay luc khoi dong.
 validatePaymentServiceEnv();
@@ -71,7 +71,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 });
 
 // ─── Health ───────────────────────────────────────────────────────────────────
-app.get('/health', (_req: Request, res: Response) => {
+app.get(['/health', '/livez', '/readyz'], (_req: Request, res: Response) => {
   const response: ApiResponse<{ service: string }> = {
     success: true,
     code: 200,
