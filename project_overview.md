@@ -370,3 +370,6 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-06-01 - AWS Lightsail Demo Deploy Runbook
 - [x] Harden production Compose cho Lightsail: chi publish Web/Kong proxy tren loopback, render Kong production voi Docker DNS + secret/domain deploy, them env production example, script deploy va runbook smoke/demo/rollback. done 2026-06-01
+
+### 2026-06-01 - Environment Configuration Synchronization
+- [x] Dong bo env local/example cho root, web-client va cac service; bo sung production Compose tuning cho outbox/payment, giu example chi chua placeholder/default an toan. done 2026-06-01

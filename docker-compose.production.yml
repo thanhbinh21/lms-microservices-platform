@@ -90,6 +90,10 @@ services:
       NOTIFICATION_SERVICE_URL: http://notification-service:3005
       COURSE_CIRCUIT_FAILURE_THRESHOLD: ${COURSE_CIRCUIT_FAILURE_THRESHOLD:-3}
       COURSE_CIRCUIT_RESET_MS: ${COURSE_CIRCUIT_RESET_MS:-10000}
+      OUTBOX_MAX_ATTEMPTS: ${OUTBOX_MAX_ATTEMPTS:-10}
+      OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-5000}
+      OUTBOX_BATCH_SIZE: ${OUTBOX_BATCH_SIZE:-20}
+      PAYMENT_INSTRUCTOR_SHARE_RATIO: ${PAYMENT_INSTRUCTOR_SHARE_RATIO:-0.7}
       VNPAY_RETURN_URL: ${APP_ORIGIN:?Set APP_ORIGIN in .env.production}/payment/vnpay-return
       VNPAY_IPN_URL: ${PUBLIC_GATEWAY_URL:?Set PUBLIC_GATEWAY_URL in .env.production}/payment/api/vnpay-ipn
     healthcheck:
@@ -143,6 +147,9 @@ services:
       <<: *service-environment
       COURSE_SERVICE_URL: http://course-service:3002
       AI_SERVICE_URL: http://ai-service:3008
+      OUTBOX_MAX_ATTEMPTS: ${OUTBOX_MAX_ATTEMPTS:-10}
+      OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-5000}
+      OUTBOX_BATCH_SIZE: ${OUTBOX_BATCH_SIZE:-20}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3006/readyz"]
       interval: 30s
