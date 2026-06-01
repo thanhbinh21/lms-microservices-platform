@@ -4,6 +4,7 @@ import {
   consumeWithRetry,
   TOPICS,
   PAYMENT_ORDER_COMPLETED_RETRY,
+  type KafkaEventEnvelope,
   type PaymentOrderCompletedEvent,
   type KafkaTopic,
   validateKafkaEvent,
@@ -12,6 +13,7 @@ import {
 import { logger } from '@lms/logger';
 import prisma from './prisma.js';
 import { enqueueEnrollmentCreatedOutbox } from './outbox.js';
+import { Prisma } from '../generated/prisma/index.js';
 
 /**
  * Learning-service Kafka consumers (Phase 2 refactor).
@@ -25,33 +27,55 @@ import { enqueueEnrollmentCreatedOutbox } from './outbox.js';
 
 const HANDLER_GROUP = 'learning-service.enrollment-creator';
 
-export async function startKafkaConsumers(): Promise<void> {
-  const producer = await createProducer();
+export type PaymentOrderCompletedHandlingResult =
+  | 'ENROLLMENT_CREATED'
+  | 'ENROLLMENT_ALREADY_EXISTS';
 
-  // Handler tao enrollment khi payment hoan tat
-  const handler = async (event: { data: PaymentOrderCompletedEvent; trace_id: string }) => {
-    const validated = validateKafkaEvent(
-      PaymentOrderCompletedSchema,
-      event.data,
-      'payment.order.completed',
-      logger,
-    );
-    if (!validated) throw new Error('Invalid payment.order.completed payload');
+export class InvalidPaymentOrderCompletedEventError extends Error {
+  constructor() {
+    super('Invalid payment.order.completed payload');
+    this.name = 'InvalidPaymentOrderCompletedEventError';
+  }
+}
 
-    const { order_id, user_id, course_id, paid_at } = validated;
+async function findExistingEnrollment(orderId: string, userId: string, courseId: string) {
+  return prisma.enrollment.findFirst({
+    where: {
+      OR: [
+        { orderId },
+        { userId, courseId },
+      ],
+    },
+  });
+}
 
+export async function handlePaymentOrderCompletedEvent(
+  event: Pick<KafkaEventEnvelope<PaymentOrderCompletedEvent>, 'data' | 'trace_id'>,
+): Promise<PaymentOrderCompletedHandlingResult> {
+  const validated = validateKafkaEvent(
+    PaymentOrderCompletedSchema,
+    event.data,
+    'payment.order.completed',
+    logger,
+  );
+  if (!validated) throw new InvalidPaymentOrderCompletedEventError();
+
+  const { order_id, user_id, course_id, paid_at } = validated;
+  logger.info(
+    { orderId: order_id, userId: user_id, courseId: course_id, traceId: event.trace_id },
+    '[learning-service] Consuming payment.order.completed',
+  );
+
+  const existing = await findExistingEnrollment(order_id, user_id, course_id);
+  if (existing) {
     logger.info(
-      { orderId: order_id, userId: user_id, courseId: course_id, traceId: event.trace_id },
-      '[learning-service] Consuming payment.order.completed',
+      { enrollmentId: existing.id, orderId: order_id, userId: user_id, courseId: course_id },
+      'Enrollment already exists',
     );
+    return 'ENROLLMENT_ALREADY_EXISTS';
+  }
 
-    // Idempotent: Enrollment.orderId la unique constraint
-    const existing = await prisma.enrollment.findUnique({ where: { orderId: order_id } });
-    if (existing) {
-      logger.info({ orderId: order_id }, '[learning-service] Enrollment already exists — skip');
-      return;
-    }
-
+  try {
     const { enrollment, outbox } = await prisma.$transaction(async (tx) => {
       const created = await tx.enrollment.create({
         data: {
@@ -85,9 +109,27 @@ export async function startKafkaConsumers(): Promise<void> {
     }
     logger.info(
       { enrollmentId: enrollment.id, orderId: order_id, userId: user_id, courseId: course_id },
-      '[learning-service] Enrollment created',
+      'Enrollment created',
     );
-  };
+    return 'ENROLLMENT_CREATED';
+  } catch (err) {
+    // Consumer co the nhan cung event song song; unique constraint la lop idempotency cuoi.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      const existingAfterRace = await findExistingEnrollment(order_id, user_id, course_id);
+      if (existingAfterRace) {
+        logger.info(
+          { enrollmentId: existingAfterRace.id, orderId: order_id, userId: user_id, courseId: course_id },
+          'Enrollment already exists',
+        );
+        return 'ENROLLMENT_ALREADY_EXISTS';
+      }
+    }
+    throw err;
+  }
+}
+
+export async function startKafkaConsumers(): Promise<void> {
+  const producer = await createProducer();
 
   // Subscribe main + retry topics
   const topics: KafkaTopic[] = [
@@ -104,7 +146,9 @@ export async function startKafkaConsumers(): Promise<void> {
         topic,
         groupId: `${HANDLER_GROUP}.${topic}`,
         retry: PAYMENT_ORDER_COMPLETED_RETRY,
-        handler: async (event) => handler(event),
+        handler: async (event) => {
+          await handlePaymentOrderCompletedEvent(event);
+        },
         onError: (err) => logger.error({ err, topic }, '[learning-service] Consumer handler failed'),
       });
       logger.info({ topic }, '[learning-service] Kafka consumer running');

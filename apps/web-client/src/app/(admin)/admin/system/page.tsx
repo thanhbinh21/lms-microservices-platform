@@ -102,7 +102,10 @@ export default function AdminSystemEventsPage() {
         const result = await retryAdminFailedEvent(eventId);
         setActionLoading(false);
         if (result.success) {
-          toast('success', 'Đã đưa sự kiện vào luồng thử lại');
+          const retryResult = result.data?.result === 'ENROLLMENT_CREATED'
+            ? 'Enrollment created'
+            : 'Enrollment already exists';
+          toast('success', `Retry thành công: ${retryResult}`);
           void fetchEvents();
           return;
         }

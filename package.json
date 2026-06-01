@@ -28,7 +28,8 @@
     "docker:prod:up": "docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml up -d --build",
     "docker:prod:down": "docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml down",
     "deploy:lightsail": "bash scripts/deploy-lightsail.sh",
-    "seed": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-all.ts"
+    "seed": "pnpm --filter @lms/auth-service exec npx tsx ../../scripts/seed-all.ts",
+    "seed:dlq-demo": "pnpm --filter @lms/learning-service exec npx tsx ../../scripts/seed-dlq-demo.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

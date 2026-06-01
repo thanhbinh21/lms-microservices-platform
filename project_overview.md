@@ -385,3 +385,5 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-06-02 - Payment Kafka Retry Chain Demo
 - [x] Mo rong `payment.order.completed` retry chain thanh 5s → 30s → 1m → DLQ, dong bo consumer Learning/Notification/Payment, topic check, log demo va tai lieu van hanh. done 2026-06-02
+- [x] Them `pnpm seed:dlq-demo` de reset rieng enrollment/outbox cua order demo va upsert 8 failed events PENDING vao learning_db ma khong xoa du lieu nghiep vu khac; full seed cung tao du 8 event cho Admin retry/resolve demo. done 2026-06-02
+- [x] Tach handler enrollment dung chung va chuyen Admin DLQ retry `payment.order.completed` sang xu ly truc tiep failed event da persist, khong phu thuoc Kafka; UI hien ket qua created/already exists. done 2026-06-02

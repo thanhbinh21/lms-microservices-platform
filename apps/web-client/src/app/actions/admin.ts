@@ -390,8 +390,8 @@ export async function getAdminFailedEvent(
 
 export async function retryAdminFailedEvent(
   eventId: string,
-): Promise<ApiResponse<any>> {
-  return callApi<any>(
+): Promise<ApiResponse<{ result: 'ENROLLMENT_CREATED' | 'ENROLLMENT_ALREADY_EXISTS' }>> {
+  return callApi<{ result: 'ENROLLMENT_CREATED' | 'ENROLLMENT_ALREADY_EXISTS' }>(
     `/learning/api/admin/dlq/${eventId}/retry`,
     { method: 'POST' },
     true,
@@ -607,4 +607,3 @@ export async function getAdminOrderEventHistoryAction(
     true,
   );
 }
-
