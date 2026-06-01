@@ -93,6 +93,7 @@ export async function startKafkaConsumers(): Promise<void> {
   const topics: KafkaTopic[] = [
     TOPICS.PAYMENT_ORDER_COMPLETED,
     TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_5S,
+    TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_30S,
     TOPICS.PAYMENT_ORDER_COMPLETED_RETRY_1M,
   ];
 

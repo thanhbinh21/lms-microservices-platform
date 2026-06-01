@@ -78,6 +78,7 @@ Next.js Server Actions:
 
 - payment.order.completed
 - payment.order.completed.retry-5s
+- payment.order.completed.retry-30s
 - payment.order.completed.retry-1m
 - system.dead-letter
 

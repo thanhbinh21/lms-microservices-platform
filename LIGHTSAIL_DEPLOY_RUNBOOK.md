@@ -352,6 +352,16 @@ $COMPOSE ps kafka
 docker exec lms-kafka kafka-topics --bootstrap-server localhost:29092 --list
 ```
 
+Kafka bật auto-create topic. Sau khi các consumer chạy, danh sách phải có đủ:
+
+```text
+payment.order.completed
+payment.order.completed.retry-5s
+payment.order.completed.retry-30s
+payment.order.completed.retry-1m
+system.dead-letter
+```
+
 Chay K6 smoke tu laptop hoac VPS da cai K6:
 
 ```bash
@@ -546,8 +556,9 @@ docker exec -i lms-kafka kafka-console-producer \
 API admin de xem sau khi login admin:
 `GET /learning/api/admin/dlq` hoac UI `https://lms.example.com/admin/dlq`.
 
-Expected sau khoang 70 giay: log `kafka.retry` cho `retry-5s`, `retry-1m`, sau
-do `kafka.dlq` va `[learning-service] DLQ event persisted`.
+Expected sau khoang 100 giay: log `kafka.retry scheduled retry-5s`,
+`kafka.retry scheduled retry-30s`, `kafka.retry scheduled retry-1m`, sau do
+`kafka.dlq published system.dead-letter` va `[learning-service] DLQ event persisted`.
 
 Log:
 

@@ -282,7 +282,74 @@ Khi service start lại, nó kết nối lại DB và tiếp tục hoạt độn
 ---
 
 # Demo 3 — Outbox → Retry → DLQ
+Demo Outbox — Bản chốt
+Mục tiêu
+Kafka bị tắt
+→ User vẫn thanh toán VNPay thành công
+→ Payment vẫn chuyển order sang COMPLETED
+→ Payment tạo outbox event payment.order.completed
+→ Event không mất, nằm trong DB với status PENDING hoặc FAILED
+Terminal 1 — Mở log
+cd ~/olms-microservices
 
+export COMPOSE="docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml"
+
+$COMPOSE logs -f --since=1m payment-service | grep --line-buffered -iE "payment.order.completed|outbox.created|outbox.publish_failed|KafkaJS|Connection timeout"
+Terminal 2 — Tắt Kafka
+cd ~/olms-microservices
+
+export COMPOSE="docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml"
+
+$COMPOSE stop kafka
+Trên UI
+1. Vào https://lms.thanhbinh.qzz.io
+2. Đăng nhập student
+3. Chọn khóa học chưa mua
+4. Thanh toán VNPay sandbox
+5. Quay về lịch sử đơn hàng
+Kỳ vọng log
+payment.order.completed
+outbox.created
+KafkaJS...Connection timeout
+
+Nói:
+
+Kafka đang down nên publish event chưa thể thực hiện.
+Nhưng Payment vẫn completed và outbox event đã được tạo.
+Kiểm tra Outbox DB
+$COMPOSE exec payment-service \
+  pnpm --filter @lms/payment-service exec node --input-type=module -e '
+    import { PrismaClient } from "./dist/generated/prisma/index.js";
+    const db = new PrismaClient();
+    const rows = await db.outboxEvent.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        topic: true,
+        status: true,
+        retryCount: true,
+        lastError: true,
+        publishedAt: true,
+        createdAt: true
+      }
+    });
+    console.table(rows);
+    await db.$disconnect();
+  '
+Kỳ vọng DB
+topic       = payment.order.completed
+status      = PENDING hoặc FAILED
+publishedAt = null
+lastError   = lỗi Kafka nếu đã thử publish
+Bật lại Kafka sau demo
+$COMPOSE start kafka
+sleep 30
+$COMPOSE ps kafka
+
+Nếu muốn kiểm tra thêm:
+
+$COMPOSE logs --tail=300 payment-service learning-service | grep -iE "outbox.published|Enrollment created"
 ## Mục tiêu
 
 Chứng minh event-driven flow có độ tin cậy bằng fault injection thật:
@@ -297,7 +364,7 @@ Kafka giữ backlog.
 Khi Learning Service phục hồi, consumer tiếp tục tạo Enrollment.
 
 Consumer xử lý lỗi:
-Event đi qua retry-5s → retry-1m → DLQ.
+Event đi qua retry-5s → retry-30s → retry-1m → DLQ.
 DLQ processor lưu failed event để Admin retry hoặc resolve.
 ```
 
@@ -324,7 +391,7 @@ docker exec lms-kafka \
   kafka-topics \
   --bootstrap-server localhost:29092 \
   --list |
-  grep -E '^(payment.order.completed|payment.order.completed.retry-5s|payment.order.completed.retry-1m|system.dead-letter)$'
+  grep -E '^(payment.order.completed|payment.order.completed.retry-5s|payment.order.completed.retry-30s|payment.order.completed.retry-1m|system.dead-letter)$'
 ```
 
 Kỳ vọng:
@@ -332,6 +399,7 @@ Kỳ vọng:
 ```text
 payment.order.completed
 payment.order.completed.retry-5s
+payment.order.completed.retry-30s
 payment.order.completed.retry-1m
 system.dead-letter
 ```
@@ -520,13 +588,13 @@ Khi Learning start lại, consumer tiếp tục đọc event và tạo Enrollmen
 
 ## 3.4. Consumer lỗi: chứng minh Retry → DLQ
 
-Notification Service có fault flag dành cho demo. Đặt fail `3` lần để cả ba lần
-xử lý `main → retry-5s → retry-1m` đều lỗi, sau đó event được đưa vào DLQ.
+Notification Service có fault flag dành cho demo. Đặt fail `4` lần để cả bốn lần
+xử lý `main → retry-5s → retry-30s → retry-1m` đều lỗi, sau đó event được đưa vào DLQ.
 
 Bật fault injection:
 
 ```bash
-DEMO_NOTIFICATION_FAIL_ATTEMPTS=3 \
+DEMO_NOTIFICATION_FAIL_ATTEMPTS=4 \
   docker compose --env-file .env.production \
   -f docker-compose.yml -f docker-compose.production.yml \
   up -d --force-recreate notification-service
@@ -543,17 +611,19 @@ $COMPOSE logs -f --since=1m notification-service learning-service |
   grep --line-buffered -iE "Demo transient email failure|kafka.retry|kafka.dlq|DLQ event persisted"
 ```
 
-Trên UI, hoàn tất thêm một payment VNPay sandbox mới. Chờ khoảng `70` giây.
+Trên UI, hoàn tất thêm một payment VNPay sandbox mới. Chờ khoảng `100` giây.
 
 Kỳ vọng theo thứ tự:
 
 ```text
 Demo transient email failure attempt 1
-kafka.retry → payment.order.completed.retry-5s
+kafka.retry scheduled retry-5s
 Demo transient email failure attempt 2
-kafka.retry → payment.order.completed.retry-1m
+kafka.retry scheduled retry-30s
 Demo transient email failure attempt 3
-kafka.dlq → system.dead-letter
+kafka.retry scheduled retry-1m
+Demo transient email failure attempt 4
+kafka.dlq published system.dead-letter
 [learning-service] DLQ event persisted
 ```
 
@@ -581,7 +651,7 @@ Kỳ vọng failed event mới nhất:
 
 ```text
 topic      = payment.order.completed
-retryCount = 2
+retryCount = 3
 status     = PENDING
 ```
 

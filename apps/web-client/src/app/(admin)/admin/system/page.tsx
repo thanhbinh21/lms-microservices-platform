@@ -18,6 +18,7 @@ import {
 const TOPIC_OPTIONS = [
   'payment.order.completed',
   'payment.order.completed.retry-5s',
+  'payment.order.completed.retry-30s',
   'payment.order.completed.retry-1m',
   'learning.enrollment.created',
   'system.dead-letter',
@@ -333,4 +334,3 @@ export default function AdminSystemEventsPage() {
     </div>
   );
 }
-

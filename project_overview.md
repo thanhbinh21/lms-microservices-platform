@@ -184,7 +184,7 @@ Dự án được chia thành nhiều giai đoạn (Phases) theo chuẩn "Vertic
 ### Phase 13-16: Commerce & Payments (VNPay + Kafka) ✅ COMPLETED
 - [x] **Phase 13:** Payment Service DB & Order CRUD — Order model, VNPayAudit model (JSONB audit), createOrder (price verify tu course-service via /internal/courses/:id), getOrder (owner check), getMyOrders, idempotency (existingPending order + alreadyPaid guard). ✅ Completed: Apr 18, 2026
 - [x] **Phase 14:** Tich hop VNPay — buildPayUrl, handleVNPayReturn (checksum verify + dev fallback), handleVNPayIPN (idempotent: check COMPLETED, amount verify, 97/01/04/02 response codes), JSONB audit per callback. Frontend: /payment/vnpay-return voi PaymentPoller component. ✅ Completed: Apr 18, 2026
-- [x] **Phase 15:** Kafka Producer — @lms/kafka-client upgraded: KafkaEventEnvelope<T> typed envelope, PaymentOrderCompletedEvent + EnrollmentCreatedEvent typed events, TopicEventMap type mapping, publishEvent<T> generic helper, RetryPolicy + consumeWithRetry retry wrapper, PAYMENT_ORDER_COMPLETED_RETRY default policy (5s → 1m → DLQ). ✅ Completed: Apr 18, 2026
+- [x] **Phase 15:** Kafka Producer — @lms/kafka-client upgraded: KafkaEventEnvelope<T> typed envelope, PaymentOrderCompletedEvent + EnrollmentCreatedEvent typed events, TopicEventMap type mapping, publishEvent<T> generic helper, RetryPolicy + consumeWithRetry retry wrapper, PAYMENT_ORDER_COMPLETED_RETRY default policy (5s → 30s → 1m → DLQ). ✅ Completed: Apr 18, 2026
 - [x] **Phase 16:** Kafka Consumer & DLQ — course-service Kafka consumer (payment.order.completed → enrollment, idempotent by orderId, transaction create enrollment + increment enrollmentCount, publish enrollment.created downstream). DLQ admin API (listFailedEvents, getFailedEventStats, retryFailedEvent, resolveFailedEvent). ✅ Completed: Apr 18, 2026
   - Rating/Review model chuyen sang Phase 10.1.
 
@@ -366,7 +366,7 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 - [x] Chan final quiz dung demo fallback khi LLM loi, het quota hoac tra JSON hong; expire session fallback cu, uu tien OpenRouter, tang token JSON generation, va thay native confirm bang modal quiz noi bo. done 2026-05-29
 
 ### 2026-06-01 - Demo-ready VPS Deployment Baseline
-- [x] Thu gon production-like VPS demo: health/liveness/readiness toi thieu, Kong rate limit + upstream timeout, circuit breaker `payment -> course`, outbox co san, Kafka retry 5s/1m + DLQ, notification retry demo, console log, K6 smoke/rate-limit va production compose; loai bo full observability stack. done 2026-06-01
+- [x] Thu gon production-like VPS demo: health/liveness/readiness toi thieu, Kong rate limit + upstream timeout, circuit breaker `payment -> course`, outbox co san, Kafka retry 5s/30s/1m + DLQ, notification retry demo, console log, K6 smoke/rate-limit va production compose; loai bo full observability stack. done 2026-06-01
 
 ### 2026-06-01 - AWS Lightsail Demo Deploy Runbook
 - [x] Harden production Compose cho Lightsail: chi publish Web/Kong proxy tren loopback, render Kong production voi Docker DNS + secret/domain deploy, them env production example, script deploy va runbook smoke/demo/rollback. done 2026-06-01
@@ -382,3 +382,6 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-06-01 - Outbox Kafka Producer Reconnect Hotfix
 - [x] Reset producer promise/instance khi Kafka connect hoac publish loi, tu reconnect va drain outbox PENDING/FAILED theo backoff ma khong restart Payment/Learning Service; bo sung log demo va cap nhat runbook. done 2026-06-01
+
+### 2026-06-02 - Payment Kafka Retry Chain Demo
+- [x] Mo rong `payment.order.completed` retry chain thanh 5s → 30s → 1m → DLQ, dong bo consumer Learning/Notification/Payment, topic check, log demo va tai lieu van hanh. done 2026-06-02
