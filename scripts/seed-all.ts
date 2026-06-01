@@ -1633,18 +1633,27 @@ async function seedDlqDemo(students: any[], courses: any[]) {
     },
   };
 
-  return learningPrisma.failedEvent.create({
-    data: {
-      topic: 'payment.order.completed',
-      eventId: payload.event_id,
-      traceId: payload.trace_id,
-      originalKey: order.id,
-      payload,
-      errorMessage: 'Learning service temporarily unavailable',
-      retryCount: 2,
-      status: 'PENDING',
-    },
-  });
+  const failures = Array.from({ length: 8 }, () => 'Learning service temporarily unavailable');
+  const failedEvents = await Promise.all(
+    failures.map((errorMessage, index) => {
+      const suffix = String(index + 1).padStart(2, '0');
+      const eventId = index === 0 ? payload.event_id : `${payload.event_id}-${suffix}`;
+      const traceId = `trace-demo-dlq-${suffix}`;
+      return learningPrisma.failedEvent.create({
+        data: {
+          topic: 'payment.order.completed',
+          eventId,
+          traceId,
+          originalKey: order.id,
+          payload: { ...payload, event_id: eventId, trace_id: traceId },
+          errorMessage,
+          retryCount: 3,
+          status: 'PENDING',
+        },
+      });
+    }),
+  );
+  return failedEvents[0];
 }
 
 async function seedAuditLogs(params: {

@@ -591,6 +591,17 @@ Khi Learning start lại, consumer tiếp tục đọc event và tạo Enrollmen
 Notification Service có fault flag dành cho demo. Đặt fail `4` lần để cả bốn lần
 xử lý `main → retry-5s → retry-30s → retry-1m` đều lỗi, sau đó event được đưa vào DLQ.
 
+Nếu chỉ cần nạp nhanh dữ liệu để demo thao tác Admin retry/resolve, chạy lệnh
+không phá dữ liệu hiện có:
+
+```bash
+pnpm seed:dlq-demo
+```
+
+Lệnh này reset riêng enrollment/outbox của order demo và upsert `8` failed events
+trạng thái `PENDING` vào `learning_db`. Lần retry đầu tiên sẽ minh họa tạo enrollment,
+các lần sau minh họa idempotency.
+
 Bật fault injection:
 
 ```bash
@@ -680,7 +691,7 @@ Mở log:
 
 ```bash
 $COMPOSE logs -f --since=1m notification-service learning-service |
-  grep --line-buffered -iE "Email Payment Success sent|Enrollment already exists|Admin retried failed event"
+  grep --line-buffered -iE "Admin retry handling payment.order.completed|Enrollment created|Enrollment already exists|Admin retried failed event|Admin failed event retry succeeded|Admin failed event retry failed"
 ```
 
 Trên UI Admin:
@@ -696,8 +707,9 @@ Trên UI Admin:
 Kỳ vọng:
 
 ```text
-Notification xử lý lại event thành công.
-Learning nhận event lặp lại nhưng bỏ qua vì Enrollment.orderId là unique.
+Learning xử lý trực tiếp failed event đã lưu, không phụ thuộc Kafka cho thao tác manual retry.
+Nếu chưa có Enrollment, log hiển thị `Enrollment created`.
+Nếu Enrollment đã tồn tại, log hiển thị `Enrollment already exists`.
 Không tạo Enrollment trùng.
 ```
 
@@ -705,9 +717,9 @@ Cách nói:
 
 ```text
 Retry và DLQ bảo vệ phía consumer.
-Event lỗi tạm thời được thử lại theo hai mốc 5 giây và 1 phút.
+Event lỗi tạm thời được thử lại theo ba mốc 5 giây, 30 giây và 1 phút.
 Nếu vẫn lỗi, event được tách sang DLQ để không chặn queue chính.
-Admin có thể retry sau khi nguyên nhân lỗi đã được khắc phục.
+Admin có thể xử lý trực tiếp failed event đã lưu sau khi nguyên nhân lỗi được khắc phục.
 Consumer Learning xử lý idempotent nên replay không tạo Enrollment trùng.
 ```
 
