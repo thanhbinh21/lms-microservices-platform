@@ -373,3 +373,6 @@ Chi tiet: Xem `plan/roadmap_phase_30_34.md`
 
 ### 2026-06-01 - Environment Configuration Synchronization
 - [x] Dong bo env local/example cho root, web-client va cac service; bo sung production Compose tuning cho outbox/payment, giu example chi chua placeholder/default an toan. done 2026-06-01
+
+### 2026-06-01 - AI Chatbox Cross-subdomain Auth Cookie Hotfix
+- [x] Cau hinh Web Client production ghi va xoa auth cookie theo `AUTH_COOKIE_DOMAIN=.thanhbinh.qzz.io`, `Secure`, `SameSite=None`, giu local host-only `SameSite=Lax`, va truyen env qua production Compose de AI Chatbox goi API subdomain khong con mat cookie. done 2026-06-01

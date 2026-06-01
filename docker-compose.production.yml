@@ -207,4 +207,5 @@ services:
       NODE_ENV: production
       GATEWAY_URL: http://kong:8000
       NEXT_PUBLIC_GATEWAY_URL: ${PUBLIC_GATEWAY_URL:?Set PUBLIC_GATEWAY_URL in .env.production}
+      AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
     ports: ["127.0.0.1:3000:3000"]
