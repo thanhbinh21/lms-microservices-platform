@@ -29,18 +29,29 @@ export async function enqueuePaymentCompletedOutbox(
   tx: PaymentOutboxTx,
   data: PaymentOrderCompletedEvent,
   traceId?: string,
-): Promise<void> {
-  await tx.outboxEvent.upsert({
-    where: { dedupeKey: `payment.order.completed:${data.order_id}` },
+): Promise<{ id: string; created: boolean }> {
+  const dedupeKey = `payment.order.completed:${data.order_id}`;
+  const existing = await tx.outboxEvent.findUnique({
+    where: { dedupeKey },
+    select: { id: true },
+  });
+  if (existing) {
+    return { id: existing.id, created: false };
+  }
+
+  const outbox = await tx.outboxEvent.upsert({
+    where: { dedupeKey },
     create: {
       topic: TOPICS.PAYMENT_ORDER_COMPLETED,
       eventKey: data.order_id,
-      dedupeKey: `payment.order.completed:${data.order_id}`,
+      dedupeKey,
       payload: data as unknown as Prisma.InputJsonValue,
       traceId,
     },
     update: {},
+    select: { id: true },
   });
+  return { id: outbox.id, created: true };
 }
 
 function getNextAttemptAt(retryCount: number): Date {
