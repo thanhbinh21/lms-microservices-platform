@@ -1,1292 +1,824 @@
 # LMS Microservices Platform
 
-Event-Driven Learning Management System built with Microservices Architecture
+## Overview
+
+LMS Microservices Platform là nền tảng học trực tuyến được xây dựng theo kiến trúc microservices và event-driven. Hệ thống hỗ trợ ba nhóm người dùng chính: học viên, giảng viên và quản trị viên, với các luồng nghiệp vụ xoay quanh khóa học, thanh toán, học tập, chứng chỉ, cộng đồng và trợ lý AI.
+
+Dự án sử dụng Next.js App Router làm web client kiêm BFF thông qua Server Actions, Kong Gateway làm entry point và security boundary, các backend service Node.js/TypeScript độc lập, PostgreSQL Neon Serverless theo mô hình database per service, Kafka cho luồng bất đồng bộ, Redis/Upstash cho cache/rate limit/read model, Cloudinary cho media và VNPay cho thanh toán.
+
+Trọng tâm kỹ thuật của hệ thống là tách rõ boundary giữa các service, không truy cập chéo database, chuẩn hóa response API, xử lý payment an toàn, enrollment idempotent, retry/DLQ cho Kafka, transactional outbox cho sự kiện quan trọng và tích hợp AI vào workflow học tập bằng context của khóa học/bài học.
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Screenshots](#screenshots)
+- [Product Scope](#product-scope)
+- [Technical Highlights](#technical-highlights)
+- [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
-- [Project Structure](#project-structure)
 - [Services](#services)
+- [Service Boundary Details](#service-boundary-details)
+- [Key Workflows](#key-workflows)
+- [Reliability, Security and Operations](#reliability-security-and-operations)
+- [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
-- [Quick Start (Verified)](#quick-start-verified)
-- [Database Setup](#database-setup)
-- [API Documentation](#api-documentation)
-- [Development](#development)
-- [Deployment](#deployment)
-- [Roadmap](#roadmap)
-- [Key Decisions](#key-decisions)
+- [API Convention](#api-convention)
+- [Development Commands](#development-commands)
+- [Testing and Demo Data](#testing-and-demo-data)
+- [Deployment Notes](#deployment-notes)
 
-## Overview
+## Screenshots
 
-Production-ready Learning Management System (LMS) designed for online course management and delivery.
+### Landing Page
+<!-- TODO: Paste landing page screenshot here -->
 
-### Core Features
+### Authentication
+<!-- TODO: Paste authentication screenshot here -->
 
-- **Course Management**: Create, manage, and organize courses with drag-and-drop curriculum builder
-- **Payment Integration**: VNPay payment gateway for secure course enrollment
-- **Event-Driven Architecture**: Kafka-based event streaming for reliable asynchronous processing
-- **Learning Progress Tracking**: Monitor student progress and course completion
-- **Media Management**: Video hosting with presigned uploads (local + S3 provider)
-- **Notification System**: Email notifications for enrollment, completion, and important events
+### Course Discovery
+<!-- TODO: Paste course discovery screenshot here -->
 
-### Architecture Characteristics
+### Course Detail
+<!-- TODO: Paste course detail screenshot here -->
 
-- Microservices architecture with database-per-service pattern
-- Event-driven communication using Apache Kafka with retry and Dead Letter Queue
-- BFF (Backend for Frontend) pattern with Next.js Server Actions
-- API Gateway for centralized authentication and routing
-- Serverless PostgreSQL databases with Neon (auto-pause for cost efficiency)
+### Student Dashboard
+<!-- TODO: Paste student dashboard screenshot here -->
+
+### Learning Page
+<!-- TODO: Paste learning page screenshot here -->
+
+### Instructor Studio
+<!-- TODO: Paste instructor studio screenshot here -->
+
+### Admin Dashboard
+<!-- TODO: Paste admin dashboard screenshot here -->
+
+### Payment Flow
+<!-- TODO: Paste payment flow screenshot here -->
+
+### Community and Q&A
+<!-- TODO: Paste community/Q&A screenshot here -->
+
+### AI Chat and Quiz
+<!-- TODO: Paste AI features screenshot here -->
+
+## Product Scope
+
+Hệ thống không chỉ dừng ở CRUD khóa học. Repository này mô phỏng một nền tảng LMS đầy đủ với nhiều vai trò, nhiều service backend và các workflow có trạng thái dài như thanh toán, ghi danh, học tập, chứng chỉ, doanh thu, hỗ trợ người dùng và AI học tập.
+
+| Role | Main Capabilities |
+|---|---|
+| Guest | Xem landing page, danh sách khóa học, chi tiết khóa học, giảng viên và đánh giá public |
+| Student | Đăng ký/đăng nhập, ghi danh khóa học, thanh toán, học bài, theo dõi tiến độ, nhận chứng chỉ, đặt câu hỏi, dùng AI chat/quiz |
+| Instructor | Tạo khóa học, quản lý curriculum, upload media, quản lý hồ sơ giảng viên, theo dõi Q&A, xem earning và gửi payout request |
+| Admin | Quản trị user, khóa học, danh mục, review, support ticket, community, order, revenue, payout, notification, audit log và DLQ |
+
+Phạm vi nghiệp vụ chính:
+
+- Course catalog: course, category, level, price, thumbnail, public detail, search/filter/sort.
+- Curriculum: chapter, lesson, video/text content, free/paid lesson gate, publish guard.
+- Learning: enrollment, progress, complete lesson, certificate, dashboard.
+- Commerce: order, VNPay, return/IPN, audit, outbox, event sourcing, order history.
+- Revenue: instructor earning, payout profile, payout request và admin payout handling.
+- Community: global feed, reply, reaction, moderation.
+- Q&A: question/answer theo khóa học, upvote, accepted answer và instructor workflow.
+- Notification: in-app notification, unread state, admin notification history, SMTP-ready email log.
+- AI: conversation, lesson/course context, quiz generation, quiz submission, provider fallback và rate limit.
+- Operations: health/readiness, Kafka retry/DLQ, seed data, smoke/rate-limit tests, production compose.
+
+## Technical Highlights
+
+### Microservices and Ownership
+
+- Mỗi service có boundary riêng, database riêng và Prisma schema riêng.
+- Không có cross-service database join; dữ liệu liên service đi qua internal API hoặc Kafka.
+- Service ownership rõ ràng: auth không quản lý course, payment không tự ghi enrollment, community không đọc trực tiếp user/course database.
+- Các service dùng chung contract và utility qua `packages/*` để tránh copy logic.
+
+### BFF with Server Actions
+
+- Web client dùng Next.js App Router và Server Actions làm Backend-for-Frontend.
+- Server Actions gọi API qua Kong Gateway, xử lý cookie/token, refresh token và trả dữ liệu phù hợp cho page/component.
+- UI không gọi trực tiếp database và không gom business logic của service vào frontend.
+- Dashboard và các trang tổng hợp có thể lấy dữ liệu song song từ nhiều service thay vì buộc backend join chéo.
+
+### Event-Driven Reliability
+
+- Kafka được dùng cho các workflow bất đồng bộ như payment completed, enrollment created, notification và course read model.
+- `packages/kafka-client` có typed event envelope, Zod validation, retry policy và DLQ handoff.
+- Retry chain cho `payment.order.completed` gồm main topic, retry 5 giây, retry 30 giây, retry 1 phút và `system.dead-letter`.
+- Offset Kafka chỉ được commit sau khi handler xử lý xong hoặc event đã được bàn giao sang retry/DLQ.
+
+### Transactional Outbox
+
+- payment-service không publish Kafka trực tiếp trong transaction thanh toán; service ghi outbox event trước.
+- Outbox worker publish event sau, có retry/backoff và trạng thái `PENDING`, `PROCESSING`, `PUBLISHED`, `FAILED`.
+- learning-service cũng có outbox cho `learning.enrollment.created`.
+- Cách này giảm rủi ro mất event khi database đã commit nhưng Kafka tạm thời lỗi.
+
+### Payment Safety
+
+- payment-service xác minh course và price từ course-service internal API trước khi tạo order.
+- Client không được quyết định số tiền thanh toán.
+- VNPay return và IPN đều được verify checksum.
+- Payload callback VNPay được lưu vào JSONB audit để giữ dữ liệu đối soát.
+- Order completion được xử lý idempotently để tránh callback lặp tạo nhiều enrollment hoặc nhiều event.
+
+### CQRS-style Course Discovery
+
+- course-service có Redis read store cho course discovery khi cache/read model khả dụng.
+- API có fallback Prisma để hệ thống vẫn chạy khi Redis không sẵn sàng.
+- Có script warmup read model từ dữ liệu hiện có.
+- Course catalog event giúp đồng bộ read model mà không ép mọi request public phải query toàn bộ relational schema.
+
+### AI in Learning Flow
+
+- AI không hoạt động như chatbot rời rạc; nó lấy context từ khóa học, chương, bài học, transcript hoặc auto context.
+- ai-service kiểm tra quyền học tập qua learning-service trước các luồng cần enrollment/completion.
+- Conversation, message và quiz session được lưu riêng trong `ai_db`.
+- Provider fallback giúp đổi hoặc sắp thứ tự provider mà không đổi contract frontend.
+- Rate limit AI dùng Redis khi có cấu hình, fallback in-memory cho local development.
+
+### Admin and Governance
+
+- Admin có các màn hình vận hành thực tế: users, courses, categories, reviews, orders, revenue, payouts, support, notifications, community, audit log và DLQ.
+- Các thao tác nhạy cảm có audit trail ở auth-service hoặc service sở hữu nghiệp vụ.
+- Payout flow có role guard, trạng thái xử lý và liên kết với earning.
+- DLQ UI/API cho phép kiểm tra failed event, retry thủ công và resolve thay vì bỏ lỗi trong log.
+
+## Features
+
+### Authentication and User Management
+
+- Đăng ký, đăng nhập, đăng xuất và refresh token rotation.
+- Quản lý access token, refresh token, session Redis và cleanup token hết hạn.
+- Phân quyền theo role học viên, giảng viên và quản trị viên.
+- Luồng đăng ký giảng viên qua instructor request, admin review và audit log.
+- Quản trị người dùng, trạng thái tài khoản, đổi role, đổi mật khẩu và cấu hình hệ thống.
+- Hệ thống support ticket cho người dùng và admin xử lý phản hồi.
+
+### Course Management
+
+- Quản lý khóa học, chương, bài học, danh mục, cấp độ, giá bán và trạng thái xuất bản.
+- Instructor Studio cho tạo khóa học, chỉnh curriculum, upload thumbnail, cấu hình bài học miễn phí/trả phí.
+- Hỗ trợ lesson video upload, YouTube/external media và nội dung text theo bài học.
+- Course discovery với search, filter, sort, pagination và Redis read model khi được bật.
+- Rating/review sau khi học viên hoàn thành khóa học theo điều kiện nghiệp vụ.
+- Hồ sơ giảng viên public, danh sách khóa học theo giảng viên và certificate template.
+
+### Learning Experience
+
+- Ghi danh khóa miễn phí hoặc khóa đã thanh toán.
+- Theo dõi tiến độ bài học, trạng thái hoàn thành và phần trăm hoàn thành khóa học.
+- Trang học tập riêng cho từng khóa, video player, navigation bài học và Q&A trong ngữ cảnh học.
+- Cấp chứng chỉ khi học viên hoàn thành điều kiện khóa học.
+- Dashboard học viên gồm khóa học của tôi, chứng chỉ, đơn hàng, cộng đồng và các trạng thái liên quan.
+
+### Payment and Revenue
+
+- Tạo order thanh toán khóa học qua VNPay.
+- Payment service xác minh giá khóa học từ course-service, không tin giá từ client.
+- Xác thực checksum VNPay cho return callback và IPN.
+- Lưu payload VNPay vào JSONB để phục vụ audit và đối soát.
+- Order event sourcing với lịch sử sự kiện đơn hàng cho admin.
+- Transactional outbox cho `payment.order.completed`.
+- Theo dõi doanh thu, instructor earning, payout profile và payout request.
+
+### Event-Driven Enrollment
+
+- Kafka event `payment.order.completed` kích hoạt enrollment trong learning-service.
+- Enrollment idempotent theo order/course/user để tránh ghi danh trùng.
+- learning-service phát `learning.enrollment.created` để các service khác cập nhật read model hoặc thông báo.
+- Retry chain cho payment event: main topic, retry 5 giây, retry 30 giây, retry 1 phút, sau đó DLQ.
+- Admin DLQ có thống kê, danh sách failed event, retry thủ công và resolve.
+
+### Media Upload
+
+- Media service tách riêng với database và storage abstraction.
+- Cloudinary là provider chính khi cấu hình `CLOUDINARY_URL`.
+- Local storage fallback cho development/test và khi Cloudinary không khả dụng.
+- Presigned/direct upload flow, confirm upload, external media registration và media lookup theo lesson/course.
+- Giữ provider abstraction để có thể thay đổi storage backend mà không đổi controller chính.
+
+### Notifications
+
+- In-app notification cho người dùng.
+- Notification bell trong web client với unread count, mark as read và mark all as read.
+- Notification service consume Kafka event từ payment/enrollment flow.
+- Lưu lịch sử notification và hỗ trợ SMTP email khi cấu hình.
+- Admin có thể xem lịch sử notification.
+
+### Community and Q&A
+
+- Community feed toàn hệ thống cho người dùng đã đăng nhập.
+- Tạo bài viết, trả lời, reaction, chỉnh sửa và xóa theo quyền.
+- Q&A theo khóa học với question, answer, upvote và accepted answer.
+- Instructor theo dõi câu hỏi liên quan đến khóa học của mình.
+- Community service gọi internal API để lấy thông tin người dùng/khóa học mà không truy cập chéo database.
+
+### AI Features
+
+- AI chatbot theo course/lesson context.
+- Quản lý conversation, message history và xóa conversation.
+- AI quiz theo bài học/khóa học, submit quiz và lưu lịch sử.
+- Context loader lấy dữ liệu khóa học, bài học, transcript hoặc auto context từ course-service.
+- Kiểm tra enrollment/completion qua learning-service trước các luồng AI cần quyền học tập.
+- Provider fallback theo cấu hình như OpenRouter, Groq, DeepSeek hoặc provider tương thích OpenAI API.
+- Rate limit AI bằng Redis/Upstash nếu cấu hình, có fallback in-memory cho development.
+
+### Admin Operations
+
+- Admin dashboard cho user, course, category, review, community, support, revenue, payout, order và notification.
+- Audit log cho các thao tác nhạy cảm.
+- System config có validation và default.
+- DLQ monitor cho event lỗi và thao tác retry/resolve.
+- Health endpoints `/health`, `/livez`, `/readyz` cho các service.
 
 ## Tech Stack
 
-### Frontend
-- **Next.js 16**: React framework with App Router and Server Actions
-- **Shadcn UI**: Component library built on Radix UI
-- **TailwindCSS**: Utility-first CSS framework
-- **Redux Toolkit**: State management
-- **TypeScript**: Type safety and developer experience
-
-### Backend
-- **Node.js 18+**: JavaScript runtime
-- **Express**: Lightweight HTTP framework
-- **TypeScript 5.3+**: Strongly typed JavaScript
-- **Prisma**: Next-generation ORM for PostgreSQL
-- **Zod**: Runtime schema validation
-
-### Infrastructure
-- **PostgreSQL**: Relational database via Neon Serverless
-- **Apache Kafka**: Distributed event streaming platform
-- **Redis**: In-memory data store for sessions and caching
-- **Kong Gateway**: Declarative API Gateway (DB-less mode)
-- **Docker**: Containerization for local development
-- **Turborepo**: High-performance monorepo build system
-
-### Payment & External Services
-- **VNPay**: Vietnam payment gateway integration
-- **AWS S3**: Optional media storage backend
+| Layer | Technology | Purpose |
+|---|---|---|
+| Language | TypeScript | Ngôn ngữ chính cho frontend, backend và shared packages |
+| Monorepo | pnpm workspace, Turborepo | Quản lý nhiều app/service/package trong một repository |
+| Web Client | Next.js App Router, React | Giao diện học viên, giảng viên, admin và BFF layer |
+| UI | Tailwind CSS, Shadcn UI, Radix UI, Lucide React | Component, layout, form và icon |
+| BFF | Next.js Server Actions | Gọi nhiều microservice qua Gateway và tổng hợp dữ liệu cho UI |
+| Backend | Node.js, Express | HTTP API cho các service độc lập |
+| API Gateway | Kong Gateway DB-less | Routing, CORS, JWT boundary, rate limit và trace header |
+| Database | PostgreSQL Neon Serverless | Database per service với kết nối SSL |
+| ORM | Prisma ORM | Schema, migration và type-safe database access |
+| Messaging | Apache Kafka | Event-driven workflow, retry topic và dead-letter topic |
+| Cache | Upstash Redis / Redis Cloud | Session/cache/read model/rate limit tùy service |
+| Payment | VNPay | Tạo payment URL, return callback, IPN và checksum verification |
+| Media | Cloudinary, local fallback | Upload và phân phối media cho khóa học/bài học |
+| Notification | In-app notification, SMTP/Nodemailer | Thông báo trong app và email khi cấu hình |
+| AI Provider | OpenRouter, Groq, DeepSeek hoặc provider tương thích | Chatbot và quiz dựa trên course/lesson context |
+| DevOps | Docker Compose, production compose override, deploy script | Local infrastructure và triển khai production-like |
+| Shared Packages | `packages/*` | Types, logger, env validator, Prisma helper, cache và Kafka client |
 
 ## Architecture
 
-### Architectural Principles
+Hệ thống dùng microservices architecture với database per service. Mỗi service sở hữu database riêng và không truy cập database của service khác. Khi cần dữ liệu liên service, hệ thống dùng HTTP internal API qua `/internal/*` với `x-internal-secret` hoặc dùng Kafka event.
 
-1. **Microservices**: Independent, deployable services with clear boundaries
-2. **Database per Service**: Each service owns its database schema and data
-3. **Event-Driven Communication**: Asynchronous messaging via Apache Kafka
-4. **BFF Pattern**: Next.js Server Actions aggregate data from multiple services
-5. **API Gateway**: Kong handles authentication, rate limiting, and routing
-6. **Stateless Services**: Session state managed by Redis, not application servers
+Kong Gateway là entry point cho client. Gateway xử lý route, CORS, rate limit, xác thực JWT và inject các header như `x-user-id`, `x-user-role`, `x-user-email`, `x-trace-id` cho downstream service. Các service tin Gateway header thay vì tự verify JWT lại.
 
-### System Architecture Diagram
+Next.js Server Actions đóng vai trò BFF. Web client gọi Gateway, tổng hợp dữ liệu từ nhiều service và trả dữ liệu đã chuẩn hóa cho page/component. Kafka được dùng cho các workflow bất đồng bộ như thanh toán thành công, tạo enrollment, notification, cập nhật read model và DLQ.
 
+```mermaid
+flowchart LR
+  Web[Next.js Web Client] --> Gateway[Kong API Gateway]
+
+  Gateway --> Auth[Auth Service]
+  Gateway --> Course[Course Service]
+  Gateway --> Learning[Learning Service]
+  Gateway --> Payment[Payment Service]
+  Gateway --> Media[Media Service]
+  Gateway --> Community[Community Service]
+  Gateway --> Notification[Notification Service]
+  Gateway --> AI[AI Service]
+
+  Auth --> AuthDB[(auth_db)]
+  Course --> CourseDB[(course_db)]
+  Learning --> LearningDB[(learning_db)]
+  Payment --> PaymentDB[(payment_db)]
+  Media --> MediaDB[(media_db)]
+  Community --> CommunityDB[(community_db)]
+  Notification --> NotificationDB[(notification_db)]
+  AI --> AIDB[(ai_db)]
+
+  Course --> Redis[(Redis/Upstash)]
+  AI --> Redis
+  Auth --> Redis
+
+  Payment --> Kafka[Kafka]
+  Kafka --> Learning
+  Kafka --> Notification
+  Learning --> Kafka
+  Kafka --> Course
+
+  Media --> Cloudinary[Cloudinary]
+  Payment --> VNPay[VNPay]
+
+  AI --> AIProvider[LLM Provider]
+  AI --> Course
+  AI --> Learning
 ```
-┌─────────────────────────────────────────────────────┐
-│              Next.js 16 (Frontend + BFF)            │
-│                    Port: 3000                       │
-│   - Student UI (Dashboard, Learning, Courses)      │
-│   - Instructor UI (Curriculum Builder)             │
-│   - Server Actions (Data Aggregation) 
-                                    │
-└─────────────────────┬───────────────────────────────┘
-                      │
-                      │ HTTP Requests
-                      ▼
-┌─────────────────────────────────────────────────────┐
-│              Kong API Gateway                       │
-│                    Port: 8000                       │
-│   - JWT Verification                               │
-│   - Rate Limiting (100 req/min)                    │
-│   - CORS Handling                                  │
-│   - Header Injection (x-user-id, x-user-role)     │
-└──────┬──────────┬──────────┬──────────┬────────────┘
-       │          │          │          │
-       ▼          ▼          ▼          ▼
-┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│  Auth    │ │ Course   │ │ Payment  │ │  Media   │
-│ Service  │ │ Service  │ │ Service  │ │ Service  │
-│  :3101   │ │  :3002   │ │  :3003   │ │  :3004   │
-└────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘
-     │            │            │            │
-     ▼            ▼            ▼            ▼
-┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│ auth_db  │ │course_db │ │payment_db│ │ media_db │
-│  (Neon)  │ │  (Neon)  │ │  (Neon)  │ │  (Neon)  │
-└──────────┘ └──────────┘ └────┬─────┘ └──────────┘
-                                │
-                                │ Publish Events
-                                ▼
-                       ┌─────────────────┐
-                       │  Apache Kafka 
-                       │  (Event Bus)    │
-                       │  Topics:        │
-                       │  - Orders       │
-                       │  - Enrollments  │
-                       │  - Notifications│
-                       └────────┬────────┘
-                                │
-                    ┌───────────┴───────────┐
-                    ▼                       ▼
-             ┌─────────────┐        ┌──────────────┐
-             │   Course    │        │Notification  │
-             │   Worker    │        │Service :3005 │
-             │ (Consumer)  │        │  + Worker    │
-             └─────────────┘        └──────────────┘
-```
-
-### Authentication Flow
-
-Kong Gateway acts as the single point of authentication:
-
-1. Client submits credentials to `/auth/login` via Kong Gateway
-2. Kong forwards request to Auth Service
-3. Auth Service verifies credentials against `auth_db`
-4. Auth Service creates session in Redis (TTL: 7 days)
-5. Auth Service returns Access Token (15 minutes) and Refresh Token (7 days)
-6. Client includes Access Token in subsequent requests (Authorization: Bearer header)
-7. Kong verifies JWT signature and expiry
-8. Kong injects headers (`x-user-id`, `x-user-role`, `x-trace-id`) to downstream services
-9. Downstream services trust Gateway headers without re-verification
-
-**Security Note**: Services MUST NOT re-verify JWT. This ensures single responsibility and prevents duplicate crypto operations.
-
-### Payment & Enrollment Flow
-
-End-to-end payment processing with idempotent enrollment:
-
-1. Student initiates payment via Payment Service
-2. Payment Service verifies course price from Course Service (prevents client-side tampering)
-3. Payment Service creates order record in `payment_db` with status `PENDING`
-4. Payment Service redirects student to VNPay payment URL
-5. Student completes payment on VNPay portal
-6. VNPay sends IPN (Instant Payment Notification) callback to Payment Service
-7. Payment Service validates VNPay signature and checksum
-8. Payment Service stores complete VNPay response in JSONB field (audit compliance)
-9. Payment Service updates order status to `COMPLETED`
-10. Payment Service publishes `payment.order.completed` event to Kafka
-11. Course Worker consumes event and creates enrollment (idempotent check by order ID)
-12. On failure: Retry mechanism (5s delay, then 1m, then 5m) before moving to Dead Letter Queue
-13. Notification Service consumes enrollment event and sends confirmation email
-
-**Anti-Tampering**: Payment Service MUST fetch price from Course Service, never trust client-submitted price.
-
-### Data Aggregation Pattern
-
-Services do NOT perform cross-database joins. Frontend aggregates data via parallel API calls:
-
-```typescript
-// Example: apps/web-client/src/app/actions/dashboard.ts
-export async function getStudentDashboard(userId: string) {
-  // Parallel fetch from multiple services
-  const [userProfile, enrolledCourses, notifications] = await Promise.all([
-    fetch(`${GATEWAY_URL}/auth/users/${userId}`),
-    fetch(`${GATEWAY_URL}/course/enrollments?userId=${userId}`),
-    fetch(`${GATEWAY_URL}/notification/recent?userId=${userId}`)
-  ]);
-  
-  // Aggregate and return merged data
-  return {
-    user: userProfile.data,
-    courses: enrolledCourses.data,
-    notifications: notifications.data
-  };
-}
-```
-
-This pattern maintains service independence while providing rich UI experiences.
-
-## Project Structure
-
-```
-olms-microservices/
-├── apps/
-│   └── web-client/               # Next.js 16 Frontend
-│       ├── src/
-│       │   ├── app/              # App Router pages
-│       │   │   ├── login/        # Login page
-│       │   │   ├── register/     # Registration page
-│       │   │   ├── dashboard/    # Student dashboard
-│       │   │   └── actions/      # Server Actions (BFF layer)
-│       │   ├── components/
-│       │   │   ├── auth/         # Auth-related components
-│       │   │   └── ui/           # Shadcn UI components
-│       │   └── lib/
-│       │       ├── redux/        # Redux store and slices
-│       │       └── schemas/      # Zod validation schemas
-│       └── public/               # Static assets
-│
-├── services/
-│   ├── auth-service/             # Authentication & JWT (Port 3101 in Kong route)
-│   │   ├── prisma/
-│   │   │   ├── schema.prisma     # User, Session, RefreshToken models
-│   │   │   └── migrations/
-│   │   └── src/
-│   │       ├── controllers/
-│   │       │   ├── register.controller.ts
-│   │       │   ├── login.controller.ts
-│   │       │   ├── refresh.controller.ts
-│   │       │   └── logout.controller.ts
-│   │       └── lib/
-│   │           ├── jwt.ts        # JWT signing/verification
-│   │           ├── redis.ts      # Redis session management
-│   │           └── prisma.ts     # Prisma client singleton
-│   │
-│   ├── course-service/           # Course CRUD & Curriculum (Port 3002)
-│   │   ├── prisma/
-│   │   │   └── schema.prisma     # Course, Chapter, Lesson, Enrollment models
-│   │   └── src/
-│   │       ├── controllers/
-│   │       │   ├── course.controller.ts
-│   │       │   ├── chapter.controller.ts
-│   │       │   └── lesson.controller.ts
-│   │       └── middleware/
-│   │           └── require-auth.ts
-│   │
-│   ├── media-service/            # Media URLs (Port 3004)
-│   │   ├── prisma/
-│   │   │   └── schema.prisma     # Media model
-│   │   └── src/
-│   │       ├── controllers/
-│   │       │   ├── upload.controller.ts
-│   │       │   └── media.controller.ts
-│   │       └── storage/
-│   │           ├── s3.storage.ts         # AWS S3 implementation
-│   │           └── local.storage.ts      # Local storage for dev
-│   │
-│   ├── payment-service/          # VNPay Integration (Port 3003) - Phase 9-10
-│   │   └── (To be implemented)
-│   │
-│   └── notification-service/     # Email Worker (Port 3005) - Phase 14
-│       └── (To be implemented)
-│
-├── packages/                     # Shared libraries
-│   ├── db-prisma/                # Prisma singleton utility
-│   │   └── src/index.ts          # Prevents "too many connections" error
-│   │
-│   ├── kafka-client/             # Kafka producer/consumer wrappers
-│   │   └── src/index.ts          # Standardized Kafka client
-│   │
-│   ├── logger/                   # Pino logger with trace_id
-│   │   └── src/index.ts          # Structured logging utility
-│   │
-│   ├── types/                    # Shared TypeScript interfaces
-│   │   └── src/index.ts          # ApiResponse, User, etc.
-│   │
-│   └── env-validator/            # Zod environment validation
-│       └── src/index.ts          # T3 Env pattern implementation
-│
-├── docker-compose.yml            # Kafka, Zookeeper, Kong
-├── kong.yml                      # Kong declarative config
-├── turbo.json                    # Turborepo pipeline config
-├── pnpm-workspace.yaml           # PNPM workspace definition
-├── tsconfig.json                 # Root TypeScript config
-├── READMECODE.md                 # Development roadmap and rules
-└── project_structure.md          # Architecture documentation
-```
-
-### Directory Responsibilities
-
-- **apps/**: Frontend applications
-- **services/**: Backend microservices (each with independent database)
-- **packages/**: Shared libraries used across multiple services
 
 ## Services
 
-### Auth Service (COMPLETED - Phase 3)
+| Service | Default Port | Database | Main Responsibility |
+|---|---:|---|---|
+| `auth-service` | 3101 | `auth_db` | Authentication, user, role, instructor request, audit log, support ticket, system config |
+| `course-service` | 3002 | `course_db` | Course, chapter, lesson, category, review, instructor profile, transcript/context, course discovery |
+| `learning-service` | 3006 | `learning_db` | Enrollment, lesson progress, certificate, failed event, learning outbox, DLQ |
+| `community-service` | 3007 | `community_db` | Community feed, course Q&A, answers, upvotes, moderation actions |
+| `payment-service` | 3003 | `payment_db` | VNPay order, audit, order event sourcing, payment outbox, earning, payout |
+| `media-service` | 3004 | `media_db` | Media asset, upload request, Cloudinary/local storage provider, external media |
+| `notification-service` | 3005 | `notification_db` | In-app notification, Kafka notification consumer, SMTP/email history |
+| `ai-service` | 3008 | `ai_db` | AI conversation, chat message, quiz session, course/lesson AI context |
 
-**Port**: 3101 (via Kong route in current workspace)  
-**Database**: `auth_db` (Neon PostgreSQL)  
-**Status**: Production Ready
+## Service Boundary Details
 
-**Responsibilities:**
-- User registration with bcrypt password hashing (10 rounds)
-- JWT-based authentication (Access Token + Refresh Token)
-- Redis session management (7-day TTL)
-- Token refresh and rotation
-- User logout and session invalidation
+### auth-service
 
-**API Endpoints:**
-- `POST /register` - Create new user account
-- `POST /login` - Authenticate user and issue tokens
-- `POST /refresh` - Refresh access token using refresh token
-- `POST /logout` - Invalidate session and refresh token
+auth-service là identity and governance service của hệ thống. Service này chịu trách nhiệm với user account, credential, role, token, instructor request, audit log, system config và support ticket.
 
-**Database Models:**
-- `User`: id, email, password (hashed), name, role, sourceType, lastLoginAt, createdAt, updatedAt
-- `Session`: id, userId, refreshToken, expiresAt, createdAt
-- `RefreshToken`: id, token (hashed), userId, expiresAt, isActive
+Điểm đáng chú ý:
 
-**Security Features:**
-- Bcrypt hashing with 10 salt rounds
-- JWT with 15-minute access token expiry
-- Refresh token rotation on use
-- Redis-backed session storage for fast revocation
+- Register mặc định tạo user role học viên, tránh client tự gửi role đặc quyền.
+- Become instructor đi qua request/review flow thay vì tự nâng quyền trực tiếp.
+- Admin-only endpoints quản lý user role/status/password và instructor request.
+- Refresh token rotation và cleanup job giúp giảm rủi ro token cũ tồn tại lâu.
+- Audit log tách khỏi business service để ghi nhận thao tác nhạy cảm từ nhiều nơi.
+- Internal API cung cấp user/admin/instructor lookup cho service khác mà không chia sẻ database.
 
----
+### course-service
 
-### Course Service (COMPLETED - Phase 5)
+course-service sở hữu course catalog và curriculum. Đây là service trung tâm cho dữ liệu khóa học public, dữ liệu instructor và context phục vụ AI.
 
-**Port**: 3002  
-**Database**: `course_db` (Neon PostgreSQL)  
-**Status**: Production Ready
+Điểm đáng chú ý:
 
-**Responsibilities:**
-- Course CRUD operations (Create, Read, Update, Delete)
-- Curriculum management (Chapters and Lessons)
-- Course enrollment tracking
-- Instructor course ownership
-- Course pricing and metadata
+- Course, chapter, lesson, category, review, instructor profile và certificate template nằm trong cùng boundary học liệu.
+- Public course discovery hỗ trợ search/filter/sort/pagination.
+- Instructor APIs quản lý course lifecycle, publish guard, chapter/lesson ordering và certificate template.
+- Review có điều kiện nghiệp vụ, gắn với course và user.
+- Lesson transcript/context phục vụ AI chat/quiz, có manual/subtitle/auto context flow.
+- Redis read model giúp tối ưu course listing, có fallback Prisma khi cache unavailable.
+- Consumer `learning.enrollment.created` cập nhật enrollment signal/read model mà không đọc learning database.
 
-**API Endpoints (service paths):**
-- `GET /api/courses` - List public courses
-- `GET /api/courses/:slug` - Get course details by slug
-- `GET /api/instructor/courses` - List instructor courses (auth)
-- `POST /api/courses` - Create course (Instructor/Admin)
-- `PUT /api/courses/:id` - Update course (Instructor/Admin)
-- `DELETE /api/courses/:id` - Delete course (Instructor/Admin)
-- `POST /api/courses/:courseId/chapters` - Add chapter
-- `POST /api/courses/:courseId/chapters/:chapterId/lessons` - Add lesson
+### learning-service
 
-**Database Models:**
-- `Course`: id, title, description, price, instructorId, status, createdAt
-- `Chapter`: id, courseId, title, position, createdAt
-- `Lesson`: id, chapterId, title, videoUrl, duration, position, createdAt
-- `Enrollment`: id, courseId, userId, enrolledAt, progress, completedAt
+learning-service sở hữu trạng thái học tập của học viên. Service này tách khỏi course-service để course catalog không bị trộn với enrollment/progress.
 
-**Authorization:**
-- Instructors can create and manage their own courses
-- Students can view published courses
-- Admin can manage all courses
+Điểm đáng chú ý:
 
----
+- Enrollment idempotent cho cả khóa miễn phí và khóa thanh toán.
+- Lesson progress dùng upsert để cập nhật trạng thái xem bài và hoàn thành bài.
+- Certificate được phát hành dựa trên completion state.
+- Internal API cho ai-service/payment-related flow kiểm tra enrollment và completion.
+- Kafka consumer xử lý `payment.order.completed` và tạo enrollment.
+- Failed event/DLQ được persist vào `learning_db` để admin retry/resolve.
+- Learning outbox phát `learning.enrollment.created` cho notification/course read model.
 
-### Media Service (COMPLETED - Phase 6)
+### payment-service
 
-**Port**: 3004  
-**Database**: `media_db` (Neon PostgreSQL)  
-**Status**: Production Ready
+payment-service sở hữu toàn bộ commerce boundary: order, VNPay, audit, outbox, event history, earning và payout.
 
-**Responsibilities:**
-- Generate presigned upload requests
-- Track media metadata (size, type, duration)
-- Support storage backends (local, S3)
-- Media access control and cleanup
+Điểm đáng chú ý:
 
-**API Endpoints (service paths):**
-- `POST /api/upload/presigned` - Request upload target
-- `POST /api/upload/complete` - Confirm uploaded asset
-- `POST /api/upload/external` - Register external media
-- `GET /api/media/:id` - Get media metadata
-- `DELETE /api/media/:id` - Delete media (Instructor/Admin)
+- Order creation gọi course-service để xác minh course price, chống price tampering từ client.
+- VNPay helper chuẩn hóa tham số, tạo pay URL và verify callback checksum.
+- Return callback và IPN dùng chung logic hoàn tất order idempotent.
+- VNPayAudit lưu callback payload JSONB để đối soát.
+- OrderEvent lưu event history; admin có thể xem timeline đơn hàng và folded current state.
+- Transactional outbox đảm bảo payment completed event không mất khi Kafka lỗi.
+- Circuit breaker/timeout cho internal call đến course-service giúp cô lập lỗi phụ thuộc.
+- Instructor earning và payout có guard, status workflow và audit.
 
-**Database Models:**
-- `MediaAsset`: id, lessonId, courseId, storageProvider, storageKey, mimeType, size, uploaderId, status
+### media-service
 
-**Storage Backends:**
-- Local Storage: Development environment
-- AWS S3: Optional external storage
+media-service tách media upload/delivery khỏi course-service để course chỉ lưu URL/metadata cần thiết.
 
-**Security:**
-- Presigned URLs expire after 1 hour
-- Only enrolled students can access course videos
-- Instructors can only delete their own media
+Điểm đáng chú ý:
 
----
+- Storage abstraction cho Cloudinary, S3-compatible implementation và local fallback.
+- Cloudinary được ưu tiên khi có `CLOUDINARY_URL`.
+- Local upload/download route phục vụ dev/test và fallback khi provider chính gặp lỗi.
+- Upload flow gồm request upload URL, browser upload, confirm upload và lookup media.
+- Hỗ trợ external media để đăng ký video YouTube hoặc URL đã có.
+- Media lookup theo lesson/course giúp web client gắn tài nguyên vào bài học.
 
-### Payment Service (PLANNED - Phase 9-10)
+### notification-service
 
-**Port**: 3003  
-**Database**: `payment_db` (Neon PostgreSQL)  
-**Status**: Implemented (Phase 13-16)
+notification-service sở hữu notification state và email delivery log. Service này không quyết định nghiệp vụ payment/enrollment, chỉ phản ứng theo event hoặc internal command.
 
-**Features:**
-- VNPay payment gateway integration (sandbox + prod compatible)
-- Order management with status tracking (`PENDING | COMPLETED | FAILED | EXPIRED | REFUNDED`)
-- Transaction audit logs (full VNPay response stored as JSONB)
-- Kafka event publishing on payment completion with typed events + retry + DLQ
-- Anti-tampering: price is verified against Course Service at order creation time
+Điểm đáng chú ý:
 
-**Endpoints (via Kong `/payment`):**
-- `POST /payment/api/orders` — Create new order + generate VNPay pay URL (auth required)
-- `GET /payment/api/orders/:id` — Get order detail (owner only)
-- `GET /payment/api/orders/my` — List my orders
-- `GET /payment/api/vnpay-return` — User browser callback after VNPay (public)
-- `GET|POST /payment/api/vnpay-ipn` — VNPay server webhook (public, signed)
+- Consume `payment.order.completed` và `learning.enrollment.created`.
+- Tạo in-app notification idempotent theo event.
+- API cho user list notification, mark as read và mark all as read.
+- Admin API xem lịch sử notification.
+- SMTP/Nodemailer được cấu hình qua environment, phù hợp local hoặc production-like.
+- Internal notification endpoint cho service khác gửi thông báo mà không cần truy cập DB.
 
----
+### community-service
 
-### Notification Service (STUB - Phase 11 WIP, Phase 16 hookup)
+community-service tách social interaction khỏi course-service. Service này xử lý feed toàn hệ thống và Q&A theo khóa học.
 
-**Port**: 3005  
-**Status**: Stub implemented — consumes Kafka events, logs mock emails.
+Điểm đáng chú ý:
 
-**Subscribes to:**
-- `payment.order.completed` → logs "thank you for purchasing" mock email
-- `learning.enrollment.created` → logs "enrollment confirmed" mock email
+- CommunityPost hỗ trợ post, reply/comment, reaction, edit và delete.
+- Q&A hỗ trợ question, answer, upvote và accepted answer.
+- Q&A có route theo course và route instructor để giảng viên theo dõi câu hỏi liên quan.
+- Service gọi auth-service/course-service qua internal client để enrich tên người dùng và thông tin khóa học.
+- Không lưu trùng toàn bộ dữ liệu user/course ngoài các khóa tham chiếu cần thiết.
 
-**Planned (Phase 11 full):**
-- Nodemailer (dev) + Resend (prod)
-- Template-based email rendering
-- Notification history in `notification_db`
-- Bell UI in web-client
+### ai-service
+
+ai-service sở hữu AI conversation và quiz session. Service này phụ thuộc vào course/learning context qua internal API thay vì tự lưu bản sao học liệu đầy đủ.
+
+Điểm đáng chú ý:
+
+- Chat conversation CRUD và message history.
+- Quiz generation, submit, history và status theo lesson/course.
+- Access control dựa trên enrollment/completion từ learning-service.
+- Course/lesson context lấy từ course-service và được rút gọn trước khi gửi provider.
+- Provider fallback theo `AI_PROVIDER_ORDER`.
+- Rate limit có Redis backend và in-memory fallback.
+- Input guard và quiz quality validation giúp giảm response kém chất lượng từ LLM.
+
+### web-client
+
+web-client là giao diện chính và BFF layer. App không chỉ render UI mà còn gom dữ liệu từ nhiều service bằng Server Actions.
+
+Điểm đáng chú ý:
+
+- App Router chia route theo public, dashboard, learn, instructor và admin.
+- Server Actions tách theo domain: auth, discovery, learning, payment, notification, community, Q&A, AI, admin, support.
+- API client xử lý access token, refresh token, cookie và fallback khi session stale.
+- Shared UI components cho navbar, notification bell, course cards, dashboard panels và learning UI.
+- Admin/Instructor shell tách riêng workflow để người dùng thao tác theo vai trò.
+
+### Shared Packages
+
+Các package dùng chung giúp microservices giữ contract nhất quán mà không copy/paste logic.
+
+| Package | Responsibility |
+|---|---|
+| `@lms/types` | `ApiResponse<T>`, response helpers, auth middleware factories và shared type contracts |
+| `@lms/logger` | Structured logger dùng chung cho service logs |
+| `@lms/env-validator` | Zod-based environment validation cho service runtime |
+| `@lms/db-prisma` | Prisma helper và retry wrapper cho lỗi kết nối/cold start |
+| `@lms/kafka-client` | Kafka producer/consumer, typed envelope, Zod event validation, retry policy và DLQ |
+| `@lms/cache` | Redis/cache abstraction dùng cho read model, rate limit hoặc cache theo service |
+
+## Key Workflows
+
+### Authentication Boundary
+
+1. Web client gửi login/register/refresh qua Kong route `/auth`.
+2. auth-service xử lý credential, token và session.
+3. Request protected đi qua Kong JWT plugin.
+4. Kong inject `x-user-id`, `x-user-role`, `x-user-email`.
+5. Service downstream dùng header này để authorize theo role và ownership.
+
+### Payment to Enrollment
+
+1. Học viên tạo order qua payment-service.
+2. payment-service gọi course-service internal API để xác minh khóa học và giá.
+3. payment-service tạo order và VNPay payment URL.
+4. VNPay redirect return hoặc gọi IPN.
+5. payment-service verify checksum, lưu audit JSONB, hoàn tất order idempotently.
+6. payment-service ghi outbox event `payment.order.completed`.
+7. Outbox worker publish Kafka event.
+8. learning-service consume event, tạo enrollment idempotently và ghi outbox `learning.enrollment.created`.
+9. notification-service gửi notification; course-service cập nhật enrollment signal/read model khi nhận event liên quan.
+10. Nếu handler lỗi, event đi qua retry topics rồi vào `system.dead-letter`.
+
+### Course Discovery Read Model
+
+1. course-service quản lý dữ liệu course/category/review trong `course_db`.
+2. Khi Redis read model khả dụng, course discovery ưu tiên read store để search/filter/sort nhanh hơn.
+3. Khi Redis không khả dụng, API fallback về Prisma query trực tiếp.
+4. Script warmup có thể rebuild read model từ dữ liệu hiện có.
+
+### AI Chat and Quiz
+
+1. Web client gọi ai-service qua Kong route `/ai`.
+2. ai-service kiểm tra quyền học tập qua learning-service khi cần.
+3. ai-service lấy context khóa học/bài học từ course-service internal API.
+4. Provider AI được gọi theo thứ tự cấu hình.
+5. Conversation, message và quiz session được lưu trong `ai_db`.
+6. Rate limit dùng Redis/Upstash nếu cấu hình, fallback in-memory cho development.
+
+## Reliability, Security and Operations
+
+### Data Consistency
+
+Hệ thống có nhiều workflow bất đồng bộ, vì vậy consistency được xử lý bằng các cơ chế rõ ràng thay vì dựa vào side effect không kiểm soát.
+
+- Database per service giúp tránh coupling schema giữa các domain.
+- Internal API dùng cho read/validation tức thời như price verification hoặc enrollment check.
+- Kafka dùng cho event propagation sau khi business state đã thay đổi.
+- Transactional outbox đảm bảo event business-critical được persist trước khi publish.
+- Idempotency được áp dụng ở payment completion, enrollment creation, notification và earning để chịu được callback/event lặp.
+- Prisma transaction được dùng cho các luồng multi-write như order completion, payout và enrollment.
+- JSONB audit giữ lại payload gateway/payment callback đầy đủ để debug và đối soát.
+
+### Fault Tolerance
+
+- Kong có timeout và rate limit ở gateway layer.
+- payment-service có internal HTTP timeout và circuit breaker khi phụ thuộc course-service.
+- Prisma helper có retry cho lỗi kết nối/cold start phù hợp với Neon Serverless.
+- Outbox worker có retry/backoff khi Kafka producer hoặc broker lỗi.
+- Kafka consumer wrapper hỗ trợ retry topics và DLQ thay vì mất message hoặc retry vô hạn không quan sát được.
+- Read model Redis có fallback về Prisma query để course listing không phụ thuộc tuyệt đối vào cache.
+- Media upload có local fallback khi Cloudinary không khởi tạo hoặc gặp lỗi runtime trong môi trường dev/test.
+
+### Security Controls
+
+- Kong là JWT verification boundary cho client traffic.
+- Downstream service chỉ trust Gateway headers sau khi request đã đi qua Gateway route.
+- Protected routes kiểm tra `x-user-id` và `x-user-role` theo role/ownership.
+- Internal API yêu cầu `x-internal-secret`, tách khỏi public Gateway contract.
+- Zod validation được dùng ở controller, env validator và Kafka payload.
+- Payment không tin price từ client; payment-service lấy giá từ course-service.
+- VNPay callback bắt buộc verify checksum trước khi hoàn tất order.
+- Admin actions và payout/payment-sensitive actions được audit.
+- Env examples chỉ chứa placeholder; secret thật nằm ngoài repository.
+
+### Observability and Debugging
+
+- API response có `trace_id` để liên kết request với log.
+- Kong correlation-id plugin tạo hoặc echo `x-trace-id`.
+- Shared logger giúp log có format nhất quán giữa service.
+- Health endpoints `/health`, `/livez`, `/readyz` có ở backend services.
+- DLQ admin API/UI giúp quan sát failed event thay vì chỉ đọc log.
+- Order event history giúp debug vòng đời order theo timeline.
+- Seed scripts tạo dữ liệu có chủ đích cho demo payment, DLQ, notification, support, Q&A và certificate.
+
+### Operations Readiness
+
+- Root scripts chuẩn hóa setup: install, Docker infrastructure, database migrate/generate và seed.
+- Docker Compose local chỉ chạy hạ tầng cần thiết như Kafka, Zookeeper và Kong; database dùng Neon, Redis dùng Upstash/cloud.
+- Production compose override có healthcheck cho backend services.
+- Script deploy/render Kong production tách khỏi code application.
+- K6 scripts kiểm tra smoke flow và rate-limit behavior.
+- Prisma migrate deploy được gom theo workspace để giảm thao tác thủ công.
+
+## Project Structure
+
+```text
+olms-microservices/
+|-- apps/
+|   `-- web-client/                 # Next.js App Router web client
+|-- services/
+|   |-- auth-service/               # Auth, user, role, audit, support
+|   |-- course-service/             # Course catalog, curriculum, reviews, transcripts
+|   |-- learning-service/           # Enrollment, progress, certificates, DLQ
+|   |-- community-service/          # Feed and Q&A
+|   |-- payment-service/            # VNPay, order, outbox, earning, payout
+|   |-- media-service/              # Upload and media provider abstraction
+|   |-- notification-service/       # In-app and email notification
+|   `-- ai-service/                 # AI chat and quiz
+|-- packages/
+|   |-- cache/
+|   |-- db-prisma/
+|   |-- env-validator/
+|   |-- kafka-client/
+|   |-- logger/
+|   `-- types/
+|-- scripts/
+|-- docker-compose.yml
+|-- docker-compose.production.yml
+|-- kong.yml
+|-- package.json
+|-- pnpm-workspace.yaml
+`-- turbo.json
+```
 
 ## Getting Started
 
 ### Prerequisites
 
-- **Node.js** >= 18.0
-- **pnpm** >= 8.0 (Package manager)
-- **Docker** and Docker Compose
-- **Neon Account** (for PostgreSQL databases)
-- **Git** for version control
+- Node.js 18 trở lên.
+- pnpm 8 trở lên.
+- Docker và Docker Compose.
+- PostgreSQL Neon databases cho từng service.
+- Redis/Upstash URL nếu bật session/cache/rate limit/read model.
+- Cloudinary account nếu dùng upload media production-like.
+- VNPay sandbox/production credentials nếu test thanh toán.
+- AI provider API key nếu dùng chatbot/quiz bằng LLM thật.
 
-## Quick Start (Verified)
+### Environment Setup
 
-Use this flow on a fresh clone to avoid setup mismatch.
+Repository có sẵn các file `.env.example` ở root, web client và từng service. Không commit `.env` thật.
 
-1. Clone and install dependencies
-```bash
-git clone <repository-url>
-cd olms-microservices
-pnpm install
-```
-
-2. Create env files
 ```bash
 cp .env.example .env
+cp apps/web-client/.env.example apps/web-client/.env.local
 cp services/auth-service/.env.example services/auth-service/.env
 cp services/course-service/.env.example services/course-service/.env
+cp services/learning-service/.env.example services/learning-service/.env
+cp services/community-service/.env.example services/community-service/.env
+cp services/payment-service/.env.example services/payment-service/.env
 cp services/media-service/.env.example services/media-service/.env
+cp services/notification-service/.env.example services/notification-service/.env
+cp services/ai-service/.env.example services/ai-service/.env
 ```
 
-PowerShell equivalent:
-```powershell
-Copy-Item .env.example .env
-Copy-Item services/auth-service/.env.example services/auth-service/.env
-Copy-Item services/course-service/.env.example services/course-service/.env
-Copy-Item services/media-service/.env.example services/media-service/.env
-```
+Các nhóm biến quan trọng:
 
-3. Configure required values
-- `services/auth-service/.env`
-  - `PORT=3101` (must match Kong route)
-  - `DATABASE_URL` = Neon pooled URL (`-pooler`)
-  - `DIRECT_URL` = Neon direct URL (without `-pooler`)
-  - `REDIS_URL`, `JWT_SECRET`
-- `services/course-service/.env`
-  - `PORT=3002`
-  - `DATABASE_URL` + `DIRECT_URL`
-- `services/media-service/.env`
-  - `PORT=3004`
-  - `DATABASE_URL` + `DIRECT_URL`
+- `DATABASE_URL` và `DIRECT_URL` cho từng service.
+- `INTERNAL_SERVICE_SECRET` dùng chung cho internal API.
+- `KAFKA_BROKER` cho Kafka.
+- `REDIS_URL` hoặc `CACHE_REDIS_URL` cho Redis/Upstash.
+- `JWT_SECRET` hoặc secret tương ứng giữa auth-service và Kong config.
+- `CLOUDINARY_URL` hoặc `STORAGE_PROVIDER=local` cho media-service.
+- `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_RETURN_URL`, `VNPAY_IPN_URL` cho payment-service.
+- `AI_PROVIDER_ORDER` và API key/model của provider AI cho ai-service.
 
-4. Create `apps/web-client/.env.local`
-```env
-GATEWAY_URL=http://localhost:8000
-NEXT_PUBLIC_AUTH_PREFIX=/auth
-```
-
-5. Start infrastructure
-```bash
-pnpm run docker:up
-pnpm run docker:health
-```
-
-6. Run Prisma generate + migrate
-```bash
-pnpm --filter @lms/auth-service prisma:generate
-pnpm --filter @lms/auth-service prisma:migrate
-pnpm --filter @lms/course-service prisma:generate
-pnpm --filter @lms/course-service prisma:migrate
-pnpm --filter @lms/media-service prisma:generate
-pnpm --filter @lms/media-service prisma:migrate
-pnpm --filter @lms/payment-service prisma:generate
-pnpm --filter @lms/payment-service prisma:migrate
-```
-
-7. Start all services
-```bash
-pnpm dev
-```
-
-8. Verify health checks
-- Kong: `http://localhost:8000/auth/health`
-- Auth Service: `http://localhost:3101/health`
-- Course Service: `http://localhost:3002/health`
-- Media Service: `http://localhost:3004/health`
-- Payment Service: `http://localhost:3003/health`
-- Notification Service: `http://localhost:3005/health`
-
----
-
-## Payment Flow (End-to-End) — Phase 13-16
-
-### Event-Driven Architecture
-
-```
-┌────────────┐   1.POST /payment/api/orders   ┌──────────────────┐
-│ web-client │ ─────────────────────────────> │  payment-service │
-│  (Next.js) │ <── 201 {payUrl} ──────────── │   (port 3003)    │
-└─────┬──────┘                                 └───────┬──────────┘
-      │ 2. redirect(payUrl)                             │ verifyPrice
-      ▼                                                 ▼
-┌────────────────┐                              ┌──────────────────┐
-│ VNPay Sandbox  │                              │  course-service  │
-│  (gateway)     │                              │   (internal)     │
-└─────┬──────────┘                              └──────────────────┘
-      │ 3. user pays
-      │
-      ├── 4a. redirect user → /payment/vnpay-return (frontend)
-      │
-      └── 4b. IPN webhook → /payment/api/vnpay-ipn (backend)
-                                        │
-                                        │ verify checksum + UPDATE order
-                                        │
-                                        ▼ publish
-                           ┌─────────────────────────────────┐
-                           │  Kafka: payment.order.completed │
-                           └─────────────────────────────────┘
-                                 │                   │
-                                 ▼                   ▼
-                        ┌──────────────┐    ┌────────────────────┐
-                        │course-service│    │notification-service│
-                        │  (consumer)  │    │   (consumer)       │
-                        └──────┬───────┘    └────────────────────┘
-                               │ create Enrollment (idempotent)
-                               │ publish learning.enrollment.created
-                               ▼
-                      ┌──────────────────┐
-                      │  notification    │ ──► mock email "Enrolled"
-                      │   (consumer #2)  │
-                      └──────────────────┘
-
-Retry chain: main -> retry-5s -> retry-30s -> retry-1m -> system.dead-letter
-```
-
-### Prerequisites
-
-1. Create a 5th Neon database: **`payment_db`**. Copy pooler + direct URLs.
-2. Copy `services/payment-service/.env.example` → `services/payment-service/.env` and fill:
-   - `DATABASE_URL`, `DIRECT_URL`
-   - `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` (sandbox creds provided in `.env.example`)
-   - `COURSE_SERVICE_URL=http://localhost:3002` (internal, not through Kong)
-3. Copy `services/notification-service/.env.example` → `services/notification-service/.env`.
-4. Run migrations:
-   ```bash
-   pnpm --filter @lms/payment-service prisma:generate
-   pnpm --filter @lms/payment-service prisma:migrate
-   ```
-5. Start services: `pnpm dev` (turborepo picks up payment + notification automatically).
-
-### Testing the flow
-
-1. Seed a paid course (or edit an existing one to have `price > 0`).
-2. Log in on web-client (`http://localhost:3000`), open the course detail page.
-3. Click **"Mua khóa học"** (button shows price).
-4. You are redirected to VNPay sandbox. Use test card:
-   - Card: `9704198526191432198` (NCB — always succeed)
-   - Name: `NGUYEN VAN A`, Expiry: `07/15`, OTP: `123456`
-5. After payment, VNPay redirects to `/payment/vnpay-return`.
-6. Behavior depends on `NODE_ENV`:
-   - **`development`**: Return URL handler verifies signature, updates order to `COMPLETED`, publishes Kafka event directly (because VNPay sandbox cannot reach `localhost` for IPN). Frontend polls until enrollment appears.
-   - **`production`** (or ngrok setup): Return URL just shows "pending", IPN webhook is the source of truth.
-7. Course-service consumer picks up `payment.order.completed` → creates Enrollment idempotently (by `orderId @unique`) → publishes `learning.enrollment.created`.
-8. Notification-service logs mock emails for both events.
-
-### Testing IPN with real VNPay calls (optional)
-
-VNPay sandbox cannot reach `localhost`. To test real IPN:
-
-```bash
-# 1. Start ngrok
-ngrok http 8000
-
-# 2. Set VNPAY_IPN_URL in services/payment-service/.env
-VNPAY_IPN_URL=https://<ngrok-id>.ngrok.app/payment/api/vnpay-ipn
-
-# 3. Restart payment-service. VNPay will now POST IPN to the public URL.
-# Optionally: set NODE_ENV=production to disable the dev Return URL fallback.
-```
-
-### Kafka topics
-
-| Topic | Producer | Consumer(s) |
-|---|---|---|
-| `payment.order.completed` | payment-service | learning-service, notification-service, payment-service |
-| `payment.order.completed.retry-5s` | (republished on failure) | same |
-| `payment.order.completed.retry-30s` | (republished on failure) | same |
-| `payment.order.completed.retry-1m` | (republished on failure) | same |
-| `learning.enrollment.created` | learning-service | course-service, notification-service |
-| `system.dead-letter` | (after retry exhaustion) | — (admin inspects) |
-
-Retry helper lives in `packages/kafka-client/src/index.ts` → `consumeWithRetry()`.
-
-### Installation Steps
-
-#### 1. Clone Repository
-
-```bash
-git clone <repository-url>
-cd olms-microservices
-```
-
-#### 2. Install Dependencies
+### Local Setup
 
 ```bash
 pnpm install
+pnpm docker:up
+pnpm setup:db
+pnpm seed
+pnpm dev:web
 ```
 
-This installs all dependencies for apps, services, and packages.
-
-#### 3. Setup Environment Variables
-
-Create `.env` files for each service:
+Lệnh `pnpm setup` có thể dùng cho lần thiết lập đầu tiên nếu muốn gom install, Docker, database setup và seed:
 
 ```bash
-# Root .env (shared infrastructure)
-cp .env.example .env
-# Edit: KAFKA_BROKER, REDIS_URL, etc.
-
-# Auth Service
-cp services/auth-service/.env.example services/auth-service/.env
-# Edit: DATABASE_URL, DIRECT_URL, JWT_SECRET, REDIS_URL, PORT=3101
-
-# Course Service
-cp services/course-service/.env.example services/course-service/.env
-# Edit: DATABASE_URL, DIRECT_URL, PORT=3002
-
-# Media Service
-cp services/media-service/.env.example services/media-service/.env
-# Edit: DATABASE_URL, DIRECT_URL, PORT=3004 (AWS vars chi can khi dung S3)
-
-# Web Client (create manually)
-# apps/web-client/.env.local
-# GATEWAY_URL=http://localhost:8000
-# NEXT_PUBLIC_AUTH_PREFIX=/auth
+pnpm setup
 ```
 
-**Critical Configuration:**
-- `JWT_SECRET` must match between Kong Gateway and Auth Service
-- All `DATABASE_URL` values must point to Neon PostgreSQL instances
-- `REDIS_URL` must point to Upstash/cloud Redis (`rediss://`)
+### Local Endpoints
 
-#### 4. Start Infrastructure Services
+| Component | URL |
+|---|---|
+| Web Client | `http://localhost:3000` |
+| Kong Gateway | `http://localhost:8000` |
+| Kong Admin API | `http://localhost:8001` |
+| Auth Service | `http://localhost:3101/health` |
+| Course Service | `http://localhost:3002/health` |
+| Learning Service | `http://localhost:3006/health` |
+| Community Service | `http://localhost:3007/health` |
+| Payment Service | `http://localhost:3003/health` |
+| Media Service | `http://localhost:3004/health` |
+| Notification Service | `http://localhost:3005/health` |
+| AI Service | `http://localhost:3008/health` |
 
-```bash
-# Start Kafka, Zookeeper, Kong Gateway
-docker-compose up -d
+## API Convention
 
-# Verify all containers are running
-docker-compose ps
+Tất cả API trả về response envelope thống nhất:
 
-# Check logs if needed
-docker-compose logs -f kafka
-docker-compose logs -f kong
-```
-
-Expected containers:
-- `kafka` (Port 9092)
-- `zookeeper` (Port 2181)
-- `kong` (Port 8000)
-
-#### 5. Run Database Migrations
-
-For each service with a database:
-
-```bash
-# Auth Service
-cd services/auth-service
-pnpm prisma:migrate
-pnpm prisma:generate
-
-# Course Service
-cd ../course-service
-pnpm prisma:migrate
-pnpm prisma:generate
-
-# Media Service
-cd ../media-service
-pnpm prisma:migrate
-pnpm prisma:generate
-```
-
-#### 6. Start Development Servers
-
-From the root directory:
-
-```bash
-# Start all services and apps concurrently
-pnpm dev
-```
-
-Or start individually:
-
-```bash
-# Auth Service only
-cd services/auth-service
-pnpm dev
-
-# Web Client only
-cd apps/web-client
-pnpm dev
-```
-
-#### 7. Verify Installation
-
-- Web Client: http://localhost:3000
-- Kong Gateway: http://localhost:8000
-- Auth Service: http://localhost:3101/health
-- Course Service: http://localhost:3002/health
-- Media Service: http://localhost:3004/health
-
-## Database Setup
-
-### Why Neon Serverless?
-
-**Cost Efficiency:**
-- Auto-pause after 5 minutes of inactivity
-- Zero resource consumption when idle
-- Free tier: 0.5GB per database
-
-**Development Benefits:**
-- No Docker overhead (saves ~400MB RAM per database)
-- Instant connection pooling
-- SSL by default
-
-**Trade-offs:**
-- Cold start latency (2-3 seconds after auto-pause)
-- Requires internet connection
-
-### Required Databases
-
-Create 5 separate databases on Neon:
-
-1. **auth_db**: User accounts, sessions, refresh tokens
-2. **course_db**: Courses, chapters, lessons, enrollments
-3. **payment_db**: Orders, transactions, VNPay audit logs
-4. **media_db**: Media metadata, storage keys
-5. **notification_db**: Email queue, notification history
-
-### Setup Instructions
-
-1. Create account at [Neon.tech](https://neon.tech)
-2. Create 5 separate projects (one per database)
-3. Copy connection string for each database
-4. Paste into respective service `.env` file:
-
-```env
-# Example connection string
-DATABASE_URL="postgresql://user:password@ep-xxx.neon.tech/auth_db?sslmode=require"
-```
-
-**Important**: Always include `?sslmode=require` at the end of connection strings.
-
-### Migration Management
-
-Each service manages its own migrations:
-
-```bash
-# Create new migration
-cd services/auth-service
-pnpm prisma migrate dev --name add_email_verified_field
-
-# Apply migrations in production
-pnpm prisma migrate deploy
-
-# Reset database (WARNING: deletes all data)
-pnpm prisma migrate reset
-
-# Prisma Studio (database GUI)
-pnpm prisma studio
-```
-
-## API Documentation
-
-### Standard Response Format
-
-All APIs return a consistent JSON structure:
-
-```typescript
+```ts
 interface ApiResponse<T> {
-  success: boolean;      // true if request succeeded
-  code: number;          // HTTP status code (200, 400, 500, etc.)
-  message: string;       // Human-readable message
-  data: T | null;        // Response payload (null on error)
-  trace_id: string;      // Request trace ID for debugging
+  success: boolean;
+  code: number;
+  message: string;
+  data: T | null;
+  trace_id: string;
 }
 ```
 
-**Success Example:**
+Ví dụ response thành công:
 
 ```json
 {
   "success": true,
   "code": 200,
-  "message": "Login successful",
+  "message": "OK",
   "data": {
-    "accessToken": "eyJhbGci...",
-    "refreshToken": "eyJhbGci...",
-    "user": {
-      "id": "user_123",
-      "email": "student@example.com",
-      "role": "STUDENT"
-    }
+    "id": "resource-id"
   },
-  "trace_id": "550e8400-e29b-41d4-a716-446655440000"
+  "trace_id": "request-trace-id"
 }
 ```
 
-**Error Example:**
+Ví dụ response lỗi:
 
 ```json
 {
   "success": false,
-  "code": 401,
-  "message": "Invalid credentials",
+  "code": 400,
+  "message": "Invalid input",
   "data": null,
-  "trace_id": "550e8400-e29b-41d4-a716-446655440000"
+  "trace_id": "request-trace-id"
 }
 ```
 
-### Gateway Headers
+Gateway routes chính:
 
-Kong Gateway injects these headers to all downstream services:
+| Public Prefix | Downstream Service |
+|---|---|
+| `/auth` | auth-service |
+| `/course` | course-service |
+| `/learning` | learning-service |
+| `/community` | community-service |
+| `/qa` | community-service |
+| `/payment` | payment-service |
+| `/media` | media-service |
+| `/notification` | notification-service |
+| `/ai` | ai-service |
 
-```
-x-user-id: <user_id>          # Authenticated user ID
-x-user-role: <role>           # User role (student, instructor, admin)
-x-trace-id: <uuid>            # Request trace ID
-```
+Internal service-to-service endpoints dùng `/internal/*` và header `x-internal-secret`. Các endpoint này không dành cho client public.
 
-**Rule**: Services MUST trust these headers. Do NOT re-verify JWT in services.
+## Development Commands
 
-### Authentication Endpoints
-
-All auth endpoints are prefixed with `/auth`:
-
-#### Register
-```http
-POST /auth/register
-Content-Type: application/json
-
-{
-  "email": "student@example.com",
-  "password": "SecurePass123!",
-  "name": "John Doe",
-  "role": "STUDENT"
-}
-```
-
-#### Login
-```http
-POST /auth/login
-Content-Type: application/json
-
-{
-  "email": "student@example.com",
-  "password": "SecurePass123!"
-}
-```
-
-#### Refresh Token
-```http
-POST /auth/refresh
-Content-Type: application/json
-
-{
-  "refreshToken": "eyJhbGci..."
-}
-```
-
-#### Logout
-```http
-POST /auth/logout
-Authorization: Bearer <access_token>
-Content-Type: application/json
-
-{
-  "refreshToken": "eyJhbGci..."
-}
-```
-
-### Course Endpoints
-
-All course endpoints are prefixed with `/course`:
-
-#### List Courses
-```http
-GET /course/api/courses?page=1&limit=10
-Authorization: Bearer <access_token>
-```
-
-#### Get Course Details
-```http
-GET /course/api/courses/:slug
-Authorization: Bearer <access_token>
-```
-
-#### Create Course (Instructor only)
-```http
-POST /course/api/courses
-Authorization: Bearer <access_token>
-Content-Type: application/json
-
-{
-  "title": "Introduction to TypeScript",
-  "description": "Learn TypeScript from scratch",
-  "price": 299000,
-  "status": "draft"
-}
-```
-
-### Error Codes
-
-- `200` OK - Request succeeded
-- `201` Created - Resource created successfully
-- `400` Bad Request - Invalid input data
-- `401` Unauthorized - Missing or invalid token
-- `403` Forbidden - Insufficient permissions
-- `404` Not Found - Resource does not exist
-- `409` Conflict - Resource already exists
-- `500` Internal Server Error - Server-side error
-
-## Development
-
-### Project Commands
-
-**Install dependencies:**
 ```bash
+# Install dependencies
 pnpm install
-```
 
-**Start all services:**
-```bash
-pnpm dev
-```
+# Start Kafka, Zookeeper and Kong
+pnpm docker:up
 
-**Build all services:**
-```bash
+# Stop local infrastructure
+pnpm docker:down
+
+# Check Docker containers
+pnpm docker:health
+
+# Build shared packages
+pnpm build:shared
+
+# Run web-focused local development stack
+pnpm dev:web
+
+# Run lighter web stack
+pnpm dev:web:lite
+
+# Build all workspaces
 pnpm build
-```
 
-**Run tests:**
-```bash
+# Run tests
 pnpm test
-```
 
-**Lint code:**
-```bash
+# Run lint
 pnpm lint
+
+# Generate Prisma clients for all services
+pnpm prisma:generate:all
+
+# Deploy pending migrations for all services
+pnpm prisma:migrate:deploy:all
+
+# Check migration status for all services
+pnpm prisma:migrate:status:all
+
+# Seed demo data
+pnpm seed
+
+# Seed DLQ demo data
+pnpm seed:dlq-demo
 ```
 
-**Run integration smoke tests:**
-```bash
-pnpm run test:integration
-```
+## Testing and Demo Data
 
-**Docker helpers:**
-```bash
-pnpm run docker:up
-pnpm run docker:down
-pnpm run docker:health
-```
+Repository có test và seed theo hướng phục vụ cả phát triển lẫn demo kiến trúc.
 
-### Service-Specific Commands
+### Automated Checks
 
-Each service supports these commands:
+| Scope | Files / Commands | Purpose |
+|---|---|---|
+| Workspace build | `pnpm build` | Build tất cả app/service/package theo Turborepo |
+| Unit/service tests | `pnpm test` | Chạy Vitest ở các workspace có test |
+| Integration smoke | `tests/integration/phase-smoke.test.ts` | Kiểm tra contract/flow tích hợp mức cơ bản |
+| K6 smoke | `tests/k6/smoke.js` | Smoke test qua Gateway/API |
+| K6 rate limit | `tests/k6/rate-limit-auth.js` | Kiểm tra behavior rate limit của auth route |
+| Prisma status | `pnpm prisma:migrate:status:all` | Kiểm tra migration status cho các service |
 
-```bash
-cd services/auth-service
+### Seed Data
 
-# Development mode with hot reload
-pnpm dev
+`scripts/seed-all.ts` tạo dữ liệu demo cho nhiều domain để có thể kiểm tra hệ thống end-to-end sau khi setup:
 
-# Build TypeScript to JavaScript
-pnpm build
+- User theo nhiều role.
+- Instructor request và hồ sơ giảng viên.
+- Course catalog, category, chapter, lesson, thumbnail, AI context keyword.
+- Enrollment, progress và certificate.
+- VNPay/order lifecycle, order event history, earning và payout.
+- Notification, support ticket, audit log.
+- Community feed và course Q&A.
+- DLQ/failed events phục vụ demo retry/resolve.
 
-# Run production build
-pnpm start
+`scripts/seed-dlq-demo.ts` tập trung vào dữ liệu DLQ để kiểm tra riêng flow admin retry/resolve mà không cần reset toàn bộ dữ liệu nghiệp vụ.
 
-# Prisma commands
-pnpm prisma:migrate       # Run migrations
-pnpm prisma:generate      # Generate Prisma Client
-pnpm prisma:studio        # Open Prisma Studio GUI
-```
+### What Can Be Demonstrated
 
-### Docker Commands
+Sau khi cấu hình env và seed dữ liệu, hệ thống có thể demo các nhóm kỹ thuật sau:
 
-**Start infrastructure:**
-```bash
-docker-compose up -d
-```
+- Login/refresh/logout và role-based UI.
+- Public course discovery và course detail.
+- Instructor tạo/publish course, quản lý curriculum và media.
+- Student enroll, học bài, cập nhật progress và nhận certificate.
+- VNPay order flow, callback verification, order history và event timeline.
+- Kafka payment completed -> enrollment -> notification.
+- Outbox retry, Kafka retry topics, DLQ persist và admin retry.
+- Admin operations: user, course, order, payout, support, audit, notification, DLQ.
+- Community feed và Q&A theo khóa học.
+- AI chat/quiz dùng context bài học/khóa học.
 
-**Stop infrastructure:**
-```bash
-docker-compose down
-```
+## Deployment Notes
 
-**View logs:**
-```bash
-# All services
-docker-compose logs -f
+Dự án có Docker Compose base và production override để chạy production-like. Các service backend expose health, liveness và readiness endpoints. Production deployment cần cấu hình đầy đủ environment variables thật ở môi trường runtime, không commit secret vào repository.
 
-# Specific service
-docker-compose logs -f kafka
-docker-compose logs -f kong
-```
+Các bước deploy tối thiểu thường gồm:
 
-**Restart service:**
-```bash
-docker-compose restart kafka
-```
+1. Cấu hình `.env.production` từ placeholder an toàn.
+2. Chạy Prisma migrate deploy cho các service.
+3. Render hoặc cập nhật Kong config theo domain và upstream production.
+4. Build và chạy compose production.
+5. Kiểm tra health endpoint qua Gateway.
+6. Kiểm tra Kafka topics, outbox worker và DLQ monitor.
 
-**Clean volumes (WARNING: deletes data):**
-```bash
-docker-compose down -v
-```
-
-### Database Management
-
-**Open Prisma Studio:**
-```bash
-cd services/auth-service
-pnpm prisma studio
-# Opens GUI at http://localhost:5555
-```
-
-**Create migration:**
-```bash
-pnpm prisma migrate dev --name descriptive_migration_name
-```
-
-**Apply migrations:**
-```bash
-pnpm prisma migrate deploy
-```
-
-**Reset database (WARNING: deletes all data):**
-```bash
-pnpm prisma migrate reset
-```
-
-**Generate Prisma Client:**
-```bash
-pnpm prisma generate
-```
-
-### Debugging
-
-**Enable debug logging:**
-
-Set environment variable in service `.env`:
-```env
-LOG_LEVEL=debug
-```
-
-**View request traces:**
-
-All API responses include `trace_id`. Search logs by trace ID:
-```bash
-docker-compose logs | grep "550e8400-e29b-41d4-a716-446655440000"
-```
-
-**Inspect Redis sessions (Upstash/cloud Redis):**
-```bash
-redis-cli -u "$REDIS_URL" --scan --pattern "session:*"
-redis-cli -u "$REDIS_URL" GET "session:user_123"
-```
-
-**Check Kafka topics:**
-```bash
-docker exec -it kafka kafka-topics --bootstrap-server localhost:9092 --list
-docker exec -it kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic payment.order.completed --from-beginning
-```
-
-## Deployment
-
-### Environment Configuration
-
-**Production checklist:**
-
-- [ ] Change `JWT_SECRET` to cryptographically random string (min 32 chars)
-- [ ] Update `DATABASE_URL` to production Neon instances
-- [ ] Set `NODE_ENV=production`
-- [ ] Configure `CORS_ORIGIN` to frontend domain
-- [ ] Update VNPay credentials (`VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`)
-- [ ] Configure AWS S3 credentials for production bucket
-- [ ] Set Redis URL to production instance
-- [ ] Configure Kafka broker URLs
-
-**Generate secure secrets:**
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-### Build Docker Images
-
-Each service can be containerized:
+Lệnh production compose trong repository:
 
 ```bash
-# Build Auth Service
-docker build -t lms-auth-service:latest -f services/auth-service/Dockerfile .
-
-# Build Course Service
-docker build -t lms-course-service:latest -f services/course-service/Dockerfile .
-
-# Build Web Client
-docker build -t lms-web-client:latest -f apps/web-client/Dockerfile .
+pnpm docker:prod:up
+pnpm docker:prod:down
 ```
 
-### Health Checks
-
-Every service exposes `/health` endpoint:
-
-```bash
-curl http://localhost:3101/health
-# Response: {"status":"ok","timestamp":"2026-03-08T10:30:00.000Z"}
-```
-
-Use health checks for:
-- Load balancer configuration
-- Kubernetes liveness/readiness probes
-- Monitoring systems
-
-### Database Migrations in Production
-
-**DO NOT use `prisma migrate dev` in production.**
-
-Use `prisma migrate deploy` instead:
-
-```bash
-cd services/auth-service
-pnpm prisma migrate deploy
-```
-
-This applies pending migrations without creating new ones.
-
-### Monitoring
-
-**Recommended tools:**
-- **Logs**: Datadog, Loggly, or ELK Stack
-- **APM**: New Relic, Datadog APM
-- **Errors**: Sentry
-- **Metrics**: Prometheus + Grafana
-
-**Key metrics to monitor:**
-- Request latency (p50, p95, p99)
-- Error rate by service
-- Database connection pool usage
-- Kafka consumer lag
-- Redis memory usage
-
-## Roadmap
-
-### Phase 1-4: Foundation (COMPLETED)
-
-- [x] **Phase 1**: Setup Monorepo (Turborepo), Docker Compose, Neon PostgreSQL (Jan 21, 2026)
-- [x] **Phase 2**: Setup API Gateway (Kong) & Shared Packages (Logger, Types) (Jan 21, 2026)
-- [x] **Phase 3**: Build Auth Service (Login, Register, JWT, Session Redis) (Jan 25, 2026)
-- [x] **Phase 4**: Build Frontend Base (Next.js, Shadcn UI, Redux, Login/Register) (Jan 25, 2026)
-
-### Phase 5-9: Core LMS & Media (IN PROGRESS)
-
-- [x] **Phase 5**: Build Course Service DB & CRUD API (Feb 28, 2026)
-- [x] **Phase 6**: Build Media Service (Presigned upload flow) (Feb 28, 2026)
-- [x] **Phase 6.1**: Code Audit & Production Hardening (Mar 1, 2026)
-- [ ] **Phase 7**: Frontend Instructor UI (Drag & Drop Curriculum Builder)
-- [ ] **Phase 8**: Frontend Public UI (Course Listing, Detail with BFF Aggregation)
-- [ ] **Phase 9**: Build Payment Service DB (Orders & Audit Transactions Table)
-
-### Phase 10-12: Commerce & Payments (PLANNED)
-
-- [ ] **Phase 10**: Integrate VNPay (Create Payment URL & IPN Webhook)
-- [ ] **Phase 11**: Kafka Setup (Producer: `payment.order.completed`)
-- [ ] **Phase 12**: Kafka Consumer (Enrollment Logic in Course Service + Retry Mechanism)
-
-### Phase 13-15: Learning & Polish (PLANNED)
-
-- [ ] **Phase 13**: Learning UI (Video Player, Progress Tracking API)
-- [ ] **Phase 14**: Notification Service (Email Worker consuming Kafka events)
-- [ ] **Phase 15**: Deployment & Audit (Dockerize, Audit Logs Check)
-
-## Key Decisions
-
-### Architecture & Database
-
-**No Cross-Service Database Joins:**  
-Services maintain complete data autonomy. Frontend performs data aggregation via parallel API calls to multiple services.
-
-**Prisma Singleton Pattern:**  
-Implemented in `packages/db-prisma` to prevent "too many connections" error during Next.js HMR (Hot Module Replacement) in development.
-
-**Neon Auto-Pause:**  
-Databases auto-pause after 5 minutes of inactivity. First request after pause incurs 2-3 second cold start latency.
-
-### Security & Authentication
-
-**JWT Architecture:**
-- Access Token: 15 minutes expiry (short-lived for security)
-- Refresh Token: 7 days expiry (stored in database + Redis)
-- Token rotation on refresh (prevents replay attacks)
-
-**Gateway-Only JWT Verification:**  
-Kong Gateway is the sole JWT verifier. Services trust injected headers (`x-user-id`, `x-user-role`) without re-verification. This prevents duplicate crypto operations and enforces single responsibility.
-
-**Password Security:**  
-Bcrypt hashing with 10 salt rounds. Passwords never logged or stored in plaintext.
-
-**Session Management:**  
-Redis stores session cache with 7-day TTL. Automatic cleanup on logout or token expiry.
-
-### Payments & Events
-
-**VNPay Checksum Requirement:**  
-Parameters must be sorted alphabetically before hashing to prevent "Invalid Checksum" errors during IPN validation.
-
-**Price Verification:**  
-Payment Service MUST fetch course price from Course Service via API. Never trust client-submitted prices to prevent price tampering.
-
-**Audit Logging:**  
-Complete VNPay response stored in JSONB field for regulatory compliance and dispute resolution.
-
-**Kafka Retry Pattern:**  
-Failed message processing retries with exponential backoff (5s, 1m, 5m) before moving to Dead Letter Queue for manual review.
-
-**Idempotent Enrollment:**  
-Course Worker checks order ID before creating enrollment to prevent duplicate enrollments from duplicate Kafka messages.
-
-### Environment & Configuration
-
-**T3 Env Pattern:**  
-Package `env-validator` uses Zod to validate environment variables at runtime. Application crashes with clear error if required variables are missing.
-
-**Environment File Locations:**
-- Root `.env`: Shared infrastructure (Kafka, Upstash/cloud Redis)
-- `services/<service>/.env`: Service-specific config
-- `apps/web-client/.env.local`: Next.js config for server actions (`GATEWAY_URL`) and optional public prefix (`NEXT_PUBLIC_AUTH_PREFIX`)
-
-**Restart Required:**  
-Changing `.env` files requires service restart for changes to take effect.
-
-**JWT_SECRET Synchronization:**  
-JWT_SECRET must match between Kong Gateway and Auth Service. Mismatch causes token verification failures.
-
-### Development Workflow
-
-**.dockerignore Configuration:**  
-Excludes `node_modules`, `.git`, `.env` to keep Docker build context lightweight.
-
-**IP Whitelisting:**  
-Neon allows connections from any IP by default. Docker containers require internet access to connect to Neon.
-
-**Monorepo Benefits:**
-- Shared packages prevent code duplication
-- Turborepo parallelizes builds
-- Single `pnpm install` for entire project
-- Consistent TypeScript configuration
-
----
-
-**Last Updated**: April 1, 2026  
-**Project Status**: Auth/Course/Media services and web-client are active; Payment/Notification remain planned.  
-**License**: MIT
+README này không chứa demo URL, tài khoản demo, secret, token, IP hoặc domain riêng. Các thông tin triển khai cụ thể nên đặt trong tài liệu vận hành riêng hoặc biến môi trường của môi trường deploy.
